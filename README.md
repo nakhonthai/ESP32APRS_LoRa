@@ -5,7 +5,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 
 ## Feature
 
-* Supported hardware: TTGO_LoRa32,TTGO-T-Beam,Heltec,HT-CT62,D.I.Y Other
+* Supported hardware: TTGO_LoRa32,TTGO-T-Beam,Heltec,HT-CT62,D.I.Y Mod GPIOrf m,l;.
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
@@ -25,8 +25,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 * display received and transmit packet on the LED and display OLED
 
 ## Hardware screen short
-![APRSTracker_HTCT62](image/ARPSLoRaTracker.jpg) ![APRSTracker_HTCT62_1](image/ARPSLoRaTracker2.jpg) ![APRSTracker_HTCT62_2](image/ARPSLoRaTracker3.jpg)
-![APRSTracker_HTCT62_3](image/ARPSLoRaTracker_4.jpg) ![APRSTracker_HTCT62_4](image/ARPSLoRaTracker5.jpg)
+![APRSTracker_HTCT62](image/ARPSLoRaTracker.jpg) ![APRSTracker_HTCT62_1](image/ARPSLoRaTracker2.jpg) 
 
 ## Web service screen short
 ![screen_dashboard](image/ESP32APRS_Screen_Dashboard.png) ![screen_radio](image/ESP32APRS_Screen_Radio.png) \
@@ -34,8 +33,8 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 
 ## ESP32APRS LoRa firmware installation (do it first time, next time via the web browser)
 - 1.Connect the USB cable to the ESP32 Module.
-- 2.Download firmware and open the program ESP32 DOWNLOAD TOOL, set it in the firmware upload program, set the firmware to ESP32APRS_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x1000 and boot.bin at 0xe000, if not loaded, connect GPIO0 cable to GND, press START button finished, press power button or reset (red) again.
-- 3.Then go to WiFi AP SSID: ESP32APRS and open a browser to the website. http://192.168.4.1 password: aprsthnetwork Can be fixed Or turn on your Wi-Fi router.
+- 2.Download firmware and open the program ESP32 DOWNLOAD TOOL, set it in the firmware upload program, set the firmware to ESP32APRS_LoRa_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x1000 and boot.bin at 0xe000, if not loaded, connect GPIO0 cable to GND, press START button finished, press power button or reset (red) again.
+- 3.Then go to WiFi AP SSID: ESP32APRS_LoRa and open a browser to the website. http://192.168.4.1 password: aprsthnetwork Can be fixed Or turn on your Wi-Fi router.
 - 4.Push **BOOT** button long >100ms to TX Position and >10Sec to Factory Default
 
 ![ESP32Tool](image/ESP32Tool.png)
@@ -49,7 +48,7 @@ https://www.espressif.com/en/support/download/other-tools
 1. Install [Visual Studio Code](https://code.visualstudio.com/) and [Python](https://www.python.org/)
 2. Search for the `PlatformIO` plugin in the `VisualStudioCode` extension and install it.
 3. After the installation is complete, you need to restart `VisualStudioCode`
-4. After restarting `VisualStudioCode`, select `File` in the upper left corner of `VisualStudioCode` -> `Open Folder` -> select the `ESP32APRS_T-TWR` directory
+4. After restarting `VisualStudioCode`, select `File` in the upper left corner of `VisualStudioCode` -> `Open Folder` -> select the `ESP32APRS_LoRa` directory
 5. Click on the `platformio.ini` file, and in the `platformio` column, cancel the sample line that needs to be used, please make sure that only one line is valid
 6. Click the (✔) symbol in the lower left corner to compile
 7. Connect the board to the computer USB
