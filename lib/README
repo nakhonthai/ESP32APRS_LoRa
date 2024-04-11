@@ -44,5 +44,3 @@ libraries scanning project source files.
 
 More information about PlatformIO Library Dependency Finder
 - https://docs.platformio.org/page/librarymanager/ldf.html
-
-ESP32APRS LoRa is a APRS on LoRa network In that is implemented for Espressif ESP32,ESP32-S3,ESP32C3 processor.

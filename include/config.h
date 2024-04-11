@@ -94,6 +94,7 @@
 #define ACTIVATE_TELEMETRY (1 << 4)	// packet is telemetry
 #define ACTIVATE_QUERY (1 << 5)		// packet is a query
 #define ACTIVATE_STATUS (1 << 6)		// packet is status
+#define ACTIVATE_WIFI (1 << 7)		// packet is wifi
 
 #include <Arduino.h>
 // #include <FS.h>

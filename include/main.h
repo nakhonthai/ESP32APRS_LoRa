@@ -67,6 +67,8 @@
 #define RF_SR_2WVS 7   // SUNRISE SR120V,SR_2WVS VHF band 136~174 MHz
 #define RF_SR_2WUS 8   // SUNRISE SR120U,SR_2WUS UHF band 400~470 MHz
 
+#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
+
 
 #define TXCH_TCP 0
 #define TXCH_RF 1
@@ -518,6 +520,8 @@ const char TNC_PORT[4][6] = {"NONE", "UART0", "UART1", "UART2"};
 const char TNC_MODE[4][6] = {"NONE", "KISS", "TNC2", "YAESU"};
 const char WX_PORT[7][11] = {"NONE", "UART0_CSV", "UART1_CSV", "UART2_CSV", "MODBUS","SENSOR","TCP/UDP"};
 const char MODEM_TYPE[2][10] = {"AFSK_300", "AFSK_1200"};
+const char PWR_MODE[3][10] = {"MODE A", "MODE B","MODE C"};
+const char ACTIVATE[8][10] = {"OFF", "TRACKER", "IGATE", "DIGI", "WX", "TELEMETRY", "QUERY", "STATUS"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
 void saveEEPROM();

@@ -3072,6 +3072,126 @@ void handle_system(AsyncWebServerRequest *request)
 		String html = "OK";
 		request->send(200, "text/html", html);
 	}
+	else if (request->hasArg("commitPWR"))
+	{
+		bool PwrEn = false;
+		config.pwr_sleep_activate=0;
+
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			// Serial.print("SERVER ARGS ");
+			// Serial.print(request->argName(i));
+			// Serial.print("=");
+			// Serial.println(request->arg(i));
+			if (request->argName(i) == "Enable")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						PwrEn = true;
+					}
+				}
+			}
+			if (request->argName(i) == "sleep")
+			{
+				if (request->arg(i) != "")
+				{
+					config.pwr_sleep_interval = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "stb")
+			{
+				if (request->arg(i) != "")
+				{
+					config.pwr_stanby_delay= request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "mode")
+			{
+				if (request->arg(i) != "")
+				{
+					config.pwr_mode = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "FilterTelemetry")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_TELEMETRY;
+				}
+			}
+
+			if (request->argName(i) == "FilterStatus")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_STATUS;
+				}
+			}
+
+			if (request->argName(i) == "FilterWeather")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_WX;
+				}
+			}
+
+			if (request->argName(i) == "FilterTracker")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_TRACKER;
+				}
+			}
+
+			if (request->argName(i) == "FilterIGate")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_IGATE;
+				}
+			}
+
+			if (request->argName(i) == "FilterDigi")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_DIGI;
+				}
+			}
+
+			if (request->argName(i) == "FilterQuery")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_QUERY;
+				}
+			}
+
+			if (request->argName(i) == "FilterWifi")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.pwr_sleep_activate |= ACTIVATE_WIFI;
+				}
+			}
+			
+		}
+		config.pwr_en=PwrEn;
+		saveEEPROM();
+		String html = "OK";
+		request->send(200, "text/html", html);
+	}
 	else if (request->hasArg("commitDISP"))
 	{
 		bool dispRX = false;
@@ -3283,6 +3403,7 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "if(e.currentTarget.id===\"formReboot\") document.getElementById(\"REBOOT\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formDisp\") document.getElementById(\"submitDISP\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formWebAuth\") document.getElementById(\"submitWebAuth\").disabled=true;\n";
+		html += "if(e.currentTarget.id===\"formPWR\") document.getElementById(\"submitPWR\").disabled=true;\n";
 		html += "if(e.currentTarget.id===\"formPath\") document.getElementById(\"submitPath\").disabled=true;\n";
 		html += "$.ajax({\n";
 		html += "url: '/system',\n";
@@ -3362,6 +3483,104 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "<div><button type='submit' id='submitWebAuth'  name=\"commit\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWebAuth\"/>\n";
 		html += "</form><br /><br />";
+
+		/**************Power Mode******************/
+		html += "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"formPWR\" method=\"post\">\n";
+		html += "<table>\n";
+		html += "<th colspan=\"2\"><span><b>Power Save</b></span></th>\n";
+		html += "<tr>";
+
+		String enFlage = "";
+		if (config.pwr_en)
+			enFlage = "checked";
+		html += "<td align=\"right\"><b>Enable</b></td>\n";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"Enable\" value=\"OK\" " + enFlage + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Sleep Interval:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"0\" max=\"9999\" name=\"sleep\" type=\"number\" value=\"" + String(config.pwr_sleep_interval) + "\" /></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>StandBy Delay:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"0\" max=\"9999\" name=\"stb\" type=\"number\" value=\"" + String(config.pwr_stanby_delay) + "\" /></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Power Mode:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"mode\" id=\"mode\">\n";
+		for (int i = 0; i < 3; i++)
+		{
+			if (config.pwr_mode == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(PWR_MODE[i]) + " </option>\n";
+			else
+				html += "<option value=\"" + String(i) + "\" >" + String(PWR_MODE[i]) + " </option>\n";
+		}
+		html += "</select> A=Continue,B=WakeUp to StandBy Delay,C=WakeUp to Event Successfully\n";
+		html += "</td>\n";
+		html += "</tr>\n";
+
+html += "<tr>\n";
+		html += "<td align=\"right\"><b>Event Activate:</b></td>\n";
+		html += "<td style=\"text-align: left;\">";
+html += "<fieldset id=\"FilterGrp\">\n";
+		html += "<legend>Events</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">";
+		html += "<tr style=\"background:unset;\">";
+
+		String filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_TRACKER)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterTracker\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Tracker</td>\n";
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_STATUS)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterStatus\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Status</td>\n";
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_TELEMETRY)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterTelemetry\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Telemetry</td>\n";
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_WX)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterWeather\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Weather</td>\n";
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_IGATE)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterIGate\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>IGate</td>\n";
+
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_DIGI)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterDigi\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Digi</td>\n";
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_QUERY)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterQuery\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Query</td>\n";
+
+		filterFlageEn = "";
+		if (config.pwr_sleep_activate & ACTIVATE_WIFI)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterWifi\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>WiFi</td>\n";
+
+
+		html += "<td style=\"border:unset;\"></td>";
+		html += "</tr></table></fieldset>\n";
+		html += "</td>\n";
+		html += "</tr>\n";
+		html += "<tr><td colspan=\"2\" align=\"center\">\n";
+		html += "<input class=\"btn btn-primary\" id=\"submitPWR\" name=\"commitPWR\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
+		html += "<input type=\"hidden\" name=\"commitPWR\"/>\n";
+		html += "</td></tr></table>\n";
+
+		html += "</form><br /><br />\n";
 
 		/************************ PATH USER define **************************/
 		html += "<form id='formPath' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
@@ -4634,7 +4853,7 @@ void handle_digi(AsyncWebServerRequest *request)
 		// html += "<th width=\"200\"><span><b>Setting</b></span></th>\n";
 		// html += "<th><span><b>Value</b></span></th>\n";
 		// html += "</tr>\n";
-		html += "<th colspan=\"2\"><span><b>[DIGI] Dital Repeater Mode</b></span></th>\n";
+		html += "<th colspan=\"2\"><span><b>[DIGI] Digital Repeater Mode</b></span></th>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Enable:</b></td>\n";
 		String digiEnFlag = "";

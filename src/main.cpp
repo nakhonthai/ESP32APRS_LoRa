@@ -102,6 +102,9 @@ WiFiMulti wifiMulti;
 time_t systemUptime = 0;
 time_t wifiUptime = 0;
 
+uint8_t Sleep_Activate = 0;
+unsigned int StandByTick = 0;
+
 boolean KISS = false;
 bool aprsUpdate = false;
 
@@ -1050,11 +1053,11 @@ void defaultConfig()
     sprintf(config.path[2], "WIDE1-1,WIDE2-1");
     sprintf(config.path[3], "RFONLY");
 
-    config.pwr_en=false;
-	config.pwr_mode=MODE_A; //A=Continue,B=Wait for receive,C=Send and sleep
-	config.pwr_sleep_interval=600; //sec
-	config.pwr_stanby_delay=300; //sec
-	config.pwr_sleep_activate=ACTIVATE_TRACKER;
+    config.pwr_en = false;
+    config.pwr_mode = MODE_A;        // A=Continue,B=Wait for receive,C=Send and sleep
+    config.pwr_sleep_interval = 600; // sec
+    config.pwr_stanby_delay = 300;   // sec
+    config.pwr_sleep_activate = ACTIVATE_TRACKER|ACTIVATE_WIFI;
 
     saveEEPROM();
 }
@@ -1538,14 +1541,10 @@ bool pkgTxSend()
                     txQueue[i].Active = false;
                     igateTLM.TX++;
                     log_d("TX->RF: %s", info);
-
-                    // for (int i = 0; i < 100; i++)
-                    // {
-                    //     //if (digitalRead(config.rf_ptt_gpio) ^ config.rf_ptt_active)
-                    //     if(!getReceive())
-                    //         break;
-                    //     delay(50); // TOT 5sec
-                    // }
+                    if (config.trk_en)
+                    {
+                        Sleep_Activate &= ~ACTIVATE_TRACKER;
+                    }
 
                     // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
                     free(info);
@@ -1685,6 +1684,7 @@ bool AFSKInitAct = false;
 void setup()
 {
     byte *ptr;
+
 #ifdef BOARD_HAS_PSRAM
     pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
@@ -1717,25 +1717,26 @@ void setup()
     Serial.begin(9600); // monitor
 #endif
 
-    Serial.println();
-    Serial.println("Start ESP32IGate V" + String(VERSION));
-    Serial.println("Push BOOT after 3 sec for Factory Default config.");
+    log_d("Start ESP32IGate V%s", VERSION);
+    // log_d("Push BOOT after 3 sec for Factory Default config.");
 
     if (!EEPROM.begin(EEPROM_SIZE))
     {
-        Serial.println(F("failed to initialise EEPROM")); // delay(100000);
+        log_d("failed to initialise EEPROM"); // delay(100000);
     }
     // ตรวจสอบคอนฟิกซ์ผิดพลาด
     ptr = (byte *)&config;
     EEPROM.readBytes(1, ptr, sizeof(Configuration));
     uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
-    Serial.printf("EEPROM Check %0Xh=%0Xh(%dByte)\n", EEPROM.read(0), chkSum, sizeof(Configuration));
+    log_d("EEPROM Check %0Xh=%0Xh(%dByte)\n", EEPROM.read(0), chkSum, sizeof(Configuration));
     if (EEPROM.read(0) != chkSum)
     {
-        Serial.println("CFG EEPROM Error!");
-        Serial.println("Factory Default");
+        log_d("CFG EEPROM Error!");
+        log_d("Factory Default");
         defaultConfig();
     }
+
+    Sleep_Activate = config.pwr_sleep_activate;
 
     if (config.i2c1_enable)
     {
@@ -1774,66 +1775,66 @@ void setup()
     display.print("Copy@2022");
     display.display();
 
-    delay(1000);
-    digitalWrite(LED_TX, HIGH);
-    display.fillRect(49, 49, 50, 8, 0);
-    display.setCursor(70, 50);
-    display.print("3 Sec");
-    display.display();
-    delay(1000);
-    digitalWrite(LED_RX, HIGH);
-    display.fillRect(49, 49, 50, 8, 0);
-    display.setCursor(70, 50);
-    display.print("2 Sec");
-    display.display();
-    delay(1000);
-    display.fillRect(49, 49, 50, 8, 0);
-    display.setCursor(70, 50);
-    display.print("1 Sec");
-    display.display();
-    delay(1000);
+    if (config.pwr_mode != MODE_A)
+    {
+        delay(1000);
+        digitalWrite(LED_TX, HIGH);
+        display.fillRect(49, 49, 50, 8, 0);
+        display.setCursor(70, 50);
+        display.print("3 Sec");
+        display.display();
+        delay(1000);
+        digitalWrite(LED_RX, HIGH);
+        display.fillRect(49, 49, 50, 8, 0);
+        display.setCursor(70, 50);
+        display.print("2 Sec");
+        display.display();
+        delay(1000);
+        display.fillRect(49, 49, 50, 8, 0);
+        display.setCursor(70, 50);
+        display.print("1 Sec");
+        display.display();
+        delay(1000);
+    }
 #else
     if (config.i2c_enable)
     {
         Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
     }
-    delay(1000);
-    digitalWrite(LED_TX, HIGH);
-    delay(1000);
-    digitalWrite(LED_RX, HIGH);
-    delay(1000);
-#endif
-    if (digitalRead(9) == LOW)
+    if (config.pwr_mode != MODE_A)
     {
-        defaultConfig();
-        Serial.println("Manual Default configure!");
-#ifdef OLED
-        display.clearDisplay();
-        display.setCursor(10, 22);
-        display.print("Factory Reset!");
-        display.display();
-#endif
-        while (digitalRead(9) == LOW)
-        {
-            delay(500);
-            digitalWrite(LED_TX, LOW);
-            digitalWrite(LED_RX, LOW);
-            delay(500);
-            digitalWrite(LED_TX, HIGH);
-            digitalWrite(LED_RX, HIGH);
-        }
+        delay(1000);
+        digitalWrite(LED_TX, HIGH);
+        delay(1000);
+        digitalWrite(LED_RX, HIGH);
+        delay(1000);
     }
-    digitalWrite(LED_TX, LOW);
-    digitalWrite(LED_RX, LOW);
-
-    // if (config.counter0_enable)
-    // {
-    //     pcnt_init_channel(PCNT_UNIT_0, config.counter0_gpio, config.counter0_active); // Initialize Unit 0 to pin 4
-    // }
-    // if (config.counter1_enable)
-    // {
-    //     pcnt_init_channel(PCNT_UNIT_1, config.counter1_gpio, config.counter1_active); // Initialize Unit 0 to pin 4
-    // }
+#endif
+    if (config.pwr_mode != MODE_A)
+    {
+        if (digitalRead(9) == LOW)
+        {
+            defaultConfig();
+            log_d("Manual Default configure!");
+#ifdef OLED
+            display.clearDisplay();
+            display.setCursor(10, 22);
+            display.print("Factory Reset!");
+            display.display();
+#endif
+            while (digitalRead(9) == LOW)
+            {
+                delay(500);
+                digitalWrite(LED_TX, LOW);
+                digitalWrite(LED_RX, LOW);
+                delay(500);
+                digitalWrite(LED_TX, HIGH);
+                digitalWrite(LED_RX, HIGH);
+            }
+        }
+        digitalWrite(LED_TX, LOW);
+        digitalWrite(LED_RX, LOW);
+    }
 
     if (config.uart0_enable)
     {
@@ -1984,6 +1985,7 @@ void setup()
             &taskSerialHandle, /* Task handle. */
             0);                /* Core where the task should run */
     }
+    StandByTick=millis();
 }
 
 String getTimeStamp()
@@ -2573,17 +2575,20 @@ unsigned long timeTask;
 unsigned long timeSec;
 char nmea[100];
 int nmea_idx = 0;
-float VBat=0;
+float VBat = 0;
 void loop()
 {
     if (millis() > timeTask)
     {
         timeTask = millis() + 10000;
-        VBat=(float)analogReadMilliVolts(0)/595.24F;
+        VBat = (float)analogReadMilliVolts(0) / 595.24F;
         log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\n", timerAPRS, timerNetwork, timerGPS, timerSerial);
-        log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(),VBat);
-        
-        //log_d("mV=%d Vbat=%.2f",VBat,(float)VBat/595.0F);
+        log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat);
+        if (WiFi.isConnected() == false && WiFi.softAPgetStationNum() == 0)
+        {
+            Sleep_Activate &= ~ACTIVATE_WIFI;
+        }
+        // log_d("mV=%d Vbat=%.2f",VBat,(float)VBat/595.0F);
     }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -2728,8 +2733,33 @@ void loop()
 #endif
         timeCheck = millis() + 1000;
         if (ESP.getFreeHeap() < 60000)
-          esp_restart();
+            esp_restart();
         // Serial.println(String(ESP.getFreeHeap()));
+
+        if (config.pwr_en)
+        {
+            if (config.pwr_mode != MODE_A)
+            {
+                if (config.pwr_mode == MODE_B) //Wake up and wait for delay time to sleep
+                {
+                    if (StandByTick > millis())
+                    {
+                        digitalWrite(2, LOW);
+                        esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
+                        esp_deep_sleep_start();
+                    }
+                }
+                else if (config.pwr_mode == MODE_C) //Wake up and wait for event to sleep
+                {
+                    if (Sleep_Activate == ACTIVATE_OFF)
+                    {
+                        digitalWrite(2, LOW);
+                        esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
+                        esp_deep_sleep_start();
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -3094,7 +3124,6 @@ void taskGPSActive()
                     if (config.gnss_channel == 1)
                     {
                         c = Serial.read();
-                        
                     }
                     else if (config.gnss_channel == 2)
                     {
@@ -3117,17 +3146,17 @@ void taskGPSActive()
                                 nmea[nmea_idx++] = (char)c;
                                 if ((char)c == 0x0A || (char)c == 0x0D)
                                 {
-                                    //nmea[nmea_idx] = 0;
+                                    // nmea[nmea_idx] = 0;
                                     if (nmea_idx > 10)
                                     {
                                         if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         {
                                             handle_ws_gnss(nmea, nmea_idx);
                                         }
-                                        log_d("[%d]:%s",nmea_idx,nmea);
-                                    
-                                    nmea_idx = 0;
-                                    memset(nmea, 0, sizeof(nmea));
+                                        log_d("[%d]:%s", nmea_idx, nmea);
+
+                                        nmea_idx = 0;
+                                        memset(nmea, 0, sizeof(nmea));
                                     }
                                     break;
                                 }
@@ -3286,17 +3315,18 @@ void taskGPS(void *pvParameters)
                                 nmea[nmea_idx++] = (char)c;
                                 if ((char)c == '\r' || (char)c == '\n')
                                 {
-                                    //nmea[nmea_idx] = 0;
+                                    // nmea[nmea_idx] = 0;
                                     if (nmea_idx > 10)
                                     {
                                         // if (webServiceBegin == false)
                                         if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         {
-                                            if(ws_gnss.availableForWriteAll()){
+                                            if (ws_gnss.availableForWriteAll())
+                                            {
                                                 handle_ws_gnss(nmea, nmea_idx);
                                             }
                                         }
-                                        //log_d("[%d]:%s",nmea_idx,nmea);
+                                        // log_d("[%d]:%s",nmea_idx,nmea);
                                     }
                                     nmea_idx = 0;
                                     memset(nmea, 0, sizeof(nmea));
@@ -3344,7 +3374,7 @@ void taskGPS(void *pvParameters)
                                     nmea[nmea_idx++] = c;
                                     if (c == '\r' || c == '\n')
                                     {
-                                        //nmea[nmea_idx] = 0;
+                                        // nmea[nmea_idx] = 0;
                                         if (nmea_idx > 10)
                                         {
                                             // if (webServiceBegin == false)
@@ -3621,22 +3651,13 @@ unsigned long iGatetickInterval;
 bool initInterval = true;
 void taskAPRS(void *pvParameters)
 {
-    //	long start, stop;
     char sts[50];
-    // char *raw;
-    // char *str;
     unsigned long tickInterval = 0;
     unsigned long DiGiInterval = 0;
 
     Serial.println("Task APRS has been start");
     PacketBuffer.clean();
 
-    // afskSetModem(config.modem_type);
-    // afskSetSQL(config.rf_sql_gpio, config.rf_sql_active);
-    // afskSetPTT(config.rf_ptt_gpio, config.rf_ptt_active);
-    // afskSetPWR(config.rf_pwr_gpio, config.rf_pwr_active);
-    // afskSetDCOffset(config.adc_dc_offset);
-    // afskSetADCAtten(config.adc_atten);
     APRS_init(&config);
     // APRS_setFreq(config.rf_freq);
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
@@ -3648,8 +3669,7 @@ void taskAPRS(void *pvParameters)
 
     timeSlot = millis();
     timeAprs = 0;
-    // afskSetHPF(config.audio_hpf);
-    // afskSetBPF(config.audio_bpf);
+
     timeSlot = millis();
     tx_interval = config.trk_interval;
     tx_counter = tx_interval - 10;
@@ -3760,8 +3780,11 @@ void taskAPRS(void *pvParameters)
                     }
                     else if (tx_counter > tx_interval)
                     { // send gps location
-                        EVENT_TX_POSITION = 8;
-                        tx_interval = config.trk_interval;
+                        if (gps.location.isValid() && gps.hdop.hdop() < 10)
+                        {
+                            EVENT_TX_POSITION = 8;
+                            tx_interval = config.trk_interval;
+                        }
                     }
                 }
             }
@@ -3770,8 +3793,8 @@ void taskAPRS(void *pvParameters)
             {
                 String rawData;
                 String cmn = "";
-                if(config.trk_bat)
-                    cmn += "BAT:"+String(VBat,2)+"V ";
+                if (config.trk_bat)
+                    cmn += "BAT:" + String(VBat, 2) + "V ";
                 if (config.trk_sat)
                     cmn += "SAT:" + String(gps.satellites.value()) + ",HDOP:" + String(gps.hdop.hdop(), 1);
                 // if (config.trk_bat)
@@ -4051,7 +4074,7 @@ void taskAPRS(void *pvParameters)
                             sprintf(sts, "POSITION FIX\nINTERVAL %ds", tx_interval);
                         if (config.digi_loc2rf)
                         { // DIGI SEND POSITION TO RF
-                            char *rawP = (char *)calloc(rawData.length(),sizeof(char));
+                            char *rawP = (char *)calloc(rawData.length(), sizeof(char));
                             // rawData.toCharArray(rawP, rawData.length());
                             memcpy(rawP, rawData.c_str(), rawData.length());
                             pkgTxPush(rawP, rawData.length(), 0);
@@ -4118,7 +4141,7 @@ void taskAPRS(void *pvParameters)
                         packet2Raw(digiPkg, incomingPacket);
                         log_d("DIGI_REPEAT: %s", digiPkg.c_str());
                         log_d("DIGI delay=%d ms.", digiDelay);
-                        char *rawP = (char *)calloc(digiPkg.length(),sizeof(char));
+                        char *rawP = (char *)calloc(digiPkg.length(), sizeof(char));
                         // digiPkg.toCharArray(rawP, digiPkg.length());
                         memcpy(rawP, digiPkg.c_str(), digiPkg.length());
                         pkgTxPush(rawP, digiPkg.length(), digiDelay);
@@ -4334,6 +4357,7 @@ void taskNetwork(void *pvParameters)
             APStationNum = WiFi.softAPgetStationNum();
             if (APStationNum > 0)
             {
+                config.pwr_sleep_activate |= ACTIVATE_WIFI;
                 if (WiFi.isConnected() == false)
                 {
                     vTaskDelay(9 / portTICK_PERIOD_MS);
@@ -4344,6 +4368,7 @@ void taskNetwork(void *pvParameters)
 
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
         {
+            config.pwr_sleep_activate |= ACTIVATE_WIFI;
             if (millis() > NTP_Timeout)
             {
                 NTP_Timeout = millis() + 86400000;
