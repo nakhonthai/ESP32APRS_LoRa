@@ -99,6 +99,12 @@ ModbusMaster modbus;
 #define PPP_USER ""
 #define PPP_PASS ""
 
+#ifdef __XTENSA__
+#define BOOT_PIN 0
+#else
+#define BOOT_PIN 9
+#endif
+
 const char *str_status[] = {
     "IDLE_STATUS",
     "NO_SSID_AVAIL",
@@ -2024,7 +2030,10 @@ void setup()
     digitalWrite(9,LOW);
     timeLEDoff=500;
     timeLEDon=10;
+#else
+    pinMode(BOOT_PIN,INPUT_PULLUP);    
 #endif
+  
     Sleep_Activate = config.pwr_sleep_activate;
     pinMode(config.pwr_gpio, OUTPUT);
     digitalWrite(config.pwr_gpio, HIGH);
@@ -3040,42 +3049,44 @@ void loop()
         Bluetooth();
 #endif
 
-    // if (digitalRead(9) == LOW)
-    // {
-    //     btn_count++;
-    //     if (btn_count > 1000) // Push BOOT 10sec
-    //     {
-    //         // digitalWrite(LED_PIN, HIGH);
-    //         // digitalWrite(LED_TX_PIN, HIGH);
-    //     }
-    // }
-    // else
-    // {
-    //     if (btn_count > 0)
-    //     {
-    //         // Serial.printf("btn_count=%dms\n", btn_count * 10);
-    //         if (btn_count > 1000) // Push BOOT 10sec to Factory Default
-    //         {
-    //             // digitalWrite(LED_RX, LOW);
-    //             // digitalWrite(LED_TX, LOW);
-    //             defaultConfig();
-    //             Serial.println("SYSTEM REBOOT NOW!");
-    //             esp_restart();
-    //         }
-    //         else
-    //         {
-    //             showDisp = true;
-    //             timeSec = timeHalfSec = millis();
-    //             // if (oledSleepTimeout > 0)
-    //             //{
-    //             curTab++;
-    //             if (curTab > 3)
-    //                 curTab = 0;
-    //             //}
-    //         }
-    //         btn_count = 0;
-    //     }
-    // }
+#ifndef BUOY
+    if (digitalRead(BOOT_PIN) == LOW)
+    {
+        btn_count++;
+        if (btn_count > 1000) // Push BOOT 10sec
+        {
+            // digitalWrite(LED_PIN, HIGH);
+            // digitalWrite(LED_TX_PIN, HIGH);
+        }
+    }
+    else
+    {
+        if (btn_count > 0)
+        {
+            // Serial.printf("btn_count=%dms\n", btn_count * 10);
+            if (btn_count > 1000) // Push BOOT 10sec to Factory Default
+            {
+                // digitalWrite(LED_RX, LOW);
+                // digitalWrite(LED_TX, LOW);
+                defaultConfig();
+                log_d("SYSTEM REBOOT NOW!");
+                esp_restart();
+            }
+            else
+            {
+                showDisp = true;
+                timeSec = timeHalfSec = millis();
+                // if (oledSleepTimeout > 0)
+                //{
+                curTab++;
+                if (curTab > 3)
+                    curTab = 0;
+                //}
+            }
+            btn_count = 0;
+        }
+    }
+#endif    
 
 #ifdef OLED
     // Popup Display
@@ -3116,6 +3127,9 @@ void loop()
                 {
                     timeSec = millis() + 10000;
                     showDisp = true;
+                    curTab++;
+                    if (curTab > 3)
+                        curTab = 0;
                     // timeHalfSec = 0;
                     // oledSleepTimeout = millis() + (config.oled_timeout * 1000);
                 }

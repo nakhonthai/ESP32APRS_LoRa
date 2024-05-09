@@ -50,7 +50,7 @@ https://www.espressif.com/en/support/download/other-tools
 2. Search for the `PlatformIO` plugin in the `VisualStudioCode` extension and install it.
 3. After the installation is complete, you need to restart `VisualStudioCode`
 4. After restarting `VisualStudioCode`, select `File` in the upper left corner of `VisualStudioCode` -> `Open Folder` -> select the `ESP32APRS_LoRa` directory
-5. Click on the `platformio.ini` file, and in the `platformio` column, cancel the sample line that needs to be used, please make sure that only one line is valid
+5. Click on the `platformio.ini` file, and in the `platformio` column, cancel the sample line that needs to be used, please make sure that only one line is valid and change ESP type HT-CT62 Module as `default_envs = ht-ct62` or TTGO LoRa32 V1 as `default_envs = ttgo-lora32-v1`
 6. Click the (✔) symbol in the lower left corner to compile
 7. Connect the board to the computer USB
 8. Click (→) to upload firmware and reboot again

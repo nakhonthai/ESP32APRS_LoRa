@@ -1354,69 +1354,6 @@ void handle_radio(AsyncWebServerRequest *request)
 		delay(500);
 		APRS_init(&config);
 	}
-	// else if (request->hasArg("commitTNC"))
-	// {
-	// 	bool hpf = 0;
-	// 	bool bpf = 0;
-	// 	for (uint8_t i = 0; i < request->args(); i++)
-	// 	{
-	// 		if (request->argName(i) == "HPF")
-	// 		{
-	// 			if (request->arg(i) != "")
-	// 			{
-	// 				if (String(request->arg(i)) == "OK")
-	// 				{
-	// 					hpf = true;
-	// 				}
-	// 			}
-	// 		}
-	// 		if (request->argName(i) == "BPF")
-	// 		{
-	// 			if (request->arg(i) != "")
-	// 			{
-	// 				if (String(request->arg(i)) == "OK")
-	// 				{
-	// 					bpf = true;
-	// 				}
-	// 			}
-	// 		}
-	// 		if (request->argName(i) == "timeSlot")
-	// 		{
-	// 			if (request->arg(i) != "")
-	// 			{
-	// 				if (isValidNumber(request->arg(i)))
-	// 				{
-	// 					config.tx_timeslot = request->arg(i).toInt();
-	// 				}
-	// 			}
-	// 		}
-	// 		if (request->argName(i) == "preamble")
-	// 		{
-	// 			if (request->arg(i) != "")
-	// 			{
-	// 				if (isValidNumber(request->arg(i)))
-	// 				{
-	// 					config.preamble = request->arg(i).toInt();
-	// 				}
-	// 			}
-	// 		}
-	// 		if (request->argName(i) == "modem_type")
-	// 		{
-	// 			if (request->arg(i) != "")
-	// 			{
-	// 				if (isValidNumber(request->arg(i)))
-	// 					config.modem_type = request->arg(i).toInt();
-	// 			}
-	// 		}
-	// 	}
-	// 	config.audio_hpf = hpf;
-	// 	config.audio_bpf = bpf;
-	// 	afskSetHPF(config.audio_hpf);
-	// 	afskSetBPF(config.audio_bpf);
-	// 	String html = "OK";
-	// 	request->send(200, "text/html", html); // send to someones browser when asked
-	// 	saveEEPROM();
-	// }
 	else
 	{
 		String html = "<script type=\"text/javascript\">\n";
@@ -1440,18 +1377,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "});\n";
 		html += "});\n";
 		html += "function rfType(){\n";
-		// html += "var type = document.getElementById(\"rf_type\").value;\n";
-		//  html += "if(type==1||type==4||type==7){document.getElementById(\"tx_freq\").setAttribute(\"max\",174);document.getElementById(\"rx_freq\").setAttribute(\"max\",174);};\n";
-		//  html += "if(type==1){document.getElementById(\"tx_freq\").setAttribute(\"min\",134);document.getElementById(\"rx_freq\").setAttribute(\"min\",134);};\n";
-		//  html += "if(type==4||type==7){document.getElementById(\"tx_freq\").setAttribute(\"min\",136);document.getElementById(\"rx_freq\").setAttribute(\"min\",136);};\n";
-		//  html += "if(type==2||type==5||type==8){document.getElementById(\"tx_freq\").setAttribute(\"max\",470);document.getElementById(\"rx_freq\").setAttribute(\"max\",470);};\n";
-		//  html += "if(type==2||type==5||type==8){document.getElementById(\"tx_freq\").setAttribute(\"min\",400);document.getElementById(\"rx_freq\").setAttribute(\"min\",400);};\n";
-		//  html += "if(type==3){document.getElementById(\"tx_freq\").setAttribute(\"min\",320);document.getElementById(\"rx_freq\").setAttribute(\"min\",320);};\n";
-		//  html += "if(type==3){document.getElementById(\"tx_freq\").setAttribute(\"max\",400);document.getElementById(\"rx_freq\").setAttribute(\"max\",400);};\n";
-		//  html += "if(type==6){document.getElementById(\"tx_freq\").setAttribute(\"min\",350);document.getElementById(\"rx_freq\").setAttribute(\"min\",350);};\n";
-		//  html += "if(type==6){document.getElementById(\"tx_freq\").setAttribute(\"max\",390);document.getElementById(\"rx_freq\").setAttribute(\"max\",390);};\n";
-		//  html += "if(type==1||type==4||type==7){document.getElementById(\"tx_freq\").setAttribute(\"value\",144.390);document.getElementById(\"rx_freq\").setAttribute(\"value\",144.390);};\n";
-		//  html += "if(type==2||type==5||type==8){document.getElementById(\"tx_freq\").setAttribute(\"value\",432.5);document.getElementById(\"rx_freq\").setAttribute(\"value\",432.5);};\n";
+
 		html += "\n";
 		html += "}\n";
 		html += "</script>\n";
@@ -1482,7 +1408,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "<td align=\"right\"><b>Mode:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"rf_mode\" id=\"rf_mode\">\n";
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 2; i++)
 		{
 			if (config.rf_mode == i)
 				html += "<option value=\"" + String(i) + "\" selected>" + String(RF_MODE[i]) + "</option>\n";
@@ -1583,84 +1509,6 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "step=\"1\" value=\"" + String(config.rf_preamable) + "\" /></td>\n";
 		html += "</tr>\n";
 
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Preamble Length:</b></td>\n";
-		// html += "<td style=\"text-align: left;\">\n";
-		// html += "<select name=\"rf_power\" id=\"rf_power\">\n";
-		// for (int i = 0; i < 32; i++)
-		// {
-		// 	if (config.rf_power == i)
-		// 		html += "<option value=\"" + String(i) + "\" selected>" + String(i) + "</option>\n";
-		// 	else
-		// 		html += "<option value=\"" + String(i) + "\" >" + String(i) + "</option>\n";
-		// }
-		// html += "</select>\n";
-		// html += "</td>\n";
-
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>RX CTCSS:</b></td>\n";
-		// html += "<td style=\"text-align: left;\">\n";
-		// html += "<select name=\"rx_ctcss\" id=\"rx_ctcss\">\n";
-		// html += "<option value=\"0\" selected>0.0</option>\n";
-		// for (int i = 0; i < 39; i++)
-		// {
-		// 	if (config.tone_rx == i)
-		// 		html += "<option value=\"" + String(i) + "\" selected>" + String(ctcss[i], 1) + "</option>\n";
-		// 	else
-		// 		html += "<option value=\"" + String(i) + "\" >" + String(ctcss[i], 1) + "</option>\n";
-		// }
-		// html += "</select> Hz\n";
-		// html += "</td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Narrow/Wide:</b></td>\n";
-		// html += "<td style=\"text-align: left;\">\n";
-		// html += "<select name=\"nw_band\" id=\"nw_band\">\n";
-		// String cmSelNWT = "";
-		// String cmSelNWF = "";
-		// if (config.band)
-		// {
-		// 	cmSelNWT = "selected";
-		// }
-		// else
-		// {
-		// 	cmSelNWF = "selected";
-		// }
-		// html += "<option value=\"1\" " + cmSelNWT + ">25.0KHz</option>\n";
-		// html += "<option value=\"0\" " + cmSelNWF + ">12.5KHz</option>\n";
-		// html += "</select>\n";
-		// html += "</td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>TX Power:</b></td>\n";
-		// html += "<td style=\"text-align: left;\">\n";
-		// html += "<select name=\"rf_power\" id=\"rf_power\">\n";
-		// String cmRfPwrF = "";
-		// String cmRfPwrT = "";
-		// if (config.rf_power)
-		// {
-		// 	cmRfPwrT = "selected";
-		// }
-		// else
-		// {
-		// 	cmRfPwrF = "selected";
-		// }
-		// html += "<option value=\"1\" " + cmRfPwrT + ">HIGH</option>\n";
-		// html += "<option value=\"0\" " + cmRfPwrF + ">LOW</option>\n";
-		// html += "</select>\n";
-		// html += "</td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>VOLUME:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input id=\"sliderVolume\" name=\"volume\" type=\"range\"\n";
-		// html += "min=\"1\" max=\"8\" value=\"" + String(config.volume) + "\" /><b><span style=\"font-size: 14pt;\" id=\"volShow\">" + String(config.volume) + "</span></b></td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>SQL Level:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input id=\"sliderSql\" name=\"sql_level\" type=\"range\"\n";
-		// html += "min=\"0\" max=\"8\" value=\"" + String(config.sql_level) + "\" /><b><span style=\"font-size: 14pt;\" id=\"sqlShow\">" + String(config.sql_level) + "</span></b></td>\n";
-		// html += "</tr>\n";
 		html += "</table>\n";
 		html += "<div class=\"form-group\">\n";
 		html += "<label class=\"col-sm-4 col-xs-12 control-label\"></label>\n";
@@ -1668,63 +1516,6 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "</div><br />\n";
 		html += "<input type=\"hidden\" name=\"commitRadio\"/>\n";
 		html += "</form>";
-
-		// // AFSK,TNC Configuration
-		// html += "<form id='formTNC' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		// html += "<table>\n";
-		// html += "<th colspan=\"2\"><span><b>AFSK/TNC Configuration</b></span></th>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Modem Type:</b></td>\n";
-		// html += "<td style=\"text-align: left;\">\n";
-		// html += "<select name=\"modem_type\" id=\"modem_type\" \">\n";
-		// for (int i = 0; i < 2; i++)
-		// {
-		// 	if (config.modem_type == i)
-		// 		html += "<option value=\"" + String(i) + "\" selected>" + String(MODEM_TYPE[i]) + "</option>\n";
-		// 	else
-		// 		html += "<option value=\"" + String(i) + "\" >" + String(MODEM_TYPE[i]) + "</option>\n";
-		// }
-		// html += "</select>\n";
-		// html += "</td>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Audio HPF:</b></td>\n";
-		// String strFlag = "";
-		// if (config.audio_hpf)
-		// 	strFlag = "checked";
-		// html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"HPF\" value=\"OK\" " + strFlag + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Audio high pass filter >1KHz cutoff 10Khz</i></label></td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Audio BPF:</b></td>\n";
-		// strFlag = "";
-		// if (config.audio_bpf)
-		// 	strFlag = "checked";
-		// html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"BPF\" value=\"OK\" " + strFlag + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Audio band pass filter 1Khz-2.5KHz</i></label></td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>TX Time Slot:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input type=\"number\" name=\"timeSlot\" min=\"2000\" max=\"99999\"\n";
-		// html += "step=\"1000\" value=\"" + String(config.tx_timeslot) + "\" /> mSec.</td>\n";
-		// html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Preamble:</b></td>\n";
-		// html += "<td style=\"text-align: left;\">\n";
-		// html += "<select name=\"preamble\">\n";
-		// for (int i = 1; i < 10; i++)
-		// {
-		// 	if (config.preamble == i)
-		// 		html += "<option value=\"" + String(i) + "\" selected>" + String(i * 100) + "</option>\n";
-		// 	else
-		// 		html += "<option value=\"" + String(i) + "\" >" + String(i * 100) + "</option>\n";
-		// }
-		// html += "</select> mSec.\n";
-		// html += "</td>\n";
-		// html += "</tr>\n";
-
-		// html += "</table>\n";
-		// html += "<div class=\"col-sm-2 col-xs-4\"><button type='submit' id='submitTNC'  name=\"commitTNC\"> Apply Change </button></div>\n";
-		// html += "<br />\n";
-		// html += "<input type=\"hidden\" name=\"commitTNC\"/>\n";
-		// html += "</form>";
 		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }
@@ -2317,58 +2108,6 @@ void handle_mod(AsyncWebServerRequest *request)
 					config.rf_mosi_gpio = request->arg(i).toInt();
 				}
 			}
-
-			// if (request->argName(i) == "tx")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.rf_tx_gpio = request->arg(i).toInt();
-			// 	}
-			// }
-
-			// if (request->argName(i) == "pd")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.rf_pd_gpio = request->arg(i).toInt();
-			// 	}
-			// }
-
-			// if (request->argName(i) == "pwr")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.rf_pwr_gpio = request->arg(i).toInt();
-			// 	}
-			// }
-			// if (request->argName(i) == "ptt")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.rf_ptt_gpio = request->arg(i).toInt();
-			// 	}
-			// }
-			// if (request->argName(i) == "sql")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.rf_sql_gpio = request->arg(i).toInt();
-			// 	}
-			// }
-			// if (request->argName(i) == "atten")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.adc_atten = request->arg(i).toInt();
-			// 	}
-			// }
-			// if (request->argName(i) == "offset")
-			// {
-			// 	if (request->arg(i) != "")
-			// 	{
-			// 		config.adc_dc_offset = request->arg(i).toInt();
-			// 	}
-			// }
 		}
 		saveEEPROM();
 		String html = "OK";
@@ -3253,6 +2992,10 @@ void handle_system(AsyncWebServerRequest *request)
 	else if (request->hasArg("REBOOT"))
 	{
 		esp_restart();
+	}else if (request->hasArg("Factory"))
+	{
+		defaultConfig();
+		esp_restart();
 	}
 	else if (request->hasArg("commitWebAuth"))
 	{
@@ -3762,9 +3505,10 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\">SYSTEM REBOOT </td>\n";
+		html += "<td style=\"text-align: right;\">SYSTEM CONTROL </td>\n";
 		html += "<td style=\"text-align: left;\"><br /><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formReboot\" method=\"post\"> <button type='submit' id='REBOOT'  name=\"commit\" style=\"background-color:red;color:white\"> REBOOT </button>\n";
-		html += " <input type=\"hidden\" name=\"REBOOT\"/></form>\n</td>\n";
+		html += " <input type=\"hidden\" name=\"REBOOT\"/></form>\n   <form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formFactory\" method=\"post\"> <button type='submit' id='Factory'  name=\"commit\" style=\"background-color:red;color:white\"> Factory Reset </button>\n";
+		html += " <input type=\"hidden\" name=\"Factory\"/></form>\n</td>\n";
 		// html += "<td style=\"text-align: left;\"><input type='submit' class=\"btn btn-danger\" id=\"REBOOT\" name=\"REBOOT\" value='REBOOT'></td>\n";
 		html += "</tr></table><br /><br />\n";
 
@@ -7338,16 +7082,8 @@ void handle_gnss(AsyncWebServerRequest *request)
 	webString += "document.getElementById(\"hdop\").innerHTML=parseFloat(jsonR.hdop);\n";
 	webString += "document.getElementById(\"sat\").innerHTML=parseInt(jsonR.sat);\n";
 	webString += "document.getElementById(\"time\").innerHTML=parseInt(jsonR.time);\n";
-	// webString += "active=parseInt(jsonR.Active);\n";
-	// webString += "Vrms=parseFloat(jsonR.mVrms)/1000;\n";
-	// webString += "dBV=20.0*Math.log10(Vrms);\n";
-	// webString += "if(dBV<-40) dBV=-40;\n";
 	webString += "raw=jsonR.RAW;\n";
 	webString += "timeStamp=Number(jsonR.timeStamp);\n";
-	// webString += "if(active==1){\nleft.update(dBV,false);\nchart.redraw();\n";
-	// webString += "var date=new Date(timeStamp * 1000);\n";
-	// webString += "var head=date+\"[\"+Vrms.toFixed(3)+\"Vrms,\"+dBV.toFixed(1)+\"dBV]\\n\";\n";
-	// webString += "document.getElementById(\"raw_txt\").value+=head+atob(raw)+\"\\n\";\n";
 	webString += "var textArea=document.getElementById(\"raw_txt\");\n";
 	webString += "textArea.value+=atob(raw)+\"\\n\";\n";
 	webString += "textArea.scrollTop = textArea.scrollHeight;\n";
@@ -7370,13 +7106,6 @@ void handle_gnss(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">" + String(gps.satellites.value()) + "</label> </td></tr>";
 	webString += "<tr><td align=\"right\"><b>Time: </b></td><td align=\"left\"> <label id=\"time\">" + String(gps.time.value()) + "</label> </td></tr>";
 	webString += "</table><table>";
-	// webString += "<tr><td><form accept-charset=\"UTF-8\" action=\"/test\" class=\"form-horizontal\" id=\"test_form\" method=\"post\">\n";
-	// webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-danger\" name=\"sendBeacon\" value='SEND BEACON'></div><br />\n";
-	// webString += "<div style=\"margin-left: 20px;\">TNC2 RAW: <input id=\"raw\" name=\"raw\" type=\"text\" size=\"60\" value=\"" + String(config.aprs_mycall) + ">APE32I,WIDE1-1:>Test Status\"/></div>\n";
-	// webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-primary\" name=\"sendRaw\" value='SEND RAW'></div> <br />\n";
-	// webString += "</form></td></tr>\n";
-	// webString += "<tr><td><hr width=\"80%\" /></td></tr>\n";
-	// webString += "<tr><td><div id=\"vumeter\" style=\"width: 300px; height: 200px; margin: 10px;\"></div></td>\n";
 	webString += "<tr><td><b>Terminal:</b><br /><textarea id=\"raw_txt\" name=\"raw_txt\" rows=\"30\" cols=\"80\" /></textarea></td></tr>\n";
 	webString += "</table>\n";
 
