@@ -170,9 +170,8 @@ int igateProcess(AX25Msg &Packet)
     if (Raw)
     {
         memset(Raw, 0, 300); // Clear frame packet
-        size_t hSize = strlen(header.c_str());
-        //memcpy(&Raw[0], header.c_str(), hSize);           // Copy header to frame packet
-        header.toCharArray(Raw,hSize,0);
+        size_t hSize = header.length();
+        memcpy(&Raw[0], header.c_str(), hSize);           // Copy header to frame packet
         memcpy(&Raw[hSize], &Packet.info[0], Packet.len); // Copy info to frame packet
         char *ptr = &Raw[0];
         int i, rmv = 0;
