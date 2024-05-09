@@ -63,12 +63,22 @@
 #include <sys/lock.h>
 #include <sys/param.h>
 
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#if __has_include("esp32c3/rom/spi_flash.h")
+//#warning("LITTLEFS: IDF 4, spi_flash.h file location different from IDF 3")
+#include "esp32c3/rom/spi_flash.h"
+#else
+//#warning("LITTLEFS: IDF 3")
+#include "rom/spi_flash.h"
+#endif
+#else
 #if __has_include("esp32/rom/spi_flash.h")
 //#warning("LITTLEFS: IDF 4, spi_flash.h file location different from IDF 3")
 #include "esp32/rom/spi_flash.h"
 #else
 //#warning("LITTLEFS: IDF 3")
 #include "rom/spi_flash.h"
+#endif
 #endif
 
 #include "esp_system.h"
@@ -514,6 +524,7 @@ static int esp_littlefs_flags_conv(int m) {
  * @param[in] conf Filesystem Configuration
  * @return ESP_OK on success
  */
+
 static esp_err_t esp_littlefs_init(const esp_vfs_littlefs_conf_t* conf)
 {
     int index = -1;
