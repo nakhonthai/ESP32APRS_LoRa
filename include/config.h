@@ -243,7 +243,7 @@ typedef struct Config_Struct
 	bool trk_smartbeacon = false;
 	bool trk_compress = false;
 	bool trk_altitude = false;
-	bool trk_cst = false;
+	bool trk_log = false;
 	bool trk_bat = false;
 	bool trk_sat = false;
 	bool trk_dx = false;
@@ -423,6 +423,9 @@ typedef struct Config_Struct
 	uint16_t pwr_sleep_interval; //sec
 	uint16_t pwr_stanby_delay; //sec
 	uint8_t pwr_sleep_activate;
+	int8_t pwr_gpio=-1;
+
+	uint16_t log=0;
 
 } Configuration;
 

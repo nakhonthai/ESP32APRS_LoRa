@@ -98,34 +98,6 @@ bool getCSV2Wx(String stream)
     // ModbusSerial.flush();
 }
 
-bool state = true;
-bool getM702Modbus(ModbusMaster &node)
-{
-uint8_t result;
-  
-  // Toggle the coil at address 0x0002 (Manual Load Control)
-  result = node.writeSingleCoil(0x0002, state);
-  state = !state;
-
-  // Read 16 registers starting at 0x3100)
-  result = node.readInputRegisters(0x0002, 7);
-  if (result == node.ku8MBSuccess)
-  {
-    weather.co2 = node.getResponseBuffer(0x00); //Co2 PPM
-    weather.ch2o = node.getResponseBuffer(0x02); //ug
-    weather.pm25 = node.getResponseBuffer(0x06); //PM2.5ug
-    weather.pm100 = node.getResponseBuffer(0x08); //PM10 ug
-    weather.temperature = (float)node.getResponseBuffer(10)/10.0f; //C
-    weather.humidity = (float)node.getResponseBuffer(12)/10.0f; //%RH
-    weather.visable|=WX_CO2;
-    weather.visable|=WX_PM25;
-    weather.visable|=WX_PM100;
-    weather.visable|=WX_TEMP;
-    weather.visable|=WX_HUMIDITY;
-    return true;
-  }
-  return false;
-}
 
 int getRawWx(char *strData)
 {

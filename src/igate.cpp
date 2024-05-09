@@ -166,14 +166,15 @@ int igateProcess(AX25Msg &Packet)
 
     // Add Information
     header += String(F(":"));
-    uint8_t *Raw = (uint8_t*)malloc(300);
+    char *Raw = (char*)calloc(300,sizeof(char));
     if (Raw)
     {
         memset(Raw, 0, 300); // Clear frame packet
         size_t hSize = strlen(header.c_str());
-        memcpy(&Raw[0], header.c_str(), hSize);           // Copy header to frame packet
+        //memcpy(&Raw[0], header.c_str(), hSize);           // Copy header to frame packet
+        header.toCharArray(Raw,hSize,0);
         memcpy(&Raw[hSize], &Packet.info[0], Packet.len); // Copy info to frame packet
-        uint8_t *ptr = &Raw[0];
+        char *ptr = &Raw[0];
         int i, rmv = 0;
         // Remove CR,LF in frame packet
         for (i = 0; i < (hSize + Packet.len - rmv); i++)

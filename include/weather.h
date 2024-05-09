@@ -13,7 +13,7 @@
 #define WEATHER_H
 
 #include <WiFi.h>
-#include <ModbusMaster.h>
+//#include <ModbusMaster.h>
 
 // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...o...O...x....
 #define WX_NONE 0
@@ -72,6 +72,5 @@ extern WeatherData weather;
 
 int getRawWx(char *strData);
 bool getCSV2Wx(String stream);
-bool getM702Modbus(ModbusMaster &node);
 
 #endif

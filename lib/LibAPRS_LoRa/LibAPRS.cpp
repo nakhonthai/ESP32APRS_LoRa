@@ -115,7 +115,8 @@ void radioRecvStatus()
     float snr = 0;
     float freqErr = 0;
 
-    rssi = radioHal->getRSSI(false, true);
+    //rssi = radioHal->getRSSI(false, true);
+    rssi = radioHal->getRSSI(true,false);
     snr = radioHal->getSNR();
     freqErr = radioHal->getFrequencyError();
     // print RSSI (Received Signal Strength Indicator)

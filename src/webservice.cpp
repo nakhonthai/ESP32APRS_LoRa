@@ -90,12 +90,14 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "$(\"#contentmain\").load(\"/tlm\");\n";
 	webString += "} else if (tabName == 'VPN') {\n";
 	webString += "$(\"#contentmain\").load(\"/vpn\");\n";
-	webString += "} else if (tabName == 'Wireless') {\n";
+	webString += "} else if (tabName == 'WiFi') {\n";
 	webString += "$(\"#contentmain\").load(\"/wireless\");\n";
 	webString += "} else if (tabName == 'MOD') {\n";
 	webString += "$(\"#contentmain\").load(\"/mod\");\n";
 	webString += "} else if (tabName == 'System') {\n";
 	webString += "$(\"#contentmain\").load(\"/system\");\n";
+	webString += "} else if (tabName == 'File') {\n";
+	webString += "$(\"#contentmain\").load(\"/storage\");\n";
 	webString += "} else if (tabName == 'About') {\n";
 	webString += "$(\"#contentmain\").load(\"/about\");\n";
 	webString += "}\n";
@@ -138,9 +140,10 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'WX')\">WX</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'TLM')\">TLM</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'VPN')\">VPN</button>\n";
-	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'Wireless')\">Wireless</button>\n";
+	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'WiFi')\">WiFi</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'MOD')\">MOD</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'System')\">System</button>\n";
+	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'File')\">File</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'About')\">About</button>\n";
 	webString += "</ul>\n";
 	webString += "</div>\n";
@@ -172,7 +175,8 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "</body>\n";
 	webString += "</html>";
 	request->send(200, "text/html", webString); // send to someones browser when asked
-	event_lastHeard();
+	//event_lastHeard();
+	lastHeard_Flag=true;
 }
 
 ////////////////////////////////////////////////////////////
@@ -343,7 +347,8 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	request->send(200, "text/html", webString); // send to someones browser when asked
 	delay(100);
 	webString.clear();
-	event_lastHeard();
+	//event_lastHeard();
+	lastHeard_Flag=true;
 }
 
 void handle_sidebar(AsyncWebServerRequest *request)
@@ -529,21 +534,35 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<tr>\n";
 	html += "<th><span><b>Up Time</b></span></th>\n";
 	html += "<th><span>Free RAM(KByte)</span></th>\n";
+	#ifdef BUOY
+	html += "<th><span>SPIFFS(KByte)</span></th>\n";
+	html += "<th><span>VBat(V)</span></th>\n";
+	html += "<th><span>Temp(C)</span></th>\n";
+	#else
 	html += "<th><span>Free PSRAM(KByte)</span></th>\n";
 	html += "<th><span>SD CARD(MByte)</span></th>\n";
+	#endif
 	html += "<th><span>CPU Speed(Mhz)</span></th>\n";
 
 	html += "</tr>\n";
 	html += "<tr>\n";
-	time_t tn = now() - systemUptime;
+	time_t tn = time(NULL) - systemUptime;
 	// String uptime = String(day(tn) - 1, DEC) + "D " + String(hour(tn), DEC) + ":" + String(minute(tn), DEC) + ":" + String(second(tn), DEC);
 	String uptime = String(day(tn) - 1, DEC) + "D " + String(hour(tn), DEC) + ":" + String(minute(tn), DEC);
 	html += "<td><b>" + uptime + "</b></td>\n";
-	html += "<td><b>" + String((float)ESP.getFreeHeap() / 1000, 1) + "/" + String((float)ESP.getHeapSize() / 1000, 1) + "</b></td>\n";
+	html += "<td><b>" + String((float)ESP.getFreeHeap() / 1000, 1) + "/" + String((float)ESP.getHeapSize() / 1000, 1) + "</b></td>\n";	
+	#ifdef BUOY
+	unsigned long cardTotal = LITTLEFS.totalBytes();
+	unsigned long cardUsed = LITTLEFS.usedBytes();
+	html += "<td><b>" + String((double)cardUsed/1024,1) + "/" + String((double)cardTotal/1024,1) + "</b></td>\n";
+	html += "<td><b>" + String(VBat,2) + "</b></td>\n";
+	html += "<td><b>" + String(TempNTC,2) + "</b></td>\n";
+	#else
 	html += "<td><b>" + String((float)ESP.getFreePsram() / 1000, 1) + "/" + String((float)ESP.getPsramSize() / 1000, 1) + "</b></td>\n";
 	uint32_t cardTotal = SD.totalBytes() / (1024 * 1024);
 	uint32_t cardUsed = SD.usedBytes() / (1024 * 1024);
 	html += "<td><b>" + String(cardUsed) + "/" + String(cardTotal) + "</b></td>\n";
+	#endif
 	html += "<td><b>" + String(ESP.getCpuFreqMHz()) + "</b></td>\n";
 	// html += "<td style=\"background: #f00\"><b>" + String(ESP.getCycleCount()) + "</b></td>\n";
 	html += "</tr>\n";
@@ -739,7 +758,7 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 						{
 							html += "<td style=\"color: #008000;\">";
 						}
-						html += String(rssi, 1) + "dBm</td></tr>\n";
+						html += String((int)rssi) + "dBm</td></tr>\n";
 					}
 				}
 			}
@@ -953,7 +972,7 @@ void event_lastHeard()
 						{
 							html += "<td style=\"color: #008000;\">";
 						}
-						html += String(rssi, 1) + "dBm</td></tr>\n";
+						html += String((int)rssi) + "dBm</td></tr>\n";
 					}
 				}
 				src_call.clear();
@@ -963,15 +982,246 @@ void event_lastHeard()
 		}
 	}
 	html += "</table>\n";
+	//log_d("HTML Length=%d Byte",html.length());
 	char *info = (char *)calloc(html.length(), sizeof(char));
 	if (info)
 	{
 		html.toCharArray(info, html.length(), 0);
 		html.clear();
-		lastheard_events.send(info, "lastHeard", millis(), 3000);
+		lastheard_events.send(info, "lastHeard", millis(), 5000);
 		free(info);
 	}
 	// lastheard_events.send(html.c_str(), "lastHeard", millis());
+}
+
+void handle_storage(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
+	}
+
+	String dirname = "/";
+	char strTime[100];
+
+	unsigned long cardTotal = LITTLEFS.totalBytes();
+	unsigned long cardUsed = LITTLEFS.usedBytes();
+
+	String webString = "<div style=\"font-size: 8pt;text-align:left;\">";
+	webString += "<b>Total space: </b>";
+	if(cardTotal>1000000)
+	webString += String((double)cardTotal/1048576,2) + " MByte ,";
+	else
+	webString += String((double)cardTotal/1024,2) + " KByte ,";
+	webString += "<b>Used space: </b>";
+	webString += String((double)cardUsed/1024,2) + " KByte";
+
+	webString += "</br>Listing directory: </b>" + dirname + "</div>\n";
+
+	File root = LITTLEFS.open(dirname);
+	if (!root)
+	{
+		webString += "Failed to open directory\n";
+		// return;
+	}
+	if (!root.isDirectory())
+	{
+		webString += "Not a directory";
+		// return;
+	}
+
+	File file = root.openNextFile();
+	webString += "<table border=\"1\"><tr align=\"center\" bgcolor=\"#03DDFC\"><td><b>DIRECTORY</b></td><td width=\"150\"><b>FILE NAME</b></td><td width=\"100\"><b>SIZE(Byte)</b></td><td width=\"170\"><b>DATE TIME</b></td><td><b>DEL</b></td></tr>";
+	while (file)
+	{
+		if (file.isDirectory())
+		{
+			// webString += "<tr><td>DIR : ");
+			webString += "<tr><td>" + String(file.name()) + "</td>";
+			time_t t = file.getLastWrite();
+			struct tm *tmstruct = localtime(&t);
+			sprintf(strTime, "<td></td><td></td><td align=\"right\">%d-%02d-%02d %02d:%02d:%02d</td>", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
+			webString += String(strTime);
+			// if (levels) {
+			//	listDir(fs, file.name(), levels - 1);
+			// }
+			webString += "<td></td></tr>\n";
+		}
+		else
+		{
+			/*Serial.print("  FILE: ");
+			Serial.print(file.name());*/
+			// String fName = String(file.name()).substring(1);
+			String fName = String(file.name());
+			webString += "<tr><td>/</td><td align=\"right\"><a href=\"/download?FILE=" + fName + "\" target=\"_blank\">" + fName + "</a></td>";
+			// Serial.print("  SIZE: ");
+			webString += "<td align=\"right\">" + String(file.size()) + "</td>";
+			time_t t = file.getLastWrite();
+			struct tm *tmstruct = localtime(&t);
+			sprintf(strTime, "<td align=\"right\">%d-%02d-%02d %02d:%02d:%02d</td>", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
+			webString += String(strTime);
+			webString += "<td align=\"center\"><a href=\"/delete?FILE=" + fName + "\">X</a></td></tr>\n";
+		}
+		file = root.openNextFile();
+	}
+	webString += "</table>\n";
+	webString += "<form accept-charset=\"UTF-8\" action=\"/format\" class=\"form-horizontal\" id=\"format_form\" method=\"post\">\n";
+	webString += "<input class=\"btn btn-primary\" id=\"format_form_sumbit\" name=\"commit\" type=\"submit\" value=\"FORMAT\" maxlength=\"80\"/></div>\n";
+	webString += "</form><br/>\n";
+	webString += "</body>\n</html>\n";
+	char *info = (char *)calloc(webString .length(), sizeof(char));
+	if (info)
+	{
+		webString .toCharArray(info, webString .length(), 0);
+		webString .clear();
+		request->send(200, "text/html", info); // send to someones browser when asked
+		//lastheard_events.send(info, "storage", millis(), 3000);
+		free(info);
+	}
+}
+
+void handle_download(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
+	}
+	String dataType = "";
+	String path="";
+
+	if (request->args() > 0)
+	{
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			if (request->argName(i) == "FILE")
+			{
+				path = request->arg(i);
+				break;
+			}
+		}
+	}
+
+	if (path.endsWith(".src"))
+		path = path.substring(0, path.lastIndexOf("."));
+	else if (path.endsWith(".htm"))
+		dataType = "text/html";
+	else if (path.endsWith(".csv"))
+		dataType = "text/csv";
+	else if (path.endsWith(".css"))
+		dataType = "text/css";
+	else if (path.endsWith(".xml"))
+		dataType = "text/xml";
+	else if (path.endsWith(".png"))
+		dataType = "image/png";
+	else if (path.endsWith(".gif"))
+		dataType = "image/gif";
+	else if (path.endsWith(".jpg"))
+		dataType = "image/jpeg";
+	else if (path.endsWith(".ico"))
+		dataType = "image/x-icon";
+	else if (path.endsWith(".svg"))
+		dataType = "image/svg+xml";
+	else if (path.endsWith(".ico"))
+		dataType = "image/x-icon";
+	else if (path.endsWith(".js"))
+		dataType = "application/javascript";
+	else if (path.endsWith(".pdf"))
+		dataType = "application/pdf";
+	else if (path.endsWith(".zip"))
+		dataType = "application/zip";
+	else if (path.endsWith(".gz"))
+	{
+		if (path.startsWith("/gz/htm"))
+			dataType = "text/html";
+		else if (path.startsWith("/gz/css"))
+			dataType = "text/css";
+		else if (path.startsWith("/gz/csv"))
+			dataType = "text/csv";
+		else if (path.startsWith("/gz/xml"))
+			dataType = "text/xml";
+		else if (path.startsWith("/gz/js"))
+			dataType = "application/javascript";
+		else if (path.startsWith("/gz/svg"))
+			dataType = "image/svg+xml";
+		else
+			dataType = "application/x-gzip";
+	}
+
+	if(path!="" && dataType!=""){
+		String file="/" + path;
+		request->send(LITTLEFS,file,dataType,true);
+		// AsyncWebServerResponse *response = request->beginResponse(LITTLEFS, file, dataType, true);
+		// response->addHeader("Content-Disposition","attachment");
+		// request->send(response);
+	}else{
+		request->send_P(404, PSTR("text/plain"), PSTR("File Not found"));
+	}
+}
+
+void handle_delete(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
+	}
+	String html = "FAIL";
+	String dataType = "text/plain";
+	String path;
+	if (request->args() > 0)
+	{
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			if (request->argName(i) == "FILE")
+			{
+				path = request->arg(i);
+#ifdef DEBUG
+				Serial.println("Deleting file: " + path);
+#endif
+				if (LITTLEFS.remove("/" + path))
+				{
+					html="File deleted";
+#ifdef DEBUG
+					Serial.println("File deleted");
+#endif
+				}
+				else
+				{
+					html="Delete failed";
+#ifdef DEBUG
+					Serial.println("Delete failed");
+#endif
+				}
+				break;
+			}
+		}
+	}
+	request->send(200, "text/html", html); // send to someones browser when asked
+}
+
+void handle_format(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
+	}
+	String html = "FAIL";
+	if (request->args() > 0)
+	{
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			if (request->argName(i) == "commit")
+			{
+				if (request->arg(i) == "FORMAT")
+				{
+					LITTLEFS.format();	
+					html="OK";	
+					break;			
+				}
+			}
+		}
+	}
+	
+	request->send(200, "text/html", html); // send to someones browser when asked
 }
 
 void handle_radio(AsyncWebServerRequest *request)
@@ -2566,7 +2816,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>DIO1 GPIO:</b></td>\n";
+		html += "<td align=\"right\"><b>IRQ/DIO1 GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_dio1\" type=\"number\" value=\"" + String(config.rf_dio1_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
@@ -3093,6 +3343,13 @@ void handle_system(AsyncWebServerRequest *request)
 					}
 				}
 			}
+			if (request->argName(i) == "pwr")
+			{
+				if (request->arg(i) != "")
+				{
+					config.pwr_gpio = request->arg(i).toInt();
+				}
+			}
 			if (request->argName(i) == "sleep")
 			{
 				if (request->arg(i) != "")
@@ -3188,6 +3445,50 @@ void handle_system(AsyncWebServerRequest *request)
 			
 		}
 		config.pwr_en=PwrEn;
+		saveEEPROM();
+		String html = "OK";
+		request->send(200, "text/html", html);
+	}
+	else if (request->hasArg("commitLOG"))
+	{
+		bool PwrEn = false;
+		config.log=0;
+
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			// Serial.print("SERVER ARGS ");
+			// Serial.print(request->argName(i));
+			// Serial.print("=");
+			// Serial.println(request->arg(i));
+
+			if (request->argName(i) == "FilterStatus")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.log |= LOG_STATUS;
+				}
+			}
+
+			if (request->argName(i) == "FilterWeather")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.log |= LOG_WX;
+				}
+			}
+
+			if (request->argName(i) == "FilterTracker")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.log |= LOG_TRACKER;
+				}
+			}
+			
+		}
 		saveEEPROM();
 		String html = "OK";
 		request->send(200, "text/html", html);
@@ -3498,6 +3799,11 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
+		html += "<td align=\"right\"><b>PWR GPIO:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"pwr\" type=\"number\" value=\"" + String(config.pwr_gpio) + "\" /></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Sleep Interval:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"0\" max=\"9999\" name=\"sleep\" type=\"number\" value=\"" + String(config.pwr_sleep_interval) + "\" /></td>\n";
 		html += "</tr>\n";
@@ -3576,8 +3882,46 @@ html += "<fieldset id=\"FilterGrp\">\n";
 		html += "</td>\n";
 		html += "</tr>\n";
 		html += "<tr><td colspan=\"2\" align=\"center\">\n";
-		html += "<input class=\"btn btn-primary\" id=\"submitPWR\" name=\"commitPWR\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n";
+		html += "<input class=\"btn btn-primary\" id=\"submitPWR\" name=\"commitPWR\" type=\"submit\" value=\"Apply Change\" maxlength=\"80\"/>\n";
 		html += "<input type=\"hidden\" name=\"commitPWR\"/>\n";
+		html += "</td></tr></table>\n";
+
+		html += "</form><br /><br />\n";
+
+		/**************Log File******************/
+		html += "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"formLOG\" method=\"post\">\n";
+		html += "<table>\n";
+		html += "<th colspan=\"2\"><span><b>Log File</b></span></th>\n";
+		
+html += "<tr>\n";
+		html += "<td align=\"right\"><b>Activate:</b></td>\n";
+		html += "<td style=\"text-align: left;\">";
+html += "<fieldset id=\"FilterGrp\">\n";
+		html += "<legend>Events</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">";
+		html += "<tr style=\"background:unset;\">";
+
+		filterFlageEn = "";
+		if (config.log & LOG_TRACKER)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterTracker\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Tracker</td>\n";
+
+		// filterFlageEn = "";
+		// if (config.log & LOG_STATUS)
+		// 	filterFlageEn = "checked";
+		// html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterStatus\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Status</td>\n";
+
+		filterFlageEn = "";
+		if (config.log & LOG_WX)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterWeather\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Weather</td>\n";
+
+		html += "<td style=\"border:unset;\"></td>";
+		html += "</tr></table></fieldset>\n";
+		html += "</td>\n";
+		html += "</tr>\n";
+		html += "<tr><td colspan=\"2\" align=\"center\">\n";
+		html += "<input class=\"btn btn-primary\" id=\"submitLOG\" name=\"commitLOG\" type=\"submit\" value=\"Apply Change\" maxlength=\"80\"/>\n";
+		html += "<input type=\"hidden\" name=\"commitLOG\"/>\n";
 		html += "</td></tr></table>\n";
 
 		html += "</form><br /><br />\n";
@@ -5645,7 +5989,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 
 			html += "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.tlm0_PARM[ax]) + "\" /></td>\n";
 			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.tlm0_UNIT[ax]) + "\" /></td></tr>\n";
-			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av^2+bv+c)</td></tr>\n";
+			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av^2+bv+c)</td></tr>\n";
 			html += "</table></td>";
 			html += "</tr>\n";
 		}
@@ -6005,7 +6349,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 		config.trk_loc2rf = pos2RF;
 		config.trk_loc2inet = pos2INET;
 
-		config.trk_cst = optCST;
+		config.trk_log = optCST;
 		config.trk_altitude = optAlt;
 		config.trk_bat = optBat;
 		config.trk_sat = optSat;
@@ -6181,11 +6525,11 @@ void handle_tracker(AsyncWebServerRequest *request)
 		trackerOptSatFlag = "checked";
 	if (config.trk_altitude)
 		trackerOptAltFlag = "checked";
-	if (config.trk_cst)
+	if (config.trk_log)
 		trackerOptCSTFlag = "checked";
 	html += "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\">";
-	html += "<input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" " + trackerOptCSTFlag + "/>Course/Speed ";
-	html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Altitude ";
+	html += "<input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" " + trackerOptCSTFlag + "/>Telemetry ";
+	html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Temperature ";
 	html += "<input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" " + trackerOptBatFlag + "/>Battery ";
 	html += "<input type=\"checkbox\" name=\"trackerOptSat\" value=\"OK\" " + trackerOptSatFlag + "/>Satellite";
 	html += "</td></tr>\n";
@@ -6654,7 +6998,7 @@ void handle_ws_gnss(char *nmea, size_t size)
 	char jsonMsg[output_length + 200];
 	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
 	// Serial.println(output_buffer);
-	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), timeStamp, nmea_enc);
+	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(),gps.time.value(), timeStamp, nmea_enc);
 	ws_gnss.textAll(jsonMsg);
 
 	// unsigned int output_length = encode_base64_length(size);
@@ -6993,6 +7337,7 @@ void handle_gnss(AsyncWebServerRequest *request)
 	webString += "document.getElementById(\"csd\").innerHTML=parseFloat(jsonR.csd);\n";
 	webString += "document.getElementById(\"hdop\").innerHTML=parseFloat(jsonR.hdop);\n";
 	webString += "document.getElementById(\"sat\").innerHTML=parseInt(jsonR.sat);\n";
+	webString += "document.getElementById(\"time\").innerHTML=parseInt(jsonR.time);\n";
 	// webString += "active=parseInt(jsonR.Active);\n";
 	// webString += "Vrms=parseFloat(jsonR.mVrms)/1000;\n";
 	// webString += "dBV=20.0*Math.log10(Vrms);\n";
@@ -7023,6 +7368,7 @@ void handle_gnss(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>Course: </b></td><td align=\"left\"> <label id=\"csd\">" + String(gps.course.deg(), 1) + "</label></td></tr>";
 	webString += "<tr><td align=\"right\"><b>HDOP: </b></td><td align=\"left\"> <label id=\"hdop\">" + String(gps.hdop.hdop(), 2) + "</label> </td></tr>";
 	webString += "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">" + String(gps.satellites.value()) + "</label> </td></tr>";
+	webString += "<tr><td align=\"right\"><b>Time: </b></td><td align=\"left\"> <label id=\"time\">" + String(gps.time.value()) + "</label> </td></tr>";
 	webString += "</table><table>";
 	// webString += "<tr><td><form accept-charset=\"UTF-8\" action=\"/test\" class=\"form-horizontal\" id=\"test_form\" method=\"post\">\n";
 	// webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-danger\" name=\"sendBeacon\" value='SEND BEACON'></div><br />\n";
@@ -7127,6 +7473,14 @@ void webService()
 					{ handle_css(request); });
 	async_server.on("/jquery-3.7.1.js", HTTP_GET, [](AsyncWebServerRequest *request)
 					{ handle_jquery(request); });
+	async_server.on("/storage", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_storage(request); });
+	async_server.on("/download", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_download(request); });									
+	async_server.on("/delete", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_delete(request); });					
+	async_server.on("/format", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_format(request); });
 	async_server.on(
 		"/update", HTTP_POST, [](AsyncWebServerRequest *request)
 		{

@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.1"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'a'
 
 #define WX
 //#define OLED
@@ -43,6 +43,11 @@
 #define PKGLISTSIZE 20
 #define PKGTXSIZE 5
 #endif
+
+#define LOG_NONE 0
+#define LOG_TRACKER (1 << 0)
+#define LOG_STATUS (1 << 1)
+#define LOG_WX (1 << 2)
 
 #define FILTER_ALL 0				// Packet is disable all packet
 #define FILTER_OBJECT (1 << 0)		// packet is an object
