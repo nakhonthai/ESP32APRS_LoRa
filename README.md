@@ -4,8 +4,8 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
  
 
 ## Feature
-
-* Supported hardware: TTGO_LoRa32,TTGO-T-Beam,Heltec,HT-CT62,D.I.Y Mod GPIOrf m,l;.
+* Supported APRS on AX.25 Protocol
+* Supported hardware: TTGO_LoRa32,TTGO-T-Beam,Heltec,HT-CT62,D.I.Y Mod GPIO
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
