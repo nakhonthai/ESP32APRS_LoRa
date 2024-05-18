@@ -187,7 +187,7 @@ RTC_DATA_ATTR TelemetryType *Telemetry;
 RTC_DATA_ATTR double VBat;
 RTC_DATA_ATTR double TempNTC;
 
-RTC_DATA_ATTR uint16_t TLM_SEQ;
+RTC_NOINIT_ATTR uint16_t TLM_SEQ;
 
 TaskHandle_t taskNetworkHandle;
 TaskHandle_t taskAPRSHandle;
@@ -1140,6 +1140,14 @@ void defaultConfig()
 
     config.onewire_enable = false;
     config.onewire_gpio = -1;
+
+    config.pwr_en = false;
+    config.pwr_mode = MODE_A;        // A=Continue,B=Wait for receive,C=Send and sleep
+    config.pwr_sleep_interval = 600; // sec
+    config.pwr_stanby_delay = 300;   // sec
+    config.pwr_sleep_activate = ACTIVATE_TRACKER | ACTIVATE_WIFI;
+    config.pwr_gpio = -1;
+
 #ifdef OLED
     config.i2c_enable = true;
     config.i2c_sda_pin = 0;
@@ -1268,6 +1276,31 @@ void defaultConfig()
     // config.i2c_sda_pin = 17;
     // config.i2c_sck_pin = 18;
     // config.i2c_rst_pin = 21;
+#elif defined(APRS_LORA_HT)
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 45;
+    config.rf_reset_gpio = 11;
+    config.rf_busy_gpio = 14;
+    config.rf_nss_gpio = 17;
+    config.rf_sclk_gpio = 18;
+    config.rf_miso_gpio = 8;
+    config.rf_mosi_gpio = 10;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_nss_active = 0;
+    config.rf_reset_active = 0;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 8;
+    config.uart1_tx_gpio = 9;
+    config.uart1_rts_gpio = -1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 47;    
+    config.pwr_gpio = 41;
 #endif
 
     config.i2c_freq = 400000;
@@ -1293,12 +1326,6 @@ void defaultConfig()
     sprintf(config.path[2], "WIDE1-1,WIDE2-1");
     sprintf(config.path[3], "RFONLY");
 
-    config.pwr_en = false;
-    config.pwr_mode = MODE_A;        // A=Continue,B=Wait for receive,C=Send and sleep
-    config.pwr_sleep_interval = 600; // sec
-    config.pwr_stanby_delay = 300;   // sec
-    config.pwr_sleep_activate = ACTIVATE_TRACKER | ACTIVATE_WIFI;
-    config.pwr_gpio = -1;
 
 #ifdef BUOY
     sprintf(config.wifi_ap_ssid, "BUOY");
@@ -2966,7 +2993,10 @@ void flash_morse_text(char *text,size_t len)
         //delay(dot_duration * 7);       
         vTaskDelay(dot_duration * 7 / portTICK_PERIOD_MS);
       }
-      delay(1);
+
+#ifndef TTGO_T_Beam_S3_SUPREME_V3
+        esp_task_wdt_reset();
+#endif
     }
 }
 
