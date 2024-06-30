@@ -5,7 +5,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 
 ## Feature
 * Supported APRS on AX.25 Protocol
-* Supported hardware: TTGO_LoRa32,TTGO-T-Beam,Heltec,HT-CT62,D.I.Y Mod GPIO
+* Supported hardware: TTGO_LoRa32,TTGO T-Beam V1.2,LILYGO T-Beam Supreme,Heltec HTIT-Tracker,HT-CT62,D.I.Y Mod GPIO
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
@@ -22,15 +22,16 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 * support VPN wireguard
 * support global time zone
 * support web service auth login
+* support Telemetry on IGate,Digi,Tracker
 * display received and transmit packet on the LED and display OLED
 
 ## Hardware screen short
-![APRSTracker_HTCT62](image/ARPSLoRaTracker.jpg) ![APRSTracker_HTCT62_1](image/ARPSLoRaTracker2.jpg) 
+![LILYGO_T_BEAM_SUPREME](doc/LILYGO_T_BEAM_SUPREME.jpg) ![HTIT_Tracker](doc/APRS_LoRa_Heltec_HTIT_Tracker_Quaterwave.jpg) ![APRS_LoRa_VHF](doc/APRS_LoRa_VHF_DIY.jpg)
 
 ## Web service screen short
-![image](https://github.com/nakhonthai/ESP32APRS_LoRa/assets/16043758/c1564cf8-eeac-4977-b11f-f5a3658d5f80)
+![Map_LoRa_VHF](doc/TEST_APRS_LoRa_VHF.jpg)
 ![screen_dashboard](image/ESP32APRS_Screen_Dashboard.png) ![screen_radio](image/ESP32APRS_Screen_Radio.png) \
-![screen_mod](image/ESP32APRS_Screen_Mod.png) ![screen_about](image/ESP32APRS_Screen_About.png)
+![screen_mod](image/ESP32APRS_Screen_Mod.png)
 
 ## ESP32APRS LoRa firmware installation (do it first time, next time via the web browser)
 - 1.Connect the USB cable to the ESP32 Module.
@@ -66,7 +67,7 @@ https://www.espressif.com/en/support/download/other-tools
 
 To support the development of ESP32APRS you can make us a donation using [github sponsors](https://github.com/sponsors/nakhonthai). \
 If you want to donate some hardware to facilitate APRS porting and development, [contact us](https://www.facebook.com/atten). \
-<a href="https://www.paypal.me/0hs5tqa0"><img src="blue.svg" height="40"></a> 
+<a href="https://www.paypal.me/0hs5tqa0"><img src="https://github.com/nakhonthai/ESP32IGate/raw/master/blue.svg" height="40"></a> 
 
 ## ESP32 Flash Download Tools
 https://www.espressif.com/en/support/download/other-tools
