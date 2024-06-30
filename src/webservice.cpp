@@ -88,6 +88,8 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "$(\"#contentmain\").load(\"/wx\");\n";
 	webString += "} else if (tabName == 'TLM') {\n";
 	webString += "$(\"#contentmain\").load(\"/tlm\");\n";
+	webString += "} else if (tabName == 'SENSOR') {\n";
+	webString += "$(\"#contentmain\").load(\"/sensor\");\n";
 	webString += "} else if (tabName == 'VPN') {\n";
 	webString += "$(\"#contentmain\").load(\"/vpn\");\n";
 	webString += "} else if (tabName == 'WiFi') {\n";
@@ -139,6 +141,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'TRACKER')\">TRACKER</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'WX')\">WX</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'TLM')\">TLM</button>\n";
+	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'SENSOR')\">SENSOR</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'VPN')\">VPN</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'WiFi')\">WiFi</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'MOD')\">MOD</button>\n";
@@ -175,8 +178,8 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "</body>\n";
 	webString += "</html>";
 	request->send(200, "text/html", webString); // send to someones browser when asked
-	//event_lastHeard();
-	lastHeard_Flag=true;
+	// event_lastHeard();
+	lastHeard_Flag = true;
 }
 
 ////////////////////////////////////////////////////////////
@@ -185,7 +188,7 @@ void setMainPage(AsyncWebServerRequest *request)
 
 void handle_css(AsyncWebServerRequest *request)
 {
-	const char *css = ".container{width:800px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}\n";
+	const char *css = ".container{width:820px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}\n";
 	request->send_P(200, "text/css", css);
 }
 
@@ -245,7 +248,10 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "</tr>\n";
 	webString += "<tr>\n";
 	webString += "<td>TX Power</td>\n";
-	webString += "<td style=\"background: #ffffff;\">+" + String(config.rf_power) + " dBm</td>\n";
+	if (config.rf_power >= 0)
+		webString += "<td style=\"background: #ffffff;\">+" + String(config.rf_power) + " dBm</td>\n";
+	else
+		webString += "<td style=\"background: #ffffff;\">-" + String(config.rf_power) + " dBm</td>\n";
 	webString += "</tr>\n";
 	webString += "</table>\n";
 	webString += "\n";
@@ -347,8 +353,8 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	request->send(200, "text/html", webString); // send to someones browser when asked
 	delay(100);
 	webString.clear();
-	//event_lastHeard();
-	lastHeard_Flag=true;
+	// event_lastHeard();
+	lastHeard_Flag = true;
 }
 
 void handle_sidebar(AsyncWebServerRequest *request)
@@ -485,7 +491,7 @@ void handle_symbol(AsyncWebServerRequest *request)
 		}
 	}
 
-	char *web = (char *)calloc(25000,sizeof(char));
+	char *web = (char *)calloc(25000, sizeof(char));
 	if (web)
 	{
 		memset(web, 0, 25000);
@@ -534,14 +540,14 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<tr>\n";
 	html += "<th><span><b>Up Time</b></span></th>\n";
 	html += "<th><span>Free RAM(KByte)</span></th>\n";
-	#ifdef BUOY
+#ifdef BUOY
 	html += "<th><span>SPIFFS(KByte)</span></th>\n";
 	html += "<th><span>VBat(V)</span></th>\n";
 	html += "<th><span>Temp(C)</span></th>\n";
-	#else
+#else
 	html += "<th><span>Free PSRAM(KByte)</span></th>\n";
 	html += "<th><span>SD CARD(MByte)</span></th>\n";
-	#endif
+#endif
 	html += "<th><span>CPU Speed(Mhz)</span></th>\n";
 
 	html += "</tr>\n";
@@ -550,19 +556,19 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	// String uptime = String(day(tn) - 1, DEC) + "D " + String(hour(tn), DEC) + ":" + String(minute(tn), DEC) + ":" + String(second(tn), DEC);
 	String uptime = String(day(tn) - 1, DEC) + "D " + String(hour(tn), DEC) + ":" + String(minute(tn), DEC);
 	html += "<td><b>" + uptime + "</b></td>\n";
-	html += "<td><b>" + String((float)ESP.getFreeHeap() / 1000, 1) + "/" + String((float)ESP.getHeapSize() / 1000, 1) + "</b></td>\n";	
-	#ifdef BUOY
+	html += "<td><b>" + String((float)ESP.getFreeHeap() / 1000, 1) + "/" + String((float)ESP.getHeapSize() / 1000, 1) + "</b></td>\n";
+#ifdef BUOY
 	unsigned long cardTotal = LITTLEFS.totalBytes();
 	unsigned long cardUsed = LITTLEFS.usedBytes();
-	html += "<td><b>" + String((double)cardUsed/1024,1) + "/" + String((double)cardTotal/1024,1) + "</b></td>\n";
-	html += "<td><b>" + String(VBat,2) + "</b></td>\n";
-	html += "<td><b>" + String(TempNTC,2) + "</b></td>\n";
-	#else
+	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
+	html += "<td><b>" + String(VBat, 2) + "</b></td>\n";
+	html += "<td><b>" + String(TempNTC, 2) + "</b></td>\n";
+#else
 	html += "<td><b>" + String((float)ESP.getFreePsram() / 1000, 1) + "/" + String((float)ESP.getPsramSize() / 1000, 1) + "</b></td>\n";
-	uint32_t cardTotal = SD.totalBytes() / (1024 * 1024);
-	uint32_t cardUsed = SD.usedBytes() / (1024 * 1024);
+	uint32_t cardTotal = LITTLEFS.totalBytes() / (1024 * 1024);
+	uint32_t cardUsed = LITTLEFS.usedBytes() / (1024 * 1024);
 	html += "<td><b>" + String(cardUsed) + "/" + String(cardTotal) + "</b></td>\n";
-	#endif
+#endif
 	html += "<td><b>" + String(ESP.getCpuFreqMHz()) + "</b></td>\n";
 	// html += "<td style=\"background: #f00\"><b>" + String(ESP.getCycleCount()) + "</b></td>\n";
 	html += "</tr>\n";
@@ -743,8 +749,6 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 					}
 					else
 					{
-						// double Vrms = (double)pkg.audio_level / 1000;
-						// double audBV = 20.0F * log10(Vrms);
 						float rssi = pkg.rssi;
 						if (rssi < -120.0F)
 						{
@@ -957,8 +961,6 @@ void event_lastHeard()
 					}
 					else
 					{
-						// double Vrms = (double)pkg.audio_level / 1000;
-						// double audBV = 20.0F * log10(Vrms);
 						float rssi = pkg.rssi;
 						if (rssi < -120.0F)
 						{
@@ -982,7 +984,7 @@ void event_lastHeard()
 		}
 	}
 	html += "</table>\n";
-	//log_d("HTML Length=%d Byte",html.length());
+	// log_d("HTML Length=%d Byte",html.length());
 	char *info = (char *)calloc(html.length(), sizeof(char));
 	if (info)
 	{
@@ -1009,12 +1011,12 @@ void handle_storage(AsyncWebServerRequest *request)
 
 	String webString = "<div style=\"font-size: 8pt;text-align:left;\">";
 	webString += "<b>Total space: </b>";
-	if(cardTotal>1000000)
-	webString += String((double)cardTotal/1048576,2) + " MByte ,";
+	if (cardTotal > 1000000)
+		webString += String((double)cardTotal / 1048576, 2) + " MByte ,";
 	else
-	webString += String((double)cardTotal/1024,2) + " KByte ,";
+		webString += String((double)cardTotal / 1024, 2) + " KByte ,";
 	webString += "<b>Used space: </b>";
-	webString += String((double)cardUsed/1024,2) + " KByte";
+	webString += String((double)cardUsed / 1024, 2) + " KByte";
 
 	webString += "</br>Listing directory: </b>" + dirname + "</div>\n";
 
@@ -1069,13 +1071,13 @@ void handle_storage(AsyncWebServerRequest *request)
 	webString += "<input class=\"btn btn-primary\" id=\"format_form_sumbit\" name=\"commit\" type=\"submit\" value=\"FORMAT\" maxlength=\"80\"/></div>\n";
 	webString += "</form><br/>\n";
 	webString += "</body>\n</html>\n";
-	char *info = (char *)calloc(webString .length(), sizeof(char));
+	char *info = (char *)calloc(webString.length(), sizeof(char));
 	if (info)
 	{
-		webString .toCharArray(info, webString .length(), 0);
-		webString .clear();
+		webString.toCharArray(info, webString.length(), 0);
+		webString.clear();
 		request->send(200, "text/html", info); // send to someones browser when asked
-		//lastheard_events.send(info, "storage", millis(), 3000);
+		// lastheard_events.send(info, "storage", millis(), 3000);
 		free(info);
 	}
 }
@@ -1087,7 +1089,7 @@ void handle_download(AsyncWebServerRequest *request)
 		return request->requestAuthentication();
 	}
 	String dataType = "";
-	String path="";
+	String path = "";
 
 	if (request->args() > 0)
 	{
@@ -1147,13 +1149,16 @@ void handle_download(AsyncWebServerRequest *request)
 			dataType = "application/x-gzip";
 	}
 
-	if(path!="" && dataType!=""){
-		String file="/" + path;
-		request->send(LITTLEFS,file,dataType,true);
+	if (path != "" && dataType != "")
+	{
+		String file = "/" + path;
+		request->send(LITTLEFS, file, dataType, true);
 		// AsyncWebServerResponse *response = request->beginResponse(LITTLEFS, file, dataType, true);
 		// response->addHeader("Content-Disposition","attachment");
 		// request->send(response);
-	}else{
+	}
+	else
+	{
 		request->send_P(404, PSTR("text/plain"), PSTR("File Not found"));
 	}
 }
@@ -1179,14 +1184,14 @@ void handle_delete(AsyncWebServerRequest *request)
 #endif
 				if (LITTLEFS.remove("/" + path))
 				{
-					html="File deleted";
+					html = "File deleted";
 #ifdef DEBUG
 					Serial.println("File deleted");
 #endif
 				}
 				else
 				{
-					html="Delete failed";
+					html = "Delete failed";
 #ifdef DEBUG
 					Serial.println("Delete failed");
 #endif
@@ -1213,14 +1218,14 @@ void handle_format(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) == "FORMAT")
 				{
-					LITTLEFS.format();	
-					html="OK";	
-					break;			
+					LITTLEFS.format();
+					html = "OK";
+					break;
 				}
 			}
 		}
 	}
-	
+
 	request->send(200, "text/html", html); // send to someones browser when asked
 }
 
@@ -2339,17 +2344,17 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RX GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"rx\" type=\"number\" value=\"" + String(config.uart0_rx_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"rx\" type=\"number\" value=\"" + String(config.uart0_rx_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>TX GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"tx\" type=\"number\" value=\"" + String(config.uart0_tx_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"tx\" type=\"number\" value=\"" + String(config.uart0_tx_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RTS/DE GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rts\" type=\"number\" value=\"" + String(config.uart0_rts_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rts\" type=\"number\" value=\"" + String(config.uart0_rts_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -2389,17 +2394,17 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RX GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"rx\" type=\"number\" value=\"" + String(config.uart1_rx_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"rx\" type=\"number\" value=\"" + String(config.uart1_rx_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>TX GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"tx\" type=\"number\" value=\"" + String(config.uart1_tx_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"tx\" type=\"number\" value=\"" + String(config.uart1_tx_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RTS/DE GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rts\" type=\"number\" value=\"" + String(config.uart1_rts_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rts\" type=\"number\" value=\"" + String(config.uart1_rts_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -2439,17 +2444,17 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		// html += "<tr>\n";
 		// html += "<td align=\"right\"><b>RX GPIO:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"rx\" type=\"number\" value=\"" + String(config.uart2_rx_gpio) + "\" /></td>\n";
+		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"rx\" type=\"number\" value=\"" + String(config.uart2_rx_gpio) + "\" /></td>\n";
 		// html += "</tr>\n";
 
 		// html += "<tr>\n";
 		// html += "<td align=\"right\"><b>TX GPIO:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"tx\" type=\"number\" value=\"" + String(config.uart2_tx_gpio) + "\" /></td>\n";
+		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"tx\" type=\"number\" value=\"" + String(config.uart2_tx_gpio) + "\" /></td>\n";
 		// html += "</tr>\n";
 
 		// html += "<tr>\n";
 		// html += "<td align=\"right\"><b>RTS/DE GPIO:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rts\" type=\"number\" value=\"" + String(config.uart2_rts_gpio) + "\" /></td>\n";
+		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rts\" type=\"number\" value=\"" + String(config.uart2_rts_gpio) + "\" /></td>\n";
 		// html += "</tr>\n";
 
 		// html += "<tr>\n";
@@ -2491,7 +2496,7 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		// html += "<tr>\n";
 		// html += "<td align=\"right\"><b>GPIO:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"data\" type=\"number\" value=\"" + String(config.onewire_gpio) + "\" /></td>\n";
+		// html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"data\" type=\"number\" value=\"" + String(config.onewire_gpio) + "\" /></td>\n";
 		// html += "</tr>\n";
 
 		// html += "<tr><td colspan=\"2\" align=\"right\">\n";
@@ -2518,7 +2523,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			LowFlag = "checked=\"checked\"";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RX ANTENNA:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_rx_gpio\" type=\"number\" value=\"" + String(config.rf_rx_gpio) + "\" /> Active:<input type=\"radio\" name=\"rx_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"rx_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_rx_gpio\" type=\"number\" value=\"" + String(config.rf_rx_gpio) + "\" /> Active:<input type=\"radio\" name=\"rx_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"rx_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
 
 		LowFlag = "";
@@ -2529,7 +2534,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			LowFlag = "checked=\"checked\"";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>TX ANTENNA:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_tx_gpio\" type=\"number\" value=\"" + String(config.rf_tx_gpio) + "\" /> Active:<input type=\"radio\" name=\"tx_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"tx_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_tx_gpio\" type=\"number\" value=\"" + String(config.rf_tx_gpio) + "\" /> Active:<input type=\"radio\" name=\"tx_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"tx_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
 
 		LowFlag = "";
@@ -2540,7 +2545,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			LowFlag = "checked=\"checked\"";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RESET GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_reset_gpio\" type=\"number\" value=\"" + String(config.rf_reset_gpio) + "\" /> Active:<input type=\"radio\" name=\"rst_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"rst_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_reset\" type=\"number\" value=\"" + String(config.rf_reset_gpio) + "\" /> Active:<input type=\"radio\" name=\"rst_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"rst_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
 
 		LowFlag = "";
@@ -2551,32 +2556,32 @@ void handle_mod(AsyncWebServerRequest *request)
 			LowFlag = "checked=\"checked\"";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>NSS/CS GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_nss\" type=\"number\" value=\"" + String(config.rf_nss_gpio) + "\" /> Active:<input type=\"radio\" name=\"nss_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"nss_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_nss\" type=\"number\" value=\"" + String(config.rf_nss_gpio) + "\" /> Active:<input type=\"radio\" name=\"nss_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"nss_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>IRQ/DIO1 GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_dio1\" type=\"number\" value=\"" + String(config.rf_dio1_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_dio1\" type=\"number\" value=\"" + String(config.rf_dio1_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>BUSY GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_busy\" type=\"number\" value=\"" + String(config.rf_busy_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_busy\" type=\"number\" value=\"" + String(config.rf_busy_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>SCLK GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_sclk\" type=\"number\" value=\"" + String(config.rf_sclk_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_sclk\" type=\"number\" value=\"" + String(config.rf_sclk_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>MISO GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_miso\" type=\"number\" value=\"" + String(config.rf_miso_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_miso\" type=\"number\" value=\"" + String(config.rf_miso_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>MOSI GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"rf_mosi\" type=\"number\" value=\"" + String(config.rf_mosi_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_mosi\" type=\"number\" value=\"" + String(config.rf_mosi_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
@@ -2602,12 +2607,12 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>SDA GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"sda\" type=\"number\" value=\"" + String(config.i2c_sda_pin) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"sda\" type=\"number\" value=\"" + String(config.i2c_sda_pin) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>SCK GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"sck\" type=\"number\" value=\"" + String(config.i2c_sck_pin) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"sck\" type=\"number\" value=\"" + String(config.i2c_sck_pin) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -2636,7 +2641,7 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>INPUT GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"gpio\" type=\"number\" value=\"" + String(config.counter0_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"gpio\" type=\"number\" value=\"" + String(config.counter0_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		LowFlag = "";
@@ -2672,12 +2677,12 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>SDA GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"sda\" type=\"number\" value=\"" + String(config.i2c1_sda_pin) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"sda\" type=\"number\" value=\"" + String(config.i2c1_sda_pin) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>SCK GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"sck\" type=\"number\" value=\"" + String(config.i2c1_sck_pin) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"sck\" type=\"number\" value=\"" + String(config.i2c1_sck_pin) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -2706,7 +2711,7 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>INPUT GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"gpio\" type=\"number\" value=\"" + String(config.counter1_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"gpio\" type=\"number\" value=\"" + String(config.counter1_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		LowFlag = "";
@@ -2808,12 +2813,12 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Address:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"address\" type=\"number\" value=\"" + String(config.modbus_address) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"address\" type=\"number\" value=\"" + String(config.modbus_address) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>DE:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\" name=\"de\" type=\"number\" value=\"" + String(config.modbus_de_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"de\" type=\"number\" value=\"" + String(config.modbus_de_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
@@ -2991,8 +2996,10 @@ void handle_system(AsyncWebServerRequest *request)
 	}
 	else if (request->hasArg("REBOOT"))
 	{
+		TLM_SEQ = 0;
 		esp_restart();
-	}else if (request->hasArg("Factory"))
+	}
+	else if (request->hasArg("Factory"))
 	{
 		defaultConfig();
 		esp_restart();
@@ -3068,7 +3075,7 @@ void handle_system(AsyncWebServerRequest *request)
 	else if (request->hasArg("commitPWR"))
 	{
 		bool PwrEn = false;
-		config.pwr_sleep_activate=0;
+		config.pwr_sleep_activate = 0;
 
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
@@ -3104,7 +3111,7 @@ void handle_system(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					config.pwr_stanby_delay= request->arg(i).toInt();
+					config.pwr_stanby_delay = request->arg(i).toInt();
 				}
 			}
 			if (request->argName(i) == "mode")
@@ -3185,9 +3192,8 @@ void handle_system(AsyncWebServerRequest *request)
 						config.pwr_sleep_activate |= ACTIVATE_WIFI;
 				}
 			}
-			
 		}
-		config.pwr_en=PwrEn;
+		config.pwr_en = PwrEn;
 		saveEEPROM();
 		String html = "OK";
 		request->send(200, "text/html", html);
@@ -3195,7 +3201,7 @@ void handle_system(AsyncWebServerRequest *request)
 	else if (request->hasArg("commitLOG"))
 	{
 		bool PwrEn = false;
-		config.log=0;
+		config.log = 0;
 
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
@@ -3230,7 +3236,6 @@ void handle_system(AsyncWebServerRequest *request)
 						config.log |= LOG_TRACKER;
 				}
 			}
-			
 		}
 		saveEEPROM();
 		String html = "OK";
@@ -3544,7 +3549,7 @@ void handle_system(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PWR GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"39\"  name=\"pwr\" type=\"number\" value=\"" + String(config.pwr_gpio) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"pwr\" type=\"number\" value=\"" + String(config.pwr_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -3572,10 +3577,10 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "</td>\n";
 		html += "</tr>\n";
 
-html += "<tr>\n";
+		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Event Activate:</b></td>\n";
 		html += "<td style=\"text-align: left;\">";
-html += "<fieldset id=\"FilterGrp\">\n";
+		html += "<fieldset id=\"FilterGrp\">\n";
 		html += "<legend>Events</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">";
 		html += "<tr style=\"background:unset;\">";
 
@@ -3604,7 +3609,6 @@ html += "<fieldset id=\"FilterGrp\">\n";
 			filterFlageEn = "checked";
 		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterIGate\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>IGate</td>\n";
 
-
 		filterFlageEn = "";
 		if (config.pwr_sleep_activate & ACTIVATE_DIGI)
 			filterFlageEn = "checked";
@@ -3619,7 +3623,6 @@ html += "<fieldset id=\"FilterGrp\">\n";
 		if (config.pwr_sleep_activate & ACTIVATE_WIFI)
 			filterFlageEn = "checked";
 		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterWifi\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>WiFi</td>\n";
-
 
 		html += "<td style=\"border:unset;\"></td>";
 		html += "</tr></table></fieldset>\n";
@@ -3636,11 +3639,11 @@ html += "<fieldset id=\"FilterGrp\">\n";
 		html += "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"formLOG\" method=\"post\">\n";
 		html += "<table>\n";
 		html += "<th colspan=\"2\"><span><b>Log File</b></span></th>\n";
-		
-html += "<tr>\n";
+
+		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Activate:</b></td>\n";
 		html += "<td style=\"text-align: left;\">";
-html += "<fieldset id=\"FilterGrp\">\n";
+		html += "<fieldset id=\"FilterGrp\">\n";
 		html += "<legend>Events</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">";
 		html += "<tr style=\"background:unset;\">";
 
@@ -3697,13 +3700,13 @@ html += "<fieldset id=\"FilterGrp\">\n";
 		delay(1);
 // log_d("%s",html.c_str());
 // log_d("Length: %d",html.length());
-#ifdef OLED
+#if defined OLED || defined ST7735_160x80
 		html += "<form id='formDisp' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		// html += "<h2>Display Setting</h2>\n";
 		html += "<table>\n";
 		html += "<th colspan=\"2\"><span><b>Display Setting</b></span></th>\n";
 		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>OLED Enable</b></td>\n";
+		html += "<td style=\"text-align: right;\"><b>OLED/TFT Enable</b></td>\n";
 		String oledFlageEn = "";
 		if (config.oled_enable == true)
 			oledFlageEn = "checked";
@@ -3745,7 +3748,7 @@ html += "<fieldset id=\"FilterGrp\">\n";
 		html += "</select>\n";
 		html += "</td></tr>\n";
 		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>OLED Sleep</b></td>\n";
+		html += "<td style=\"text-align: right;\"><b>OLED/TFT Sleep</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"oled_timeout\" id=\"oled_timeout\">\n";
 		for (int i = 0; i <= 600; i += 30)
@@ -4053,6 +4056,54 @@ void handle_igate(AsyncWebServerRequest *request)
 						timeStamp = true;
 				}
 			}
+
+			String arg;
+			for (int x = 0; x < 5; x++)
+			{
+				arg = "sensorCH" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.igate_tlm_sensor[x] = request->arg(i).toInt();
+				}
+				arg = "param" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.igate_tlm_PARM[x], request->arg(i).c_str());
+					}
+				}
+				arg = "unit" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.igate_tlm_UNIT[x], request->arg(i).c_str());
+					}
+				}
+				arg = "precision" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.igate_tlm_precision[x] = request->arg(i).toInt();
+				}
+				arg = "offset" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.igate_tlm_offset[x] = request->arg(i).toFloat();
+				}
+				for (int y = 0; y < 3; y++)
+				{
+					arg = "eqns" + String(x) + String((char)(y + 'a'));
+					if (request->argName(i) == arg)
+					{
+						if (isValidNumber(request->arg(i)))
+							config.igate_tlm_EQNS[x][y] = request->arg(i).toFloat();
+					}
+				}
+			}
 		}
 
 		config.igate_en = aprsEn;
@@ -4299,6 +4350,17 @@ void handle_igate(AsyncWebServerRequest *request)
 		// Checkbox has been unchecked
 		html += "document.getElementById(\"inet2rfFilterGrp\").disabled=true;\n";
 		html += "}\n}\n";
+
+		html += "function selPrecision(idx) {\n";
+		html += "var x=0;\n";
+		html += "x = document.getElementsByName(\"precision\"+idx)[0].value;\n";
+		html += "document.getElementsByName(\"eqns\"+idx+\"b\")[0].value=1/Math.pow(10,x);\n";
+		html += "}\n";
+		html += "function selOffset(idx) {\n";
+		html += "var x=0;\n";
+		html += "x = document.getElementsByName(\"offset\"+idx)[0].value;\n";
+		html += "document.getElementsByName(\"eqns\"+idx+\"c\")[0].value=x*(-1);\n";
+		html += "}\n";
 		html += "</script>\n";
 		delay(1);
 		/************************ IGATE Mode **************************/
@@ -4487,6 +4549,56 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</table></td>";
 		html += "</tr>\n";
 
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Telemetry:</b><br />(v=0->8280)</td>\n";
+		html += "<td align=\"center\"><table>\n";
+		for (int ax = 0; ax < 5; ax++)
+		{
+			html += "<tr><td align=\"right\"><b>CH A" + String(ax + 1) + ":</b></td>\n";
+			html += "<td align=\"center\">\n";
+			html += "<table>";
+
+			html += "<tr><td style=\"text-align: right;\">Sensor:</td>\n";
+			html += "<td style=\"text-align: left;\">CH: ";
+			html += "<select name=\"sensorCH" + String(ax) + "\" id=\"sensorCH" + String(ax) + "\">\n";
+			for (uint8_t idx = 0; idx < 11; idx++)
+			{
+				if (idx == 0)
+				{
+					if (config.igate_tlm_sensor[ax] == idx)
+					{
+						html += "<option value=\"" + String(idx) + "\" selected>NONE</option>\n";
+					}
+					else
+					{
+						html += "<option value=\"" + String(idx) + "\">NONE</option>\n";
+					}
+				}
+				else
+				{
+					if (config.igate_tlm_sensor[ax] == idx)
+					{
+						html += "<option value=\"" + String(idx) + "\" selected>SENSOR#" + String(idx) + "</option>\n";
+					}
+					else
+					{
+						html += "<option value=\"" + String(idx) + "\">SENSOR#" + String(idx) + "</option>\n";
+					}
+				}
+			}
+			html += "</select></td>\n";
+
+			html += "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.igate_tlm_PARM[ax]) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.igate_tlm_UNIT[ax]) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision" + String(ax) + "\" type=\"text\" value=\"" + String(config.igate_tlm_precision[ax]) + "\"  onchange=\"selPrecision(" + String(ax) + ")\"/></td></tr>\n";
+
+			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.igate_tlm_EQNS[ax][0], 5) + "\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.igate_tlm_EQNS[ax][1], 5) + "\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.igate_tlm_EQNS[ax][2], 5) + "\" /> (av<sup>2</sup>+bv+c) </td>\n";
+			html += "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset" + String(ax) + "\" type=\"text\" value=\"" + String(config.igate_tlm_offset[ax], 5) + "\" onchange=\"selOffset(" + String(ax) + ")\"/></td></tr>\n";
+			html += "</table></td>";
+			html += "</tr>\n";
+		}
+		html += "</table></td></tr>\n";
+
 		html += "</table><br />\n";
 		html += "<div><button type='submit' id='submitIGATE'  name=\"commitIGATE\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitIGATE\"/>\n";
@@ -4619,7 +4731,18 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "<div><button type='submit' id='submitIGATEfilter'  name=\"commitIGATEfilter\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitIGATEfilter\"/>\n";
 		html += "</form><br />";
-		request->send(200, "text/html", html); // send to someones browser when asked
+		// request->send(200, "text/html", html); // send to someones browser when asked
+		if ((ESP.getFreeHeap() / 1000) > 100)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+			response->addHeader("IGate", "content");
+			request->send(response);
+		}
+		// html.clear();
 	}
 }
 
@@ -4877,6 +5000,54 @@ void handle_digi(AsyncWebServerRequest *request)
 						timeStamp = true;
 				}
 			}
+
+			String arg;
+			for (int x = 0; x < 5; x++)
+			{
+				arg = "sensorCH" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.digi_tlm_sensor[x] = request->arg(i).toInt();
+				}
+				arg = "param" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.digi_tlm_PARM[x], request->arg(i).c_str());
+					}
+				}
+				arg = "unit" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.digi_tlm_UNIT[x], request->arg(i).c_str());
+					}
+				}
+				arg = "precision" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.digi_tlm_precision[x] = request->arg(i).toInt();
+				}
+				arg = "offset" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.digi_tlm_offset[x] = request->arg(i).toFloat();
+				}
+				for (int y = 0; y < 3; y++)
+				{
+					arg = "eqns" + String(x) + String((char)(y + 'a'));
+					if (request->argName(i) == arg)
+					{
+						if (isValidNumber(request->arg(i)))
+							config.digi_tlm_EQNS[x][y] = request->arg(i).toFloat();
+					}
+				}
+			}
 		}
 		config.digi_en = digiEn;
 		config.digi_gps = posGPS;
@@ -4931,6 +5102,16 @@ void handle_digi(AsyncWebServerRequest *request)
 		html += "document.getElementById('digiImgSymbol').src = \"http://aprs.dprns.com/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n";
 		html += "\n}\n";
 		html += "function calculatePHGR(){document.forms.formDIGI.texttouse.value=\"PHG\"+calcPower(document.forms.formDIGI.power.value)+calcHeight(document.forms.formDIGI.haat.value)+calcGain(document.forms.formDIGI.gain.value)+calcDirection(document.forms.formDIGI.direction.selectedIndex)}function Log2(e){return Math.log(e)/Math.log(2)}function calcPerHour(e){return e<10?e:String.fromCharCode(65+(e-10))}function calcHeight(e){return String.fromCharCode(48+Math.round(Log2(e/10),0))}function calcPower(e){if(e<1)return 0;if(e>=1&&e<4)return 1;if(e>=4&&e<9)return 2;if(e>=9&&e<16)return 3;if(e>=16&&e<25)return 4;if(e>=25&&e<36)return 5;if(e>=36&&e<49)return 6;if(e>=49&&e<64)return 7;if(e>=64&&e<81)return 8;if(e>=81)return 9}function calcDirection(e){if(e==\"0\")return\"0\";if(e==\"1\")return\"1\";if(e==\"2\")return\"2\";if(e==\"3\")return\"3\";if(e==\"4\")return\"4\";if(e==\"5\")return\"5\";if(e==\"6\")return\"6\";if(e==\"7\")return\"7\";if(e==\"8\")return\"8\"}function calcGain(e){return e>9?\"9\":e<0?\"0\":Math.round(e,0)}\n";
+		html += "function selPrecision(idx) {\n";
+		html += "var x=0;\n";
+		html += "x = document.getElementsByName(\"precision\"+idx)[0].value;\n";
+		html += "document.getElementsByName(\"eqns\"+idx+\"b\")[0].value=1/Math.pow(10,x);\n";
+		html += "}\n";
+		html += "function selOffset(idx) {\n";
+		html += "var x=0;\n";
+		html += "x = document.getElementsByName(\"offset\"+idx)[0].value;\n";
+		html += "document.getElementsByName(\"eqns\"+idx+\"c\")[0].value=x*(-1);\n";
+		html += "}\n";
 		html += "</script>\n";
 
 		/************************ DIGI Mode **************************/
@@ -5146,11 +5327,66 @@ void handle_digi(AsyncWebServerRequest *request)
 		html += "<td style=\"border:unset;\"></td>";
 		html += "</tr></table></fieldset>\n";
 		html += "</td></tr>\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Telemetry:</b><br />(v=0->8280)</td>\n";
+		html += "<td align=\"center\"><table>\n";
+		for (int ax = 0; ax < 5; ax++)
+		{
+			html += "<tr><td align=\"right\"><b>CH A" + String(ax + 1) + ":</b></td>\n";
+			html += "<td align=\"center\">\n";
+			html += "<table>";
+
+			html += "<tr><td style=\"text-align: right;\">Sensor:</td>\n";
+			html += "<td style=\"text-align: left;\">CH: ";
+			html += "<select name=\"sensorCH" + String(ax) + "\" id=\"sensorCH" + String(ax) + "\">\n";
+			for (uint8_t idx = 0; idx < 11; idx++)
+			{
+				if (idx == 0)
+				{
+					if (config.digi_tlm_sensor[ax] == idx)
+					{
+						html += "<option value=\"" + String(idx) + "\" selected>NONE</option>\n";
+					}
+					else
+					{
+						html += "<option value=\"" + String(idx) + "\">NONE</option>\n";
+					}
+				}
+				else
+				{
+					if (config.digi_tlm_sensor[ax] == idx)
+					{
+						html += "<option value=\"" + String(idx) + "\" selected>SENSOR#" + String(idx) + "</option>\n";
+					}
+					else
+					{
+						html += "<option value=\"" + String(idx) + "\">SENSOR#" + String(idx) + "</option>\n";
+					}
+				}
+			}
+			html += "</select></td>\n";
+
+			html += "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.digi_tlm_PARM[ax]) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.digi_tlm_UNIT[ax]) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision" + String(ax) + "\" type=\"text\" value=\"" + String(config.digi_tlm_precision[ax]) + "\"  onchange=\"selPrecision(" + String(ax) + ")\"/></td></tr>\n";
+
+			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.digi_tlm_EQNS[ax][0], 5) + "\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.digi_tlm_EQNS[ax][1], 5) + "\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.digi_tlm_EQNS[ax][2], 5) + "\" /> (av<sup>2</sup>+bv+c) </td>\n";
+			html += "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset" + String(ax) + "\" type=\"text\" value=\"" + String(config.digi_tlm_offset[ax], 5) + "\" onchange=\"selOffset(" + String(ax) + ")\" /></td></tr>\n";
+			html += "</table></td>";
+			html += "</tr>\n";
+		}
+		html += "</table></td></tr>\n";
+
 		html += "</table><br />\n";
 		html += "<div><button type='submit' id='submitDIGI'  name=\"commitDIGI\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitDIGI\"/>\n";
 		html += "</form><br />";
 		request->send(200, "text/html", html); // send to someones browser when asked
+		// AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+		// response->addHeader("Digi", "content");
+		// request->send(response);
+		html.clear();
 	}
 }
 
@@ -5165,9 +5401,13 @@ void handle_wx(AsyncWebServerRequest *request)
 	bool pos2RF = false;
 	bool pos2INET = false;
 	bool timeStamp = false;
+	String arg = "";
 
 	if (request->hasArg("commitWX"))
 	{
+		for (int x = 0; x < WX_SENSOR_NUM; x++)
+			config.wx_sensor_enable[x] = false;
+
 		for (int i = 0; i < request->args(); i++)
 		{
 			if (request->argName(i) == "Enable")
@@ -5209,6 +5449,14 @@ void handle_wx(AsyncWebServerRequest *request)
 						config.wx_ssid = request->arg(i).toInt();
 					if (config.wx_ssid > 15)
 						config.wx_ssid = 3;
+				}
+			}
+			if (request->argName(i) == "channel")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.wx_channel = request->arg(i).toInt();
 				}
 			}
 			if (request->argName(i) == "PosInv")
@@ -5294,6 +5542,36 @@ void handle_wx(AsyncWebServerRequest *request)
 				{
 					if (String(request->arg(i)) == "OK")
 						timeStamp = true;
+				}
+			}
+			for (int x = 0; x < WX_SENSOR_NUM; x++)
+			{
+				arg = "senEn" + String(x);
+				if (request->argName(i) == arg)
+				{
+
+					if (request->arg(i) != "")
+					{
+						if (String(request->arg(i)) == "OK")
+							config.wx_sensor_enable[x] = true;
+					}
+				}
+				arg = "sensorCH" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.wx_sensor_ch[x] = request->arg(i).toInt();
+				}
+				arg = "avgSel" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						if (request->arg(i).toInt() == 1)
+							config.wx_sensor_avg[x] = true;
+						else if (request->arg(i).toInt() == 0)
+							config.wx_sensor_avg[x] = false;
+					}
 				}
 			}
 		}
@@ -5424,26 +5702,94 @@ void handle_wx(AsyncWebServerRequest *request)
 		html += "</table></td>";
 		html += "</tr>\n";
 
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>PORT:</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"channel\" id=\"channel\">\n";
-		for (int i = 0; i < 4; i++)
+		// html += "<tr>\n";
+		// html += "<td align=\"right\"><b>PORT:</b></td>\n";
+		// html += "<td style=\"text-align: left;\">\n";
+		// html += "<select name=\"channel\" id=\"channel\">\n";
+		// for (int i = 0; i < 5; i++)
+		// {
+		// 	if (config.wx_channel == i)
+		// 		html += "<option value=\"" + String(i) + "\" selected>" + String(WX_PORT[i]) + " </option>\n";
+		// 	else
+		// 		html += "<option value=\"" + String(i) + "\" >" + String(WX_PORT[i]) + " </option>\n";
+		// }
+		// html += "</select>\n";
+		// html += "</td>\n";
+		// html += "</tr>\n";
+		/************************ Sensor Config Mode **************************/
+		// html += "<form id='formSENSOR' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
+		// html += "<table>\n";
+		// html += "<th colspan=\"2\"><span><b>Sensor Config</b></span></th>\n";
+
+		html += "<tr><td align=\"right\"><b>SENSOR:<br />Selection</b></td>\n";
+		html += "<td align=\"center\">\n";
+		html += "<table>";
+
+		for (int ax = 0; ax < WX_SENSOR_NUM; ax++)
 		{
-			if (config.wx_channel == i)
-				html += "<option value=\"" + String(i) + "\" selected>" + String(WX_PORT[i]) + " </option>\n";
+			html += "<tr><td align=\"right\"><b>" + String(WX_SENSOR[ax]) + ":</b> \n";
+			EnFlag = "";
+			if (config.wx_sensor_enable[ax])
+				EnFlag = "checked";
+			html += "<label class=\"switch\"><input type=\"checkbox\" name=\"senEn" + String(ax) + "\" value=\"OK\" " + EnFlag + "><span class=\"slider round\"></span></label>";
+			html += "</td>\n";
+
+			// html += "<td style=\"text-align: lefe;\">Sensor:</td>\n";
+			html += "<td style=\"text-align: left;\">Sensor Channel: ";
+			html += "<select name=\"sensorCH" + String(ax) + "\" id=\"sensorCH" + String(ax) + "\">\n";
+			for (uint8_t idx = 0; idx < 11; idx++)
+			{
+				if (idx == 0)
+				{
+					if (config.wx_sensor_ch[ax] == idx)
+					{
+						html += "<option value=\"" + String(idx) + "\" selected>NONE</option>\n";
+					}
+					else
+					{
+						html += "<option value=\"" + String(idx) + "\">NONE</option>\n";
+					}
+				}
+				else
+				{
+					if (config.wx_sensor_ch[ax] == idx)
+					{
+						html += "<option value=\"" + String(idx) + "\" selected>SENSOR#" + String(idx) + "</option>\n";
+					}
+					else
+					{
+						html += "<option value=\"" + String(idx) + "\">SENSOR#" + String(idx) + "</option>\n";
+					}
+				}
+			}
+			html += "</select>\n";
+			String avgFlag = "";
+			String sampleFlag = "";
+			if (config.wx_sensor_avg[ax])
+				avgFlag = "checked=\"checked\"";
 			else
-				html += "<option value=\"" + String(i) + "\" >" + String(WX_PORT[i]) + " </option>\n";
+				sampleFlag = "checked=\"checked\"";
+			html += "<input type=\"radio\" name=\"avgSel" + String(ax) + "\" value=\"0\" " + sampleFlag + "/>Sample <input type=\"radio\" name=\"avgSel" + String(ax) + "\" value=\"1\" " + avgFlag + "/>Average";
+			html += "</td></tr>";
 		}
-		html += "</select>\n";
-		html += "</td>\n";
-		html += "</tr>\n";
+		html += "</table></td></tr>\n";
 
 		html += "</table><br />\n";
 		html += "<div><button type='submit' id='submitWX'  name=\"commitWX\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWX\"/>\n";
 		html += "</form><br />";
-		request->send(200, "text/html", html); // send to someones browser when asked
+		// request->send(200, "text/html", html); // send to someones browser when asked
+		if ((ESP.getFreeHeap() / 1000) > 110)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+			response->addHeader("Weather", "content");
+			request->send(response);
+		}
+		// html.clear();
 	}
 }
 
@@ -5733,7 +6079,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 
 			html += "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.tlm0_PARM[ax]) + "\" /></td>\n";
 			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.tlm0_UNIT[ax]) + "\" /></td></tr>\n";
-			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av^2+bv+c)</td></tr>\n";
+			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av<sup>2</sup>+bv+c)</td></tr>\n";
 			html += "</table></td>";
 			html += "</tr>\n";
 		}
@@ -5770,7 +6116,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 				LowFlag = "checked=\"checked\"";
 			html += "<td style=\"text-align: left;\"> Active:<input type=\"radio\" name=\"bitact" + String(ax) + "\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"bitact" + String(ax) + "\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 			html += "</tr>\n";
-			// html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av^2+bv+c)</td></tr>\n";
+			// html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av<sup>2</sup>+bv+c)</td></tr>\n";
 			html += "</table></td>";
 			html += "</tr>\n";
 			b <<= 1;
@@ -5791,6 +6137,329 @@ void handle_tlm(AsyncWebServerRequest *request)
 		html += "<input type=\"hidden\" name=\"commitTLM\"/>\n";
 		html += "</form><br />";
 		request->send(200, "text/html", html); // send to someones browser when asked
+	}
+}
+
+void handle_sensor(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
+	}
+	String arg = "";
+
+	if (request->hasArg("commitSENSOR"))
+	{
+		for (int x = 0; x < SENSOR_NUMBER; x++)
+		{
+			config.sensor[x].enable = false;
+		}
+		for (int i = 0; i < request->args(); i++)
+		{
+
+			for (int x = 0; x < SENSOR_NUMBER; x++)
+			{
+				arg = "En" + String(x);
+				if (request->argName(i) == arg)
+				{
+
+					if (request->arg(i) != "")
+					{
+						if (String(request->arg(i)) == "OK")
+							config.sensor[x].enable = true;
+					}
+				}
+				arg = "sensorCH" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.sensor[x].type = request->arg(i).toInt();
+				}
+				arg = "sensorP" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.sensor[x].port = request->arg(i).toInt();
+				}
+				arg = "address" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.sensor[x].address = request->arg(i).toInt();
+				}
+				arg = "sample" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.sensor[x].samplerate = request->arg(i).toInt();
+				}
+				arg = "avg" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.sensor[x].averagerate = request->arg(i).toInt();
+				}
+				arg = "param" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.sensor[x].parm, request->arg(i).c_str());
+					}
+				}
+				arg = "unit" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.sensor[x].unit, request->arg(i).c_str());
+					}
+				}
+				for (int y = 0; y < 3; y++)
+				{
+					arg = "eqns" + String(x) + String((char)(y + 'a'));
+					if (request->argName(i) == arg)
+					{
+						if (isValidNumber(request->arg(i)))
+							config.sensor[x].eqns[y] = request->arg(i).toFloat();
+					}
+				}
+				//}
+			}
+		}
+
+		saveEEPROM();
+		String html = "OK";
+		request->send(200, "text/html", html);
+	}
+	else
+	{
+
+		String html = "<script type=\"text/javascript\">\n";
+		html += "$('form').submit(function (e) {\n";
+		html += "e.preventDefault();\n";
+		html += "var data = new FormData(e.currentTarget);\n";
+		html += "document.getElementById(\"submitSENSOR\").disabled=true;\n";
+		html += "$.ajax({\n";
+		html += "url: '/sensor',\n";
+		html += "type: 'POST',\n";
+		html += "data: data,\n";
+		html += "contentType: false,\n";
+		html += "processData: false,\n";
+		html += "success: function (data) {\n";
+		html += "alert(\"Submited Successfully\");\n";
+		html += "},\n";
+		html += "error: function (data) {\n";
+		html += "alert(\"An error occurred.\");\n";
+		html += "}\n";
+		html += "});\n";
+		html += "});\n";
+		html += "function selSensorType(idx) {\n";
+		html += "var x=0;\n";
+		html += "x = document.getElementById(\"sensorCH\"+idx).value;\n";
+		html += "if (x==1) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Co2\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"ppm\";\n";
+		html += "}else if (x==2) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"CH2O\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"μg/m³\";\n";
+		html += "}else if (x==3) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"TVOC\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"μg/m³\";\n";
+		html += "}else if (x==4) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"PM2.5\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"μg/m³\";\n";
+		html += "}else if (x==5) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"PM10.0\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"μg/m³\";\n";
+		html += "}else if (x==6) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Temperature\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"°C\";\n";
+		html += "}else if (x==7) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Humidity\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"%RH\";\n";
+		html += "}else if (x==8) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Pressure\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"hPa\";\n";
+		html += "}else if (x==9) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"WindSpeed\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"kPh\";\n";
+		html += "}else if (x==10) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"WindCourse\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"°\";\n";
+		html += "}else if (x==11) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Rain\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"mm\";\n";
+		html += "}else if (x==12) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Luminosity\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"W/m³\";\n";
+		html += "}else if (x==13) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"SoilTemp\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"°C\";\n";
+		html += "}else if (x==14) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"SoilMoisture\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"%VWC\";\n";
+		html += "}else if (x==15) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"WaterTemp\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"°C\";\n";
+		html += "}else if (x==16) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"WaterTDS\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\" \";\n";
+		html += "}else if (x==17) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"WaterLevel\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"mm\";\n";
+		html += "}else if (x==18) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Voltage\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"V\";\n";
+		html += "}else if (x==19) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Current\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"A\";\n";
+		html += "}else if (x==20) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Power\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"W\";\n";
+		html += "}else if (x==21) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Satellite\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\" \";\n";
+		html += "}else if (x==22) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"HDOP\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\" \";\n";
+		html += "}else if (x==23) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"Battery\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"V\";\n";
+		html += "}\n}\n";
+
+		html += "function selSensor(idx) {\n";
+		html += "var x=0;\n";
+		html += "x = document.getElementById(\"sensorP\"+idx).value;\n";
+		html += "if (x>=10 && x<=13) {\n";
+#ifdef TTGO_T_Beam_S3_SUPREME_V3
+		html += "document.getElementById(\"address\"+idx).value=119;\n";
+#else
+		html += "document.getElementById(\"address\"+idx).value=118;\n";
+#endif
+		html += "}else if (x==16 || x==17) {\n";
+		html += "document.getElementById(\"address\"+idx).value=90;\n";
+		html += "}\n}\n";
+		html += "</script>\n";
+
+		/************************ Sensor Monitor **************************/
+		// html += "<form id='formSENSOR' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
+		html += "<table>\n";
+		html += "<th colspan=\"5\"><span><b>Sensor Monitor</b></span></th>\n";
+		int ax = 0;
+		for (int r = 0; r < 3; r++)
+		{
+			html += "<tr>\n";
+			for (int c = 0; c < 5; c++)
+			{
+
+				html += "<td align=\"center\">\n";
+				if (config.sensor[ax].enable)
+					html += "<fieldset id=\"SenGrp" + String(ax + 1) + "\">\n";
+				else
+					html += "<fieldset id=\"SenGrp" + String(ax + 1) + "\" disabled>\n";
+
+				html += "<legend>SEN#" + String(ax + 1) + "-" + String(config.sensor[ax].parm) + "</legend>\n";
+				html += "<input id=\"sVal" + String(ax) + "\" style=\"text-align:right;\" size=\"5\" type=\"text\" value=\"" + String(sen[ax].sample, 2) + "\" readonly/> " + String(config.sensor[ax].unit) + "\n";
+				html += "</td>\n";
+				ax++;
+				if (ax >= SENSOR_NUMBER)
+					break;
+			}
+			html += "</tr>\n";
+			if (ax >= SENSOR_NUMBER)
+				break;
+		}
+		html += "</table>< /br>\n";
+
+		/************************ Sensor Config Mode **************************/
+		html += "<form id='formSENSOR' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
+		html += "<table>\n";
+		html += "<th colspan=\"2\"><span><b>Sensor Config</b></span></th>\n";
+		String EnFlag = "";
+
+		for (int ax = 0; ax < SENSOR_NUMBER; ax++)
+		{
+			html += "<tr><td align=\"right\"><b>SENSOR#" + String(ax + 1) + ":</b><br />\n";
+			EnFlag = "";
+			if (config.sensor[ax].enable)
+				EnFlag = "checked";
+			html += "<label class=\"switch\"><input type=\"checkbox\" name=\"En" + String(ax) + "\" value=\"OK\" " + EnFlag + "><span class=\"slider round\"></span></label>";
+			html += "</td><td align=\"center\">\n";
+			html += "<table>";
+
+			html += "<tr><td style=\"text-align: right;\">Type:</td>\n";
+			html += "<td style=\"text-align: left;\">";
+			html += "<select name=\"sensorCH" + String(ax) + "\" id=\"sensorCH" + String(ax) + "\" onchange=\"selSensorType(" + String(ax) + ")\">\n";
+			for (uint8_t idx = 0; idx < SENSOR_NAME_NUM; idx++)
+			{
+				if (config.sensor[ax].type == idx)
+				{
+					html += "<option value=\"" + String(idx) + "\" selected>" + String(SENSOR_NAME[idx]) + "</option>\n";
+				}
+				else
+				{
+					html += "<option value=\"" + String(idx) + "\">" + String(SENSOR_NAME[idx]) + "</option>\n";
+				}
+			}
+			html += "</select></td>\n";
+
+			html += "<td style=\"text-align: left;\">Name: <input maxlength=\"15\" size=\"15\" name=\"param" + String(ax) + "\" id=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.sensor[ax].parm) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"10\" size=\"5\" name=\"unit" + String(ax) + "\" id=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.sensor[ax].unit) + "\" /></td></tr>\n";
+			// html += "<tr><td style=\"text-align: right;\">Port:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[2], 3) + "\" /> (av<sup>2</sup>+bv+c)</td></tr>\n";
+			html += "<tr><td style=\"text-align: right;\">PORT:</td>\n";
+			html += "<td style=\"text-align: left;\">";
+			html += "<select name=\"sensorP" + String(ax) + "\" id=\"sensorP" + String(ax) + "\" onchange=\"selSensor(" + String(ax) + ")\">\n";
+			for (uint8_t idx = 0; idx < SENSOR_PORT_NUM; idx++)
+			{
+				if (config.sensor[ax].port == idx)
+				{
+					html += "<option value=\"" + String(idx) + "\" selected>" + String(SENSOR_PORT[idx]) + "</option>\n";
+				}
+				else
+				{
+					html += "<option value=\"" + String(idx) + "\">" + String(SENSOR_PORT[idx]) + "</option>\n";
+				}
+			}
+			html += "</select></td>\n";
+			html += "<td style=\"text-align: left;\">Addr/Reg/GPIO: <input style=\"text-align:right;\" min=\"0\" max=\"999\" step=\"1\" name=\"address" + String(ax) + "\" id=\"address" + String(ax) + "\" type=\"number\" value=\"" + String(config.sensor[ax].address) + "\" /></td>\n";
+			html += "<td style=\"text-align: left;\">Sample: <input style=\"text-align:right;\" min=\"0\" max=\"9999\" step=\"1\" name=\"sample" + String(ax) + "\" type=\"number\" value=\"" + String(config.sensor[ax].samplerate) + "\" />Sec.\n";
+			html += "Average: <input style=\"text-align:right;\" min=\"0\" max=\"999\" step=\"1\" name=\"avg" + String(ax) + "\" type=\"number\" value=\"" + String(config.sensor[ax].averagerate) + "\" />Sec.</td></tr>\n";
+			html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[0], 5) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[1], 5) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[2], 5) + "\" /> (av<sup>2</sup>+bv+c)</td></tr>\n";
+			html += "</table></td>";
+			html += "</tr>\n";
+		}
+
+		html += "</table><br />\n";
+		html += "<div><button type='submit' id='submitSENSOR'  name=\"commitSENSOR\"> Apply Change </button></div>\n";
+		html += "<input type=\"hidden\" name=\"commitSENSOR\"/>\n";
+		html += "</form><br />";
+		if ((ESP.getFreeHeap() / 1000) > 110)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+			response->addHeader("Sensor", "content");
+			request->send(response);
+		}
+		html.clear();
+
+		// char *info = (char *)calloc(html.length(), sizeof(char));
+		//  if (info)
+		//  {
+		//  	html.toCharArray(info, html.length(), 0);
+		//  	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, html.length());
+
+		// 	response->addHeader("Sensor", "content");
+		// 	request->send(response);
+		// 	free(info);
+		// }
+		// else
+		// {
+		// 	log_d("Can't define calloc info size %d", html.length());
+		// }
 	}
 }
 
@@ -6084,6 +6753,53 @@ void handle_tracker(AsyncWebServerRequest *request)
 						timeStamp = true;
 				}
 			}
+			String arg;
+			for (int x = 0; x < 5; x++)
+			{
+				arg = "sensorCH" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.trk_tlm_sensor[x] = request->arg(i).toInt();
+				}
+				arg = "param" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.trk_tlm_PARM[x], request->arg(i).c_str());
+					}
+				}
+				arg = "unit" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (request->arg(i) != "")
+					{
+						strcpy(config.trk_tlm_UNIT[x], request->arg(i).c_str());
+					}
+				}
+				arg = "precision" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.trk_tlm_precision[x] = request->arg(i).toInt();
+				}
+				arg = "offset" + String(x);
+				if (request->argName(i) == arg)
+				{
+					if (isValidNumber(request->arg(i)))
+						config.trk_tlm_offset[x] = request->arg(i).toFloat();
+				}
+				for (int y = 0; y < 3; y++)
+				{
+					arg = "eqns" + String(x) + String((char)(y + 'a'));
+					if (request->argName(i) == arg)
+					{
+						if (isValidNumber(request->arg(i)))
+							config.trk_tlm_EQNS[x][y] = request->arg(i).toFloat();
+					}
+				}
+			}
 		}
 		config.trk_en = trakerEn;
 		config.trk_smartbeacon = smartEn;
@@ -6095,7 +6811,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 
 		config.trk_log = optCST;
 		config.trk_altitude = optAlt;
-		config.trk_bat = optBat;
+		config.trk_rssi = optBat;
 		config.trk_sat = optSat;
 		config.trk_timestamp = timeStamp;
 
@@ -6163,6 +6879,16 @@ void handle_tracker(AsyncWebServerRequest *request)
 	html += "document.getElementById(\"smartbcnGrp\").disabled=true;\n";
 	html += "}\n}\n";
 
+	html += "function selPrecision(idx) {\n";
+	html += "var x=0;\n";
+	html += "x = document.getElementsByName(\"precision\"+idx)[0].value;\n";
+	html += "document.getElementsByName(\"eqns\"+idx+\"b\")[0].value=1/Math.pow(10,x);\n";
+	html += "}\n";
+	html += "function selOffset(idx) {\n";
+	html += "var x=0;\n";
+	html += "x = document.getElementsByName(\"offset\"+idx)[0].value;\n";
+	html += "document.getElementsByName(\"eqns\"+idx+\"c\")[0].value=x*(-1);\n";
+	html += "}\n";
 	html += "</script>\n";
 
 	delay(1);
@@ -6263,7 +6989,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 	String trackerOptSatFlag = "";
 	String trackerOptAltFlag = "";
 	String trackerOptCSTFlag = "";
-	if (config.trk_bat)
+	if (config.trk_rssi)
 		trackerOptBatFlag = "checked";
 	if (config.trk_sat)
 		trackerOptSatFlag = "checked";
@@ -6273,9 +6999,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 		trackerOptCSTFlag = "checked";
 	html += "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\">";
 	html += "<input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" " + trackerOptCSTFlag + "/>Telemetry ";
-	html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Temperature ";
-	html += "<input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" " + trackerOptBatFlag + "/>Battery ";
-	html += "<input type=\"checkbox\" name=\"trackerOptSat\" value=\"OK\" " + trackerOptSatFlag + "/>Satellite";
+	// html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Temperature ";
+	html += "<input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" " + trackerOptBatFlag + "/>RSSI Request ";
+	// html += "<input type=\"checkbox\" name=\"trackerOptSat\" value=\"OK\" " + trackerOptSatFlag + "/>Satellite";
 	html += "</td></tr>\n";
 
 	html += "<tr>";
@@ -6340,7 +7066,59 @@ void handle_tracker(AsyncWebServerRequest *request)
 	html += "<tr><td style=\"text-align: right;\">Min Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"100\" step=\"1\" id=\"minInterval\" name=\"minInterval\" type=\"number\" value=\"" + String(config.trk_mininterval) + "\" /> Sec.</td></tr>\n";
 	html += "<tr><td style=\"text-align: right;\">Min Angle:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"359\" step=\"1\" id=\"minAngle\" name=\"minAngle\" type=\"number\" value=\"" + String(config.trk_minangle) + "\" /> Degree.</td></tr>\n";
 
-	html += "</table></fieldset></tr></table><br />\n";
+	html += "</table></fieldset></tr>";
+
+	html += "<tr>\n";
+	html += "<td align=\"right\"><b>Telemetry:</b><br />(v=0->8280)</td>\n";
+	html += "<td align=\"center\"><table>\n";
+	for (int ax = 0; ax < 5; ax++)
+	{
+		html += "<tr><td align=\"right\"><b>CH A" + String(ax + 1) + ":</b></td>\n";
+		html += "<td align=\"center\">\n";
+		html += "<table>";
+
+		html += "<tr><td style=\"text-align: right;\">Sensor:</td>\n";
+		html += "<td style=\"text-align: left;\">CH: ";
+		html += "<select name=\"sensorCH" + String(ax) + "\" id=\"sensorCH" + String(ax) + "\">\n";
+		for (uint8_t idx = 0; idx < 11; idx++)
+		{
+			if (idx == 0)
+			{
+				if (config.trk_tlm_sensor[ax] == idx)
+				{
+					html += "<option value=\"" + String(idx) + "\" selected>NONE</option>\n";
+				}
+				else
+				{
+					html += "<option value=\"" + String(idx) + "\">NONE</option>\n";
+				}
+			}
+			else
+			{
+				if (config.trk_tlm_sensor[ax] == idx)
+				{
+					html += "<option value=\"" + String(idx) + "\" selected>SENSOR#" + String(idx) + "</option>\n";
+				}
+				else
+				{
+					html += "<option value=\"" + String(idx) + "\">SENSOR#" + String(idx) + "</option>\n";
+				}
+			}
+		}
+		html += "</select></td>\n";
+
+		html += "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param" + String(ax) + "\" type=\"text\" value=\"" + String(config.trk_tlm_PARM[ax]) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit" + String(ax) + "\" type=\"text\" value=\"" + String(config.trk_tlm_UNIT[ax]) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision" + String(ax) + "\" type=\"text\" value=\"" + String(config.trk_tlm_precision[ax]) + "\" onchange=\"selPrecision(" + String(ax) + ")\" /></td></tr>\n";
+
+		html += "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.trk_tlm_EQNS[ax][0], 5) + "\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.trk_tlm_EQNS[ax][1], 5) + "\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.trk_tlm_EQNS[ax][2], 5) + "\" /> (av<sup>2</sup>+bv+c) </td>\n";
+		html += "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset" + String(ax) + "\" type=\"text\" value=\"" + String(config.trk_tlm_offset[ax], 5) + "\"  onchange=\"selOffset(" + String(ax) + ")\" /></td></tr>\n";
+		html += "</table></td>";
+		html += "</tr>\n";
+	}
+	html += "</table></td></tr>\n";
+
+	html += "</table><br />\n";
 	html += "<div><button type='submit' id='submitTRACKER'  name=\"commitTRACKER\"> Apply Change </button></div>\n";
 	html += "<input type=\"hidden\" name=\"commitTRACKER\"/>\n";
 	html += "</form><br />";
@@ -6648,8 +7426,10 @@ void handle_wireless(AsyncWebServerRequest *request)
 
 extern bool afskSync;
 extern String lastPkgRaw;
-extern float dBV;
-extern int mVrms;
+extern float rssi;
+extern float snr;
+extern float freqErr;
+
 void handle_realtime(AsyncWebServerRequest *request)
 {
 	// char jsonMsg[1000];
@@ -6660,9 +7440,9 @@ void handle_realtime(AsyncWebServerRequest *request)
 	if (afskSync && (lastPkgRaw.length() > 5))
 	{
 		int input_length = lastPkgRaw.length();
-		jsonMsg = (char *)calloc((input_length * 2) + 70,sizeof(char));
-		char *input_buffer = (char *)calloc(input_length + 2,sizeof(char));
-		char *output_buffer = (char *)calloc(input_length * 2,sizeof(char));
+		jsonMsg = (char *)calloc((input_length * 2) + 100, sizeof(char));
+		char *input_buffer = (char *)calloc(input_length + 2, sizeof(char));
+		char *output_buffer = (char *)calloc(input_length * 2, sizeof(char));
 		if (output_buffer)
 		{
 			// lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
@@ -6670,7 +7450,7 @@ void handle_realtime(AsyncWebServerRequest *request)
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, output_buffer, timeStamp);
 			// Serial.println(jsonMsg);
 			free(input_buffer);
 			free(output_buffer);
@@ -6678,11 +7458,11 @@ void handle_realtime(AsyncWebServerRequest *request)
 	}
 	else
 	{
-		jsonMsg = (char *)calloc(200,sizeof(char));
+		jsonMsg = (char *)calloc(200, sizeof(char));
 		if (afskSync)
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", mVrms, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
 		else
-			sprintf(jsonMsg, "{\"Active\":\"0\",\"mVrms\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
 	}
 	afskSync = false;
 	request->send(200, "text/html", String(jsonMsg));
@@ -6701,9 +7481,9 @@ void handle_ws()
 	if (afskSync && (lastPkgRaw.length() > 5))
 	{
 		int input_length = lastPkgRaw.length();
-		jsonMsg = (char *)calloc((input_length * 2) + 70,sizeof(char));
-		char *input_buffer = (char *)calloc(input_length + 2,sizeof(char));
-		char *output_buffer = (char *)calloc(input_length * 2,sizeof(char));
+		jsonMsg = (char *)calloc((input_length * 2) + 100, sizeof(char));
+		char *input_buffer = (char *)calloc(input_length + 2, sizeof(char));
+		char *output_buffer = (char *)calloc(input_length * 2, sizeof(char));
 		if (output_buffer)
 		{
 			memset(input_buffer, 0, (input_length + 2));
@@ -6713,7 +7493,7 @@ void handle_ws()
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", mVrms, output_buffer, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, output_buffer, timeStamp);
 			// Serial.println(jsonMsg);
 			free(input_buffer);
 			free(output_buffer);
@@ -6721,11 +7501,11 @@ void handle_ws()
 	}
 	else
 	{
-		jsonMsg = (char *)calloc(200,sizeof(char));
+		jsonMsg = (char *)calloc(200, sizeof(char));
 		if (afskSync)
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"mVrms\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", mVrms, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
 		else
-			sprintf(jsonMsg, "{\"Active\":\"0\",\"mVrms\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
 	}
 	afskSync = false;
 	ws.textAll(jsonMsg);
@@ -6742,7 +7522,7 @@ void handle_ws_gnss(char *nmea, size_t size)
 	char jsonMsg[output_length + 200];
 	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
 	// Serial.println(output_buffer);
-	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(),gps.time.value(), timeStamp, nmea_enc);
+	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), gps.time.value(), timeStamp, nmea_enc);
 	ws_gnss.textAll(jsonMsg);
 
 	// unsigned int output_length = encode_base64_length(size);
@@ -6802,17 +7582,17 @@ void handle_test(AsyncWebServerRequest *request)
 	webString += "<script language=\"JavaScript\">";
 	webString += "$(document).ready(function() {\nvar chart = {\ntype: 'gauge',plotBorderWidth: 1,plotBackgroundColor: {linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },stops: [[0, '#FFFFC6'],[0.3, '#FFFFFF'],[1, '#FFF4C6']]},plotBackgroundImage: null,height: 200};\n";
 	webString += "var credits = {enabled: false};\n";
-	webString += "var title = {text: 'RX VU Meter'};\n";
+	webString += "var title = {text: 'RX Meter'};\n";
 	webString += "var pane = [{startAngle: -45,endAngle: 45,background: null,center: ['50%', '145%'],size: 300}];\n";
-	webString += "var yAxis = [{min: -40,max: 1,minorTickPosition: 'outside',tickPosition: 'outside',labels: {rotation: 'auto',distance: 20},\n";
-	webString += "plotBands: [{from: -10,to: 1,color: '#C02316',innerRadius: '100%',outerRadius: '105%'},{from: -20,to: -10,color: '#00C000',innerRadius: '100%',outerRadius: '105%'},{from: -30,to: -20,color: '#AFFF0F',innerRadius: '100%',outerRadius: '105%'},{from: -40,to: -30,color: '#C0A316',innerRadius: '100%',outerRadius: '105%'}],\n";
-	webString += "pane: 0,title: {text: '<span style=\"font-size:12px\">dBV</span>',y: -40}}];\n";
+	webString += "var yAxis = [{min: -140,max: 1,minorTickPosition: 'outside',tickPosition: 'outside',labels: {rotation: 'auto',distance: 20},\n";
+	webString += "plotBands: [{from: -60,to: 0,color: '#C02316',innerRadius: '100%',outerRadius: '105%'},{from: -90,to: -60,color: '#00C000',innerRadius: '100%',outerRadius: '105%'},{from: -120,to: -90,color: '#AFFF0F',innerRadius: '100%',outerRadius: '105%'},{from: -140,to: -120,color: '#C0A316',innerRadius: '100%',outerRadius: '105%'}],\n";
+	webString += "pane: 0,title: {text: '<span style=\"font-size:14px\">dBm</span>',y: -40}}];\n";
 	webString += "var plotOptions = {gauge: {dataLabels: {enabled: false},dial: {radius: '100%'}}};\n";
-	webString += "var series= [{data: [-40],yAxis: 0}];\n";
+	webString += "var series= [{data: [-140],yAxis: 0}];\n";
 	webString += "var json = {};\n json.chart = chart;\n json.credits = credits;\n json.title = title;\n json.pane = pane;\n json.yAxis = yAxis;\n json.plotOptions = plotOptions;\n json.series = series;\n";
 	// Add some life
 	webString += "var chartFunction = function (chart) { \n"; // the chart may be destroyed
-	webString += "var Vrms=0;\nvar dBV=-40;\nvar active=0;var raw=\"\";var timeStamp;\n";
+	webString += "var rssi=-140;\nvar snr=0;\nvar freqErr=0;\nvar active=0;var raw=\"\";var timeStamp;\n";
 	webString += "if (chart.series) {\n";
 	webString += "var left = chart.series[0].points[0];\n";
 	webString += "var host='ws://'+location.hostname+':81/ws'\n";
@@ -6821,14 +7601,15 @@ void handle_test(AsyncWebServerRequest *request)
 	webString += "ws.onmessage = function(event) {\n  console.log(event.data);\n";
 	webString += "const jsonR=JSON.parse(event.data);\n";
 	webString += "active=parseInt(jsonR.Active);\n";
-	webString += "Vrms=parseFloat(jsonR.mVrms)/1000;\n";
-	webString += "dBV=20.0*Math.log10(Vrms);\n";
-	webString += "if(dBV<-40) dBV=-40;\n";
+	webString += "rssi=parseFloat(jsonR.rssi);\n";
+	webString += "snr=parseFloat(jsonR.snr);\n";
+	webString += "freqErr=parseFloat(jsonR.freqErr);\n";
+	webString += "if(rssi<-140) rssi=-140;\n";
 	webString += "raw=jsonR.RAW;\n";
 	webString += "timeStamp=Number(jsonR.timeStamp);\n";
-	webString += "if(active==1){\nleft.update(dBV,false);\nchart.redraw();\n";
-	webString += "var date=new Date(timeStamp * 1000);\n";
-	webString += "var head=date+\"[\"+Vrms.toFixed(3)+\"Vrms,\"+dBV.toFixed(1)+\"dBV]\\n\";\n";
+	webString += "if(active==1){\nleft.update(rssi,false);\nchart.redraw();\n";
+	webString += "var d=new Date(timeStamp * 1000);\n";
+	webString += "var head=d.getFullYear()+\"-\"+(d.getMonth()+1)+\"-\"+d.getDate()+\",\"+d.getHours()+\":\"+d.getMinutes()+\":\"+d.getSeconds()+\" [RSSI:\"+rssi.toFixed(0)+\"dBm,SNR:\"+snr.toFixed(0)+\"dB,FreqErr:\"+freqErr.toFixed(0)+\"Hz]\\n\";\n";
 	// webString += "document.getElementById(\"raw_txt\").value+=head+atob(raw)+\"\\n\";\n";
 	webString += "var textArea=document.getElementById(\"raw_txt\");\n";
 	webString += "textArea.value+=head+atob(raw)+\"\\n\";\n";
@@ -6874,30 +7655,35 @@ void handle_about(AsyncWebServerRequest *request)
 	// webString += "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
 	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\">";
 #ifdef HT_CT62
-	webString += "HT-CT62,DIY";
+	webString += "HT-CT62,ESP32-C3 DIY";
 #elif defined(TTGO_LORA32_V1)
-	webString += "TTGO LORA32 V1,DIY";
+	webString += "TTGO LORA32 V1,ESP32 DIY";
 #elif defined(TTGO_T_Beam_V1_2)
-	webString += "TTGO_T_Beam_V1.2,DIY";
+	webString += "TTGO_T_Beam_V1.2,ESP32 DIY";
 #elif defined(TTGO_T_Beam_V1_0)
-	webString += "TTGO_T_Beam_V1.0,DIY";
+	webString += "TTGO_T_Beam_V1.0,ESP32 DIY";
 #elif defined(TTGO_T_LORA32_V2_1_GPS)
-	webString += "TTGO_T_LORA32_V2.1-GPS,DIY";
+	webString += "TTGO_T_LORA32_V2.1-GPS,ESP32 DIY";
 #elif defined(TTGO_T_Beam_S3_SUPREME_V3)
-	webString += "TTGO_T_Beam_S3_SUPREME_V3,DIY";
+	webString += "TTGO_T_Beam_S3_SUPREME_V3,ESP32-S3 DIY";
 #elif defined(HELTEC_V3_GPS)
-	webString += "HELTEC_V3_GPS,DIY";
+	webString += "HELTEC_V3_GPS,ESP32 DIY";
+#elif defined(HELTEC_HTIT_TRACKER)
+	webString += "HELTEC HTIT-TRACKER,ESP32-S3 DIY";
+#elif defined(APRS_LORA_DONGLE)
+	webString += "APRS LoRa Dongle,ESP32-S3 DIY";
 #elif defined(TTGO_T_Beam_V1_2_SX1262) || defined(TTGO_T_Beam_V1_2_SX1268)
 	webString += "TTGO_T_Beam_V1_2_SX1262,TTGO_T_Beam_V1_2_SX1268";
 #endif
 	webString += "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>RF LoRa Chip: </b></td><td align=\"left\"> " + String(RF_TYPE[config.rf_type]) + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>ESP32 Model: </b></td><td align=\"left\"> " + String(ESP.getChipModel()) + "</td></tr>";
-	webString += "<tr><td align=\"right\"><b>Chip ID: </b></td><td align=\"left\"> " + String(strCID) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Revision: </b></td><td align=\"left\"> " + String(ESP.getChipRevision()) + "</td></tr>";
-	webString += "<tr><td align=\"right\"><b>Flash: </b></td><td align=\"left\">" + String(ESP.getFlashChipSize() / 1000) + " KByte</td></tr>";
-	webString += "<tr><td align=\"right\"><b>PSRAM: </b></td><td align=\"left\">" + String(ESP.getPsramSize() / 1000) + " KByte</td></tr>";
+	webString += "<tr><td align=\"right\"><b>Chip ID: </b></td><td align=\"left\"> " + String(strCID) + "</td></tr>";
+	webString += "<tr><td align=\"right\"><b>Flash: </b></td><td align=\"left\">" + String(ESP.getFlashChipSize() / 1024) + " KByte</td></tr>";
+	webString += "<tr><td align=\"right\"><b>PSRAM: </b></td><td align=\"left\">" + String((float)ESP.getFreePsram() / 1024, 1) + "/" + String((float)ESP.getPsramSize() / 1024, 1) + " KByte</td></tr>";
+	webString += "<tr><td align=\"right\"><b>FILE SYSTEM: </b></td><td align=\"left\">" + String((float)LITTLEFS.usedBytes() / 1024, 1) + "/" + String((float)LITTLEFS.totalBytes() / 1024, 1) + " KByte</td></tr>";
 	webString += "</table>";
 	webString += "</td><td width=\"2%\" style=\"border:unset;\"></td>";
 	webString += "<td width=\"49%\" style=\"border:unset;\">";
@@ -6905,13 +7691,14 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<table>";
 	webString += "<th colspan=\"2\"><span><b>Developer/Support Information</b></span></th>\n";
 	webString += "<tr><td align=\"right\"><b>Author: </b></td><td align=\"left\">Mr.Somkiat Nakhonthai </td></tr>";
-	webString += "<tr><td align=\"right\"><b>Callsign: </b></td><td align=\"left\">HS5TQA</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>Callsign: </b></td><td align=\"left\">HS5TQA,Atten,Nakhonthai</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>Country: </b></td><td align=\"left\">Bangkok,Thailand</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>Github: </b></td><td align=\"left\"><a href=\"https://github.com/nakhonthai\" target=\"_github\">https://github.com/nakhonthai</a></td></tr>";
 	webString += "<tr><td align=\"right\"><b>Youtube: </b></td><td align=\"left\"><a href=\"https://www.youtube.com/@HS5TQA\" target=\"_youtube\">https://www.youtube.com/@HS5TQA</a></td></tr>";
 	webString += "<tr><td align=\"right\"><b>Facebook: </b></td><td align=\"left\"><a href=\"https://www.facebook.com/atten\" target=\"_facebook\">https://www.facebook.com/atten</a></td></tr>";
-	webString += "<tr><td align=\"right\"><b>Chat LINE: </b></td><td align=\"left\"><a href=\"https://line.me/ti/p/Pw5MKwm6Vo\" target=\"_line\">nakhonline</a></td></tr>";
-	webString += "<tr><td align=\"right\"><b>Donate: </b></td><td align=\"left\"><a href=\"https://www.paypal.com/paypalme/hs5tqa\" target=\"_sponsor\">https://www.paypal.com/paypalme/hs5tqa</a></td></tr>";
+	webString += "<tr><td align=\"right\"><b>Chat: </b></td><td align=\"left\">LineID:<a href=\"https://line.me/ti/p/Pw5MKwm6Vo\" target=\"_line\">nakhonline</a>,WeChat ID: HS5TQA</td></tr>";
+	webString += "<tr><td align=\"right\"><b>Sponsors: </b></td><td align=\"left\"><a href=\"https://github.com/sponsors/nakhonthai\" target=\"_sponsor\">https://github.com/sponsors/nakhonthai</a></td></tr>";
+	webString += "<tr><td align=\"right\"><b>Donate: </b></td><td align=\"left\"><a href=\"https://www.paypal.me/0hs5tqa0\" target=\"_sponsor\">https://www.paypal.me/0hs5tqa0</a></td></tr>";
 
 	webString += "</table>";
 	webString += "</td></tr></table><br />";
@@ -7064,10 +7851,7 @@ void handle_gnss(AsyncWebServerRequest *request)
 
 	// Add some life
 	webString += "function gnss() { \n"; // the chart may be destroyed
-	webString += "var Vrms=0;\nvar dBV=-40;\nvar active=0;var raw=\"\";var timeStamp;\n";
-	// webString += "if (chart.series) {\n";
-	// webString += "var left = chart.series[0].points[0];\n";
-	// webString += "const ws = new WebSocket(\"ws://" + WiFi.localIP().toString() + ":81/ws_gnss\");\n";
+	webString += "var raw=\"\";var timeStamp;\n";
 	webString += "var host='ws://'+location.hostname+':81/ws_gnss'\n";
 	webString += "const ws = new WebSocket(host);\n";
 	webString += "ws.onopen = function() { console.log('Connection opened');};\n ws.onclose = function() { console.log('Connection closed');};\n";
@@ -7088,8 +7872,6 @@ void handle_gnss(AsyncWebServerRequest *request)
 	webString += "textArea.value+=atob(raw)+\"\\n\";\n";
 	webString += "textArea.scrollTop = textArea.scrollHeight;\n";
 	webString += "}\n";
-	// webString += "}};\n";
-	// webString += "$('#vumeter').highcharts(json, chartFunction);\n";
 	webString += "};\n</script>\n";
 	webString += "</head><body onload=\"gnss()\">\n";
 
@@ -7178,6 +7960,8 @@ void webService()
 					{ handle_wx(request); });
 	async_server.on("/tlm", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
 					{ handle_tlm(request); });
+	async_server.on("/sensor", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_sensor(request); });
 	async_server.on("/system", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
 					{ handle_system(request); });
 	async_server.on("/wireless", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
@@ -7205,9 +7989,9 @@ void webService()
 	async_server.on("/storage", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
 					{ handle_storage(request); });
 	async_server.on("/download", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
-					{ handle_download(request); });									
+					{ handle_download(request); });
 	async_server.on("/delete", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
-					{ handle_delete(request); });					
+					{ handle_delete(request); });
 	async_server.on("/format", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
 					{ handle_format(request); });
 	async_server.on(

@@ -7,7 +7,9 @@
 
 ICACHE_RAM_ATTR IRadioHal *radioHal;
 
-extern float dBm;
+extern float rssi;
+extern float snr;
+extern float freqErr;
 extern bool afskSync;
 
 // float _freq;
@@ -111,9 +113,6 @@ void startRx()
 
 void radioRecvStatus()
 {
-    float rssi = 0;
-    float snr = 0;
-    float freqErr = 0;
 
     //rssi = radioHal->getRSSI(false, true);
     rssi = radioHal->getRSSI(true,false);
@@ -123,7 +122,7 @@ void radioRecvStatus()
     log_d("[LoRa] RSSI:%.0f dBm\tSNR:%.0f dBm\tFreqErr:%.0f Hz", rssi, snr, freqErr);
     // Serial.print(radioHal->getRSSI());
     // Serial.println(F(" dBm"));
-    dBm = (int16_t)rssi;
+    //dBm = (int16_t)rssi;
     afskSync = true;
 }
 
@@ -372,7 +371,7 @@ void APRS_poll(void)
     {
         if (ax25_stateTx)
         {
-            ax25_stateTx = false;
+            ax25_stateTx = false;            
             // flagTx = true;
             uint8_t *byteArr = (uint8_t *)calloc(250,sizeof(uint8_t));
             if (byteArr)

@@ -8,14 +8,16 @@
  Support IS monitor: http://aprs.dprns.com:14501 or http://aprs.hs5tqa.ampr.org:14501
 */
 
-#include "main.h"
 #ifndef WEATHER_H
 #define WEATHER_H
 
-#include <WiFi.h>
+#include "main.h"
+#include "sensor.h"
 //#include <ModbusMaster.h>
 
-// c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...o...O...x....
+// c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...o...O...x....F....T....
+#define WX_SENSOR_NUM 21
+
 #define WX_NONE 0
 #define WX_WIND_DIR (1 << 0)       // c Wind Direction (in degrees)
 #define WX_WIND_SPD (1 << 1)       // s Wind Speed (mhp)
@@ -37,6 +39,7 @@
 #define WX_PM100 (1 << 17)         // O Ordure PM 10 ,0~1000μg/m³
 #define WX_CO2 (1 << 18)           // X,x Co2 (PPM) x=0-9999,X=010000-999999
 #define WX_CH2O (1<<19)             //F,f Formaldehyde(CH2O) F=0-9999,f,1000-2000 μg/m³
+#define WX_TVOC (1<<20)             // T
 
 typedef struct Weather_Struct
 {
@@ -62,6 +65,7 @@ typedef struct Weather_Struct
     uint16_t pm100;         // Ordure PM 10 (0~1000μg/m³)
     uint32_t co2;           // Co2 (ppm)
     uint16_t ch2o;           // F,f Formaldehyde(CH2O) F=0-9999,f,1000-2000 μg/m³
+    uint16_t tvoc;         // (0~2000μg/m³)
     float vbat;             // Battery Voltage (V)
     float vsolar;           // Solar cell Voltage (V)
     float ibat;             // Battery Current (A)
@@ -72,5 +76,10 @@ extern WeatherData weather;
 
 int getRawWx(char *strData);
 bool getCSV2Wx(String stream);
+void getSensor(uint32_t type, float *val, int i);
+void getSensor(uint32_t type, uint16_t *val, int i);
+void getSensor(uint32_t type, uint32_t *val, int i);
+// bool getM70xModbus(ModbusMaster &node);
+// bool getM70xModbus(ModbusMaster &node, uint32_t sensor);
 
 #endif

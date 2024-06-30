@@ -20,7 +20,7 @@
 #include <time.h>
 #include <TimeLib.h>
 #include <TinyGPSPlus.h>
-#include <LITTLEFS.h>
+#include "LITTLEFS.h"
 
 typedef struct timeZoneName
 {
@@ -98,10 +98,12 @@ extern float vbat;
 extern WiFiClient aprsClient;
 extern bool initInterval;
 extern bool webServiceBegin;
-extern LITTLEFSFS LITTLEFS;
+extern fs::LITTLEFSFS LITTLEFS;
 extern double VBat;
 extern double TempNTC;
 extern bool lastHeard_Flag;
+extern SensorData sen[SENSOR_NUMBER];
+extern uint16_t TLM_SEQ;
 
 #ifdef __cplusplus
 extern "C"
