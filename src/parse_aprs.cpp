@@ -35,7 +35,7 @@
 #define HINCH_TO_MM 0.254
 
 /// The magic constant.
-//#define PI 3.14159265
+// #define PI 3.14159265
 /// Degrees to radians.
 #define DEG2RAD(x) (x / 360 * 2 * PI)
 /// Radians to degrees.
@@ -2133,7 +2133,10 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 {
 	int flage = 0;
 	static char wind_dir[4], wind_speed[4], wind_gust[4], temperature[4], rain[4], rain24[4], rainMn[4], humidity[3], barometric[6], luminosity[4], uv[3];
+	char snow[3], soil_temp[4], soil_hum[4], water_temp[4], water_tds[5], water_level[4], pm25[4], pm100[4], co2[5], ch2o[5], tvoc[5];
 	bool luminosityAbove = false;
+	bool co2Above = false;
+	bool ch2oAbove = false;
 	char buf_5b[6];
 	int len, retval = 1;
 	char *rest = NULL, *tmp_str;
@@ -2170,112 +2173,301 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	{
 		if (tmp_str = strchr(rest, 'c'))
 		{
-			memcpy(wind_dir, tmp_str + 1, 3);
-			wind_dir[3] = 0;
-			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-			rest = tmp_str;
-			rest_len = tmp_us;
-			flage++;
+			if (strlen(tmp_str) > 3)
+			{
+				memcpy(wind_dir, tmp_str + 1, 3);
+				wind_dir[3] = 0;
+				tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+				rest = tmp_str;
+				rest_len = tmp_us;
+				flage++;
+			}
 		}
 		if (tmp_str = strchr(rest, 's'))
 		{
-			memcpy(wind_speed, tmp_str + 1, 3);
-			wind_speed[3] = 0;
-			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-			rest = tmp_str;
-			rest_len = tmp_us;
+			if (strlen(tmp_str) > 3)
+			{
+				memcpy(wind_speed, tmp_str + 1, 3);
+				wind_speed[3] = 0;
+				tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+				rest = tmp_str;
+				rest_len = tmp_us;
+			}
 		}
 	}
 
 	if (tmp_str = strchr(rest, 'g'))
 	{
-		memcpy(wind_gust, tmp_str + 1, 3);
-		wind_gust[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if (tmp_str = strchr(rest, 't'))
-	{
-		memcpy(temperature, tmp_str + 1, 3);
-		temperature[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if (tmp_str = strchr(rest, 'r'))
-	{
-		memcpy(rain, tmp_str + 1, 3);
-		rain[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if (tmp_str = strchr(rest, 'p'))
-	{
-		memcpy(rain24, tmp_str + 1, 3);
-		rain24[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-	if (tmp_str = strchr(rest, 'P'))
-	{
-		memcpy(rainMn, tmp_str + 1, 3);
-		rainMn[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if (tmp_str = strchr(rest, 'h'))
-	{
-		memcpy(humidity, tmp_str + 1, 2);
-		humidity[2] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-	if (tmp_str = strchr(rest, 'b'))
-	{
-		memcpy(barometric, tmp_str + 1, 5);
-		barometric[5] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 6, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if (tmp_str = strchr(rest, 'l'))
-	{
-		memcpy(luminosity, tmp_str + 1, 3);
-		if (is_number(luminosity))
+		if (strlen(tmp_str) > 3)
 		{
-			luminosityAbove = true;
-			luminosity[3] = 0;
+			memcpy(wind_gust, tmp_str + 1, 3);
+			wind_gust[3] = 0;
 			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
 			rest = tmp_str;
 			rest_len = tmp_us;
 			flage++;
 		}
 	}
-	if (tmp_str = strchr(rest, 'L'))
+
+	if (tmp_str = strchr(rest, 't'))
 	{
-		memcpy(luminosity, tmp_str + 1, 3);
-		if (is_number(luminosity))
+		if (strlen(tmp_str) > 3)
 		{
-			luminosityAbove = false;
-			luminosity[3] = 0;
+			memcpy(temperature, tmp_str + 1, 3);
+			temperature[3] = 0;
 			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'r'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(rain, tmp_str + 1, 3);
+			rain[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'p'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(rain24, tmp_str + 1, 3);
+			rain24[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+	if (tmp_str = strchr(rest, 'P'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(rainMn, tmp_str + 1, 3);
+			rainMn[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'h'))
+	{
+		if (strlen(tmp_str) > 2)
+		{
+			memcpy(humidity, tmp_str + 1, 2);
+			humidity[2] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+	if (tmp_str = strchr(rest, 'b'))
+	{
+		if (strlen(tmp_str) > 5)
+		{
+			memcpy(barometric, tmp_str + 1, 5);
+			barometric[5] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 6, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'l'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(luminosity, tmp_str + 1, 3);
+			if (is_number(luminosity))
+			{
+				luminosityAbove = true;
+				luminosity[3] = 0;
+				tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+				rest = tmp_str;
+				rest_len = tmp_us;
+				flage++;
+			}
+		}
+	}
+	else if (tmp_str = strchr(rest, 'L'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(luminosity, tmp_str + 1, 3);
+			if (is_number(luminosity))
+			{
+				luminosityAbove = false;
+				luminosity[3] = 0;
+				tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+				rest = tmp_str;
+				rest_len = tmp_us;
+				flage++;
+			}
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'S'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(snow, tmp_str + 1, 3);
+			snow[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'm'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(soil_temp, tmp_str + 1, 3);
+			soil_temp[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'M'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(soil_hum, tmp_str + 1, 3);
+			soil_hum[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'w'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(water_temp, tmp_str + 1, 3);
+			water_temp[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'W'))
+	{
+		if (strlen(tmp_str) > 4)
+		{
+			memcpy(water_tds, tmp_str + 1, 4);
+			water_tds[4] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 5, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'v'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(water_level, tmp_str + 1, 3);
+			water_level[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'o'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(pm25, tmp_str + 1, 3);
+			pm25[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'O'))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(pm100, tmp_str + 1, 3);
+			pm100[3] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'X'))
+	{
+		if (strlen(tmp_str) > 4)
+		{
+			memcpy(luminosity, tmp_str + 1, 4);
+			co2Above = true;
+			co2[4] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 5, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+	else if (tmp_str = strchr(rest, 'x'))
+	{
+		if (strlen(tmp_str) > 4)
+		{
+			memcpy(luminosity, tmp_str + 1, 4);
+			co2Above = false;
+			co2[4] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 5, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
+	if (tmp_str = strchr(rest, 'F'))
+	{
+		if (strlen(tmp_str) > 4)
+		{
+			memcpy(ch2o, tmp_str + 1, 4);
+			ch2o[4] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 5, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+	if (tmp_str = strchr(rest, 'T'))
+	{
+		if (strlen(tmp_str) > 4)
+		{
+			memcpy(tvoc, tmp_str + 1, 4);
+			tvoc[4] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 5, &tmp_us);
 			rest = tmp_str;
 			rest_len = tmp_us;
 			flage++;
@@ -2284,12 +2476,15 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 
 	if (tmp_str = strchr(rest, 'u'))
 	{
-		memcpy(uv, tmp_str + 1, 2);
-		uv[2] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
+		if (strlen(tmp_str) > 2)
+		{
+			memcpy(uv, tmp_str + 1, 2);
+			uv[2] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
 	}
 
 	// packet->format = fapPOS_WX;
@@ -2356,6 +2551,77 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			pb->wx_report.luminosity += 1000;
 		}
 	}
+
+	if (is_number(snow))
+	{
+		pb->wx_report.flags |= W_SNOW;
+		pb->wx_report.snow = atoi(snow);
+	}
+
+	if (is_number(soil_temp))
+	{
+		pb->wx_report.flags |= W_SOIL_TEMP;
+		pb->wx_report.soil_temp = FAHRENHEIT_TO_CELCIUS(atof(soil_temp));
+	}
+
+	if (is_number(soil_hum))
+	{
+		pb->wx_report.flags |= W_SOIL_HUM;
+		pb->wx_report.soil_moisture = (float)atoi(soil_hum) / 10;
+	}
+
+	if (is_number(water_temp))
+	{
+		pb->wx_report.flags |= W_WATER_TEMP;
+		pb->wx_report.water_temp = FAHRENHEIT_TO_CELCIUS(atof(water_temp));
+	}
+
+	if (is_number(water_tds))
+	{
+		pb->wx_report.flags |= W_WATER_TDS;
+		pb->wx_report.water_tds = atoi(water_tds);
+	}
+
+	if (is_number(water_level))
+	{
+		pb->wx_report.flags |= W_WATER_LVL;
+		pb->wx_report.water_level = atoi(water_level);
+	}
+
+	if (is_number(pm25))
+	{
+		pb->wx_report.flags |= W_PM25;
+		pb->wx_report.pm25 = atoi(pm25);
+	}
+
+	if (is_number(pm100))
+	{
+		pb->wx_report.flags |= W_PM100;
+		pb->wx_report.pm100 = atoi(pm100);
+	}
+
+	if (is_number(co2))
+	{
+		pb->wx_report.flags |= W_PAR;
+		pb->wx_report.co2 = atoi(co2);
+		if (co2Above)
+		{
+			pb->wx_report.co2 *= 10;
+		}
+	}
+
+	if (is_number(ch2o))
+	{
+		pb->wx_report.flags |= W_CH2O;
+		pb->wx_report.ch2o = atoi(ch2o);
+	}
+
+	if (is_number(tvoc))
+	{
+		pb->wx_report.flags |= W_TVOC;
+		pb->wx_report.tvoc = atoi(tvoc);
+	}
+
 	/* UV Index. */
 	if (is_number(uv))
 	{
@@ -2386,7 +2652,7 @@ int ParseAPRS::parse_aprs_comment(struct pbuf_t *pb, char const *input, unsigned
 
 	if (input_len < 1)
 		return 0;
-	//log_d("COMMENT DATA[%d]: %s", input_len, input);
+	// log_d("COMMENT DATA[%d]: %s", input_len, input);
 
 	if (input_len >= 7)
 	{
@@ -2496,7 +2762,7 @@ int ParseAPRS::parse_aprs_comment(struct pbuf_t *pb, char const *input, unsigned
 		/* Check for optional altitude anywhere in the comment, take the first occurrence. */
 		if (res = strstr(rest, "/A="))
 		{
-			//log_d("Found Alt : %s", res);
+			// log_d("Found Alt : %s", res);
 			/* Save altitude, if not already there. */
 			memcpy(altitude, res + 3, 6);
 			altitude[6] = 0;
@@ -2547,7 +2813,7 @@ int ParseAPRS::parse_aprs_comment(struct pbuf_t *pb, char const *input, unsigned
 		pb->comment = rest;
 		pb->comment_len = rest_len;
 		// pb->comment[rest_len] = 0;
-		//log_d("Comment: %s", rest);
+		// log_d("Comment: %s", rest);
 	}
 	return rest_len;
 }

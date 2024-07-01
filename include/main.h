@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.2"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'a'
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
@@ -245,7 +245,7 @@ const char MODEM_TYPE[2][10] = {"AFSK_300", "AFSK_1200"};
 const char PWR_MODE[3][10] = {"MODE A", "MODE B","MODE C"};
 const char ACTIVATE[8][10] = {"OFF", "TRACKER", "IGATE", "DIGI", "WX", "TELEMETRY", "QUERY", "STATUS"};
 //const char SENSOR_PORT[12][15] = {"UART0_CSV", "UART1_CSV", "ADC", "I2C_0","I2C_1","CNT_0","CNT_1","MODBUS","M701_Modbus","M702_Modbus","BME280_I2C0","BME280_I2C1"};
-const char WX_SENSOR[21][19]={"Wind Course","Wind Speed","Wind Gust","Temperature","Rain 1hr","Rain 24hr","Rain Midnight","Humidity","Barometric","Luminosity","Snow","Soil Temperature","Soil Humidity","Water Temperature","Water TDS","Water Level","PM 2.5","PM 10","Co2","CH2O","TVOC"};
+const char WX_SENSOR[22][19]={"Wind Course","Wind Speed","Wind Gust","Temperature","Rain 1hr","Rain 24hr","Rain Midnight","Humidity","Barometric","Luminosity","Snow","Soil Temperature","Soil Humidity","Water Temperature","Water TDS","Water Level","PM 2.5","PM 10","Co2","CH2O","TVOC","UV"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
 void saveEEPROM();

@@ -381,9 +381,9 @@ typedef struct Config_Struct
 	char igate_tlm_UNIT[5][8];
 	float igate_tlm_EQNS[5][3];
 
-	bool wx_sensor_enable[21];
-	bool wx_sensor_avg[21];
-	uint8_t wx_sensor_ch[21];
+	bool wx_sensor_enable[22];
+	bool wx_sensor_avg[22];
+	uint8_t wx_sensor_ch[22];
 
 } Configuration;
 

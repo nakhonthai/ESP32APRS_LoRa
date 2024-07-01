@@ -2807,7 +2807,7 @@ void setup()
     // pinMode(0, INPUT);
     // pinMode(1, INPUT);
     //  Set the CPU frequency to 80 MHz for power optimization
-    // setCpuFrequencyMhz(160);
+    //setCpuFrequencyMhz(80);
 
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
@@ -3843,6 +3843,80 @@ String digi_position(double lat, double lon, double alt, String comment)
     tnc2Raw += String(loc);
     tnc2Raw += String(config.digi_phg) + String(strAltitude);
     tnc2Raw += comment + " " + String(config.digi_comment);
+    return tnc2Raw;
+}
+
+String wx_report(double lat, double lon, double alt, String comment)
+{
+    String tnc2Raw = "";
+    int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
+    char strtmp[500], loc[100];
+    char lon_ew = 'E';
+    char lat_ns = 'N';
+    if (lat < 0)
+        lat_ns = 'S';
+    if (lon < 0)
+        lon_ew = 'W';
+    memset(strtmp, 0, sizeof(strtmp));
+    memset(loc, 0, sizeof(loc));
+    DD_DDDDDtoDDMMSS(lat, &lat_dd, &lat_mm, &lat_ss);
+    DD_DDDDDtoDDMMSS(lon, &lon_dd, &lon_mm, &lon_ss);
+    char strAltitude[12];
+    memset(strAltitude, 0, sizeof(strAltitude));
+    if (alt > 0)
+    {
+        sprintf(strAltitude, "/A=%06d", (int)(alt * 3.28F));
+    }
+    if (strlen(config.wx_object) >= 3)
+    {
+        char object[10];
+        memset(object, 0x20, 10);
+        memcpy(object, config.wx_object, strlen(config.wx_object));
+        object[9] = 0;
+        if (config.wx_timestamp)
+        {
+            String timeStamp = getTimeStamp();
+            sprintf(loc, ";%s*%s%02d%02d.%02d%c/%03d%02d.%02d%c_", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
+        }
+        else
+        {
+            sprintf(loc, ")%s!%02d%02d.%02d%c/%03d%02d.%02d%c_", config.wx_object, lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
+        }
+    }
+    else
+    {
+        if (config.wx_timestamp)
+        {
+            String timeStamp = getTimeStamp();
+            sprintf(loc, "@%s%02d%02d.%02d%c/%03d%02d.%02d%c_", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
+        }
+        else
+        {
+            sprintf(loc, "!%02d%02d.%02d%c/%03d%02d.%02d%c_", lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
+        }
+    }
+    if (config.wx_ssid == 0)
+        sprintf(strtmp, "%s>APE32I", config.wx_mycall);
+    else
+        sprintf(strtmp, "%s-%d>APE32I", config.wx_mycall, config.wx_ssid);
+    tnc2Raw = String(strtmp);
+    if (config.wx_path < 5)
+    {
+        if (config.wx_path > 0)
+            tnc2Raw += "-" + String(config.wx_path);
+    }
+    else
+    {
+        tnc2Raw += ",";
+        tnc2Raw += getPath(config.wx_path);
+    }
+    tnc2Raw += ":";
+    tnc2Raw += String(loc);
+    char WxRaw[500];
+    memset(WxRaw, 0, 500);
+    getRawWx(&WxRaw[0]);
+    tnc2Raw += String(WxRaw);
+    tnc2Raw += comment + " " + String(config.wx_comment);
     return tnc2Raw;
 }
 
@@ -5437,6 +5511,7 @@ void taskSerial(void *pvParameters)
 
 long timeSlot;
 unsigned long iGatetickInterval;
+unsigned long WxInterval;
 bool initInterval = true;
 void taskAPRS(void *pvParameters)
 {
@@ -5473,7 +5548,7 @@ void taskAPRS(void *pvParameters)
         time(&timeStamp);
         if (initInterval)
         {
-            tickInterval = DiGiInterval = iGatetickInterval = millis() + 10000;
+            tickInterval = WxInterval = DiGiInterval = iGatetickInterval = millis() + 10000;
             systemTLM.ParmTimeout = millis() + 20000;
             systemTLM.TeleTimeout = millis() + 30000;
             initInterval = false;
@@ -6383,6 +6458,57 @@ void taskAPRS(void *pvParameters)
 #endif
                         free(rawP);
                     }
+                }
+            }
+        }
+
+        // Weather
+        if (config.wx_en)
+        {
+            if (millis() > WxInterval)
+            {
+
+                String rawData = "";
+                if (config.wx_gps)
+                { // Wx Send GPS position
+                    if (gps.location.isValid())
+                        rawData = wx_report(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                }
+                else
+                { // Wx Send fix position
+                    rawData = wx_report(config.wx_lat, config.wx_lon, config.wx_alt, "");
+                }
+                if (rawData != "")
+                {
+                    WxInterval = millis() + (config.wx_interval * 1000);
+                    log_d("WX_REPORT: %s", rawData.c_str());
+                    if (config.wx_2rf)
+                    { // WX SEND POSITION TO RF
+                        char *rawP = (char *)calloc(rawData.length(), sizeof(char));
+                        // rawData.toCharArray(rawP, rawData.length());
+                        memcpy(rawP, rawData.c_str(), rawData.length());
+                        pkgTxPush(rawP, rawData.length(), 0);
+#ifdef OLED
+                        sprintf(sts, "--src call--\n%s\nDelay: %dms.", config.wx_mycall, (config.wx_interval * 1000));
+                        pushTxDisp(TXCH_RF, "WX REPORT", sts);
+#endif
+                        free(rawP);
+                    }
+                    if (config.wx_2inet)
+                    { // WX SEND TO APRS-IS
+                        if (aprsClient.connected())
+                        {
+                            status.txCount++;
+                            aprsClient.println(rawData); // Send packet to Inet
+#ifdef OLED
+                            // pushTxDisp(TXCH_TCP, "WX REPORT", sts);
+#endif
+                        }
+                    }
+                }
+                else
+                {
+                    WxInterval = millis() + (10 * 1000);
                 }
             }
         }
