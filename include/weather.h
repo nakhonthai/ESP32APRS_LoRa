@@ -75,6 +75,7 @@ typedef struct Weather_Struct
 } WeatherData;
 
 extern WeatherData weather;
+extern float mslAltitude;
 
 int getRawWx(char *strData);
 bool getCSV2Wx(String stream);

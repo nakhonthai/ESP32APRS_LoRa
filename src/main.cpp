@@ -3861,11 +3861,17 @@ String wx_report(double lat, double lon, double alt, String comment)
     memset(loc, 0, sizeof(loc));
     DD_DDDDDtoDDMMSS(lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(lon, &lon_dd, &lon_mm, &lon_ss);
-    char strAltitude[12];
-    memset(strAltitude, 0, sizeof(strAltitude));
-    if (alt > 0)
-    {
-        sprintf(strAltitude, "/A=%06d", (int)(alt * 3.28F));
+    // char strAltitude[12];
+    // memset(strAltitude, 0, sizeof(strAltitude));
+    // if (alt > 0)
+    // {
+    //     sprintf(strAltitude, "/A=%06d", (int)(alt * 3.28F));
+    // }
+    if(config.wx_gps){
+        if(gps.satellites.value()>5 && gps.hdop.hdop()<5)
+            mslAltitude=alt;
+    }else{
+        mslAltitude=alt;
     }
     if (strlen(config.wx_object) >= 3)
     {

@@ -10,12 +10,16 @@
 
 #include "weather.h"
 #include <WiFi.h>
+#include <TinyGPSPlus.h>
 
 extern Configuration config;
 extern WiFiClient aprsClient;
 extern SensorData sen[SENSOR_NUMBER];
+extern TinyGPSPlus gps;
 
 WeatherData weather;
+
+float mslAltitude=0;
 
 bool weatherUpdate = false;
 bool getCSV2Wx(String stream)
@@ -402,172 +406,6 @@ int getRawWx(char *strData)
         senType <<= 1;
     }
 
-    // for (i = 0; i < SENSOR_NUMBER; i++)
-    // {
-    //     if (config.sensor[i].enable)
-    //     {
-    //         switch (config.sensor[i].type)
-    //         {
-    //         case SENSOR_TEMPERATURE:
-    //             weather.visable &= ~WX_TEMP;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.temperature = sen[i].sample;
-    //                 else
-    //                     weather.temperature = sen[i].average;
-    //                 weather.visable |= WX_TEMP;
-    //                 // log_d("Temperature: %.1f \tAvg: %.1f C",sen[i].sample,sen[i].average);
-    //             }
-    //             break;
-    //         case SENSOR_HUMIDITY:
-    //             weather.visable &= ~WX_HUMIDITY;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.humidity = sen[i].sample;
-    //                 else
-    //                     weather.humidity = sen[i].average;
-    //                 weather.visable |= WX_HUMIDITY;
-    //             }
-    //             // log_d("Humidity: %.1f \tAvg: %.1f %%RH",sen[i].sample,sen[i].average);
-    //             break;
-    //         case SENSOR_PM25:
-    //             weather.visable &= ~WX_PM25;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.pm25 = (uint16_t)sen[i].sample;
-    //                 else
-    //                     weather.pm25 = (uint16_t)sen[i].average;
-    //                 weather.visable |= WX_PM25;
-    //             }
-    //             // log_d("PM2.5: %d \tAvg: %.1f μg/m³",(int)sen[i].sample,sen[i].average);
-    //             break;
-    //         case SENSOR_PM100:
-    //             weather.visable &= ~WX_PM100;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.pm100 = (uint16_t)sen[i].sample;
-    //                 else
-    //                     weather.pm100 = (uint16_t)sen[i].average;
-    //                 weather.visable |= WX_PM100;
-    //             }
-    //             // log_d("PM10: %d \tAvg: %.1fd μg/m³",(int)sen[i].sample,sen[i].average);
-    //             break;
-    //         case SENSOR_CO2:
-    //             weather.visable &= ~WX_CO2;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.co2 = (uint32_t)sen[i].sample;
-    //                 else
-    //                     weather.co2 = (uint32_t)sen[i].average;
-    //                 weather.visable |= WX_CO2;
-    //             }
-    //             // log_d("Co2: %d \tAvg: %.1f ppm",(int)sen[i].sample,sen[i].average);
-    //             break;
-    //         case SENSOR_CH2O:
-    //             weather.visable &= ~WX_CH2O;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.ch2o = (uint16_t)sen[i].sample;
-    //                 else
-    //                     weather.ch2o = (uint16_t)sen[i].average;
-    //                 weather.visable |= WX_CH2O;
-    //             }
-    //             // log_d("CH2O: %d \tAvg: %.1fd μg/m³",(int)sen[i].sample,sen[i].average);
-    //             break;
-    //         case SENSOR_TVOC:
-    //             weather.visable &= ~WX_TVOC;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.tvoc = (uint16_t)sen[i].sample;
-    //                 else
-    //                     weather.tvoc = (uint16_t)sen[i].average;
-    //                 weather.visable |= WX_TVOC;
-    //             }
-    //             // log_d("TVOC: %d \tAvg: %.1fd μg/m³",(int)sen[i].sample,sen[i].average);
-    //             break;
-    //         case SENSOR_PRESSURE:
-    //             weather.visable &= ~WX_BARO;
-    //             if (sen[i].visable)
-    //             {
-    //                 if (config.sensor[i].averagerate <= config.sensor[i].samplerate || sen[i].timeAvg == 0)
-    //                     weather.barometric = (float)sen[i].sample;
-    //                 else
-    //                     weather.barometric = (float)sen[i].average;
-    //                 weather.visable |= WX_BARO;
-    //             }
-    //             // log_d("TVOC: %d \tAvg: %.1fd μg/m³",(int)sen[i].sample,sen[i].average);
-    //             break;
-    //         default:
-    //             break;
-    //         }
-    //     }
-    // }
-
-    // DD_DDDDDtoDDMMSS(config.wx_lat, &lat_dd, &lat_mm, &lat_ss);
-    // DD_DDDDDtoDDMMSS(config.wx_lon, &lon_dd, &lon_mm, &lon_ss);
-    // if (strlen(config.wx_object) >= 3)
-    // {
-    //     char object[10];
-    //     memset(object, 0x20, 10);
-    //     memcpy(object, config.wx_object, strlen(config.wx_object));
-    //     object[9] = 0;
-    //     String timeStamp = getTimeStamp();
-    //     sprintf(obj, ";%s*%s", object, timeStamp);
-    // }
-    // else
-    // {
-    //     if (config.wx_timestamp)
-    //     {
-    //         String timeStamp = getTimeStamp();
-    //         sprintf(obj, "/%s", timeStamp.c_str());
-    //     }
-    //     else
-    //     {
-    //         sprintf(obj, "!");
-    //         obj[1] = 0;
-    //     }
-    // }
-    // if (config.wx_ssid == 0)
-    // {
-    //     if (config.wx_path < 5)
-    //     {
-    //         if (config.wx_path > 0)
-    //             sprintf(strtmp, "%s>APE32I-%d:", config.wx_mycall, config.wx_path);
-    //         else
-    //             sprintf(strtmp, "%s>APE32I:", config.wx_mycall);
-    //     }
-    //     else
-    //     {
-    //         sprintf(strtmp, "%s>APE32I,%s:", config.wx_mycall, getPath(config.igate_path).c_str());
-    //     }
-    // }
-    // else
-    // {
-    //     if (config.wx_path < 5)
-    //     {
-    //         if (config.wx_path > 0)
-    //             sprintf(strtmp, "%s-%d>APE32I-%d:", config.wx_mycall, config.wx_ssid, config.wx_path);
-    //         else
-    //             sprintf(strtmp, "%s-%d>APE32I:", config.wx_mycall, config.wx_ssid);
-    //     }
-    //     else
-    //     {
-    //         sprintf(strtmp, "%s-%d>APE32I,%s:", config.wx_mycall, config.wx_ssid, getPath(config.igate_path).c_str());
-    //     }
-    // }
-
-    // strcat(strData, strtmp);
-    // strcat(strData, obj);
-
-    // sprintf(strtmp, "%02d%02d.%02dN/%03d%02d.%02dE_", lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss);
-    // strcat(strData, strtmp);
     config.wx_flage = 0xFFFFFFFF;
 
     if (config.wx_flage & WX_WIND_DIR)
@@ -595,7 +433,7 @@ int getRawWx(char *strData)
     }
     strcat(strData, strtmp);
 
-    if ((config.wx_flage & WX_WIND_SPD) && (config.wx_flage & WX_WIND_GUST))
+    if ((weather.visable & WX_WIND_SPD) && (weather.visable & WX_WIND_GUST))
     {
         sprintf(strtmp, "g%03u", (unsigned int)(weather.windgust * 0.621));
     }
@@ -693,10 +531,16 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_BARO)
     {
-        if (weather.visable & WX_BARO)
-            sprintf(strtmp, "b%05u", (unsigned int)(weather.barometric * 10));
-        else
+        if (weather.visable & WX_BARO){
+            //* @param pressure - The current pressure in Pascals (Pa).
+            //* @param altitude - The altitude in meters (m) above sea level.
+            // Calculate the MSL pressure using the barometric formula
+            float pressure = weather.barometric * 100.0;
+            float mslPressure = pressure / pow(1 - (mslAltitude / 44330.0), 5.255);
+            sprintf(strtmp, "b%05u", (unsigned int)(mslPressure/10.0));
+        }else{
             sprintf(strtmp, "b.....");
+        }
     }
     else
     {
