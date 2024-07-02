@@ -61,7 +61,19 @@ https://www.espressif.com/en/support/download/other-tools
 
 - APRS SERVER of T2THAI at [aprs.dprns.com:14580](http://aprs.dprns.com:14501)
 - APRS SERVER of T2THAI ampr host at [aprs.hs5tqa.ampr.org:14580](http://aprs.hs5tqa.ampr.org:14501)
-- APRS MAP SERVICE [http://aprs.nakhonthai.net](http://aprs.nakhonthai.net)
+- APRS MAP SERVICE [http://aprs.dprns.com](http://aprs.dprns.com)
+
+## Developer/Support Information
+
+- Author:	Mr.Somkiat Nakhonthai
+- Callsign:	HS5TQA,Atten,Nakhonthai
+- Country:	Bangkok,Thailand
+- Github:	[https://github.com/nakhonthai](https://github.com/nakhonthai)
+- Youtube:	[https://www.youtube.com/@HS5TQA](https://www.youtube.com/@HS5TQA)
+- TikTok:   [https://www.tiktok.com/@hs5tqa](https://www.tiktok.com/@hs5tqa)
+- Facebook:	[https://www.facebook.com/atten](https://www.facebook.com/atten)
+- LineID: nakhonline
+- WeChat: HS5TQA
 
 ## Donate
 

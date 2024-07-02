@@ -2743,15 +2743,15 @@ boolean APRSConnect()
         if (strlen(config.igate_object) >= 3)
         {
             uint16_t passcode = aprsParse.passCode(config.igate_object);
-            login = "user " + String(config.igate_object) + " pass " + String(passcode, DEC) + " vers ESP32IGate V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
+            login = "user " + String(config.igate_object) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
         }
         else
         {
             uint16_t passcode = aprsParse.passCode(config.aprs_mycall);
             if (config.aprs_ssid == 0)
-                login = "user " + String(config.aprs_mycall) + " pass " + String(passcode, DEC) + " vers ESP32IGate V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
+                login = "user " + String(config.aprs_mycall) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
             else
-                login = "user " + String(config.aprs_mycall) + "-" + String(config.aprs_ssid) + " pass " + String(passcode, DEC) + " vers ESP32IGate V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
+                login = "user " + String(config.aprs_mycall) + "-" + String(config.aprs_ssid) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
         }
         aprsClient.println(login);
         // Serial.println(login);
@@ -2850,7 +2850,7 @@ void setup()
         log_d("Use space:  %lu\n\n", LITTLEFS.usedBytes());
     }
 
-    log_d("Start ESP32IGate V%s", VERSION);
+    log_d("Start ESP32APRS_LoRa V%s", VERSION);
     // log_d("Push BOOT after 3 sec for Factory Default config.");
 
     if (!EEPROM.begin(EEPROM_SIZE))
@@ -6676,7 +6676,7 @@ void taskNetwork(void *pvParameters)
                 wifiMulti.addAP(config.wifi_sta[i].wifi_ssid, config.wifi_sta[i].wifi_pass);
             }
         }
-        WiFi.setHostname("ESP32IGate");
+        WiFi.setHostname("ESP32APRS_LoRa");
     }
 
     if (config.wifi_mode & WIFI_AP_FIX)

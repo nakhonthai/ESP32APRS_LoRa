@@ -114,15 +114,15 @@ void startRx()
 void radioRecvStatus()
 {
 
-    //rssi = radioHal->getRSSI(false, true);
-    rssi = radioHal->getRSSI(true,false);
+    // rssi = radioHal->getRSSI(false, true);
+    rssi = radioHal->getRSSI(true, false);
     snr = radioHal->getSNR();
     freqErr = radioHal->getFrequencyError();
     // print RSSI (Received Signal Strength Indicator)
     log_d("[LoRa] RSSI:%.0f dBm\tSNR:%.0f dBm\tFreqErr:%.0f Hz", rssi, snr, freqErr);
     // Serial.print(radioHal->getRSSI());
     // Serial.println(F(" dBm"));
-    //dBm = (int16_t)rssi;
+    // dBm = (int16_t)rssi;
     afskSync = true;
 }
 
@@ -135,10 +135,10 @@ void APRS_sendTNC2Pkt(String raw)
     }
     else
     {
-        char *str = (char *)calloc(raw.length(),sizeof(char));
+        char *str = (char *)calloc(raw.length(), sizeof(char));
         if (str)
         {
-            ax25frame *frame = (ax25frame *)calloc(1,sizeof(ax25frame));
+            ax25frame *frame = (ax25frame *)calloc(1, sizeof(ax25frame));
             if (frame)
             {
 
@@ -210,7 +210,7 @@ void APRS_init(Configuration *cfg)
     {
         log_d("Init chip SX1268");
         radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_busy_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    } 
+    }
     else if (cfg->rf_type == RF_SX1261)
     {
         log_d("Init chip SX1262");
@@ -259,9 +259,12 @@ void APRS_init(Configuration *cfg)
     }
 
     log_d("[%d] Begin... ", config.rf_type);
-    if((cfg->rf_type == RF_SX1231)||(cfg->rf_type == RF_SX1233)){
-        state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0),config.rf_baudrate, config.rf_bw,config.rf_bw, config.rf_power, config.rf_preamable, 0, 1.6);
-    }else{
+    if ((cfg->rf_type == RF_SX1231) || (cfg->rf_type == RF_SX1233))
+    {
+        state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_baudrate, config.rf_bw, config.rf_bw, config.rf_power, config.rf_preamable, 0, 1.6);
+    }
+    else
+    {
         state = radioHal->begin(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_bw, config.rf_sf, config.rf_cr, config.rf_sync, config.rf_power, config.rf_preamable, 1, 1.6);
     }
     if (state == RADIOLIB_ERR_NONE)
@@ -301,17 +304,18 @@ void APRS_poll(void)
         disableInterrupt();
 
         received = false;
-        uint8_t *byteArr = (uint8_t *)calloc(350,sizeof(uint8_t));
+        uint8_t *byteArr = (uint8_t *)calloc(350, sizeof(uint8_t));
         if (byteArr)
         {
             int numBytes = 0;
             int state = -1;
 
             numBytes = radioHal->getPacketLength();
+            memset(byteArr, 0, 350);
             state = radioHal->readData(&byteArr[0], numBytes);
             radioRecvStatus();
             log_d("[LoRa] Received packet! %d Byte\n", numBytes);
-            if ((state == RADIOLIB_ERR_NONE) || (state == RADIOLIB_ERR_CRC_MISMATCH))
+            if (state == RADIOLIB_ERR_NONE)
             {
                 // packet was successfully received
                 // log_d("[LoRa] Received packet! %d Byte\n", numBytes);
@@ -327,34 +331,32 @@ void APRS_poll(void)
                     }
                     else if (byteArr[0] == '<' && byteArr[1] == 0xFF && byteArr[2] == 0x01)
                     {
-                        if (state == RADIOLIB_ERR_NONE)
-                        {
-                            String str = "";
-                            // str.getBytes(byteArr, numBytes - 3,3);
-                            //  print data of the packet
+                        String str = "";
+                        // str.getBytes(byteArr, numBytes - 3,3);
+                        //  print data of the packet
 
-                            for (int i = 0; i < numBytes - 3; i++)
-                            {
-                                str += String((char)byteArr[i + 3]);
-                                // str.setCharAt(i,byteArr[i+3]);
-                            }
-                            Serial.print(F("[SX1278] Data:\t\t"));
-                            Serial.println(str);
-                            // Add RSSI in comment
-                            int size = APRS_getTNC2Pkt(byteArr, str);
-                            rx_Fifo_flush();
-                            for (int i = 0; i < size; i++)
-                            {
-                                rx_putchar((char)byteArr[i]);
-                            }
+                        for (int i = 0; i < numBytes - 3; i++)
+                        {
+                            str += String((char)byteArr[i + 3]);
+                            // str.setCharAt(i,byteArr[i+3]);
+                        }
+                        Serial.print(F("[SX1278] Data:\t\t"));
+                        Serial.println(str);
+                        // Add RSSI in comment
+                        memset(byteArr, 0, 350);
+                        int size = APRS_getTNC2Pkt(byteArr, str);
+                        rx_Fifo_flush();
+                        for (int i = 0; i < size; i++)
+                        {
+                            rx_putchar((char)byteArr[i]);
                         }
                     }
                 }
-                if (state == RADIOLIB_ERR_CRC_MISMATCH)
-                {
-                    // packet was received, but is malformed
-                    log_d("[LoRa] CRC error!");
-                }
+            }
+            else if (state == RADIOLIB_ERR_CRC_MISMATCH)
+            {
+                // packet was received, but is malformed
+                log_d("[LoRa] CRC error!");
             }
             else
             {
@@ -371,13 +373,14 @@ void APRS_poll(void)
     {
         if (ax25_stateTx)
         {
-            ax25_stateTx = false;            
+            ax25_stateTx = false;
             // flagTx = true;
-            uint8_t *byteArr = (uint8_t *)calloc(250,sizeof(uint8_t));
+            uint8_t *byteArr = (uint8_t *)calloc(250, sizeof(uint8_t));
             if (byteArr)
             {
                 // Serial.print("TX HEX: ");
                 int i;
+                memset(byteArr, 0, 250);
                 for (i = 0; i < 250; i++)
                 {
                     int c = tx_getchar();
@@ -681,7 +684,7 @@ void APRS_sendLoc(void *_buffer, size_t length)
         usePHG = true;
         payloadLength += 7;
     }
-    uint8_t *packet = (uint8_t *)calloc(payloadLength,sizeof(uint8_t));
+    uint8_t *packet = (uint8_t *)calloc(payloadLength, sizeof(uint8_t));
     uint8_t *ptr = packet;
     packet[0] = '=';
     packet[9] = symbolTable;
@@ -719,7 +722,7 @@ void APRS_sendMsg(void *_buffer, size_t length)
         length = 67;
     size_t payloadLength = 11 + length + 4;
 
-    uint8_t *packet = (uint8_t *)calloc(payloadLength,sizeof(uint8_t));
+    uint8_t *packet = (uint8_t *)calloc(payloadLength, sizeof(uint8_t));
     uint8_t *ptr = packet;
     packet[0] = ':';
     int callSize = 6;
