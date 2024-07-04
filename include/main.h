@@ -63,8 +63,10 @@
 
 #define LOG_NONE 0
 #define LOG_TRACKER (1 << 0)
-#define LOG_STATUS (1 << 1)
-#define LOG_WX (1 << 2)
+#define LOG_IGATE (1 << 1)
+#define LOG_DIGI (1 << 2)
+#define LOG_WX (1 << 3)
+#define LOG_STATUS (1 << 4)
 
 #define FILTER_ALL 0				// Packet is disable all packet
 #define FILTER_OBJECT (1 << 0)		// packet is an object

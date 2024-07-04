@@ -3210,7 +3210,7 @@ void handle_system(AsyncWebServerRequest *request)
 			// Serial.print("=");
 			// Serial.println(request->arg(i));
 
-			if (request->argName(i) == "FilterStatus")
+			if (request->argName(i) == "logStatus")
 			{
 				if (request->arg(i) != "")
 				{
@@ -3219,7 +3219,7 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 
-			if (request->argName(i) == "FilterWeather")
+			if (request->argName(i) == "logWeather")
 			{
 				if (request->arg(i) != "")
 				{
@@ -3228,7 +3228,7 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 
-			if (request->argName(i) == "FilterTracker")
+			if (request->argName(i) == "logTracker")
 			{
 				if (request->arg(i) != "")
 				{
@@ -3236,6 +3236,25 @@ void handle_system(AsyncWebServerRequest *request)
 						config.log |= LOG_TRACKER;
 				}
 			}
+
+			if (request->argName(i) == "logIgate")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.log |= LOG_IGATE;
+				}
+			}
+
+			if (request->argName(i) == "logDigi")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.log |= LOG_DIGI;
+				}
+			}
+
 		}
 		saveEEPROM();
 		String html = "OK";
@@ -3650,17 +3669,22 @@ void handle_system(AsyncWebServerRequest *request)
 		filterFlageEn = "";
 		if (config.log & LOG_TRACKER)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterTracker\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Tracker</td>\n";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"logTracker\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Tracker</td>\n";
 
-		// filterFlageEn = "";
-		// if (config.log & LOG_STATUS)
-		// 	filterFlageEn = "checked";
-		// html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterStatus\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Status</td>\n";
+		filterFlageEn = "";
+		if (config.log & LOG_IGATE)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"logIgate\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>IGate</td>\n";
+
+		filterFlageEn = "";
+		if (config.log & LOG_DIGI)
+			filterFlageEn = "checked";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"logDigi\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>DIGI</td>\n";
 
 		filterFlageEn = "";
 		if (config.log & LOG_WX)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterWeather\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Weather</td>\n";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"logWeather\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Weather</td>\n";
 
 		html += "<td style=\"border:unset;\"></td>";
 		html += "</tr></table></fieldset>\n";
@@ -4433,11 +4457,11 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Host:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"20\" size=\"20\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /> *Support APRS-IS of T2THAI at <a href=\"http://aprs.dprns.com:14501\" target=\"_t2thai\">aprs.dprns.com:14580</a></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"20\" size=\"20\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /> *APRS-IS by T2THAI at <a href=\"http://aprs.dprns.com:14501\" target=\"_t2thai\">aprs.dprns.com:14580</a>,CBAPRS at <a href=\"http://aprs.dprns.com:24501\" target=\"_t2thai\">aprs.dprns.com:24580</a></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Port:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"1\" max=\"65535\" step=\"1\" id=\"aprsPort\" name=\"aprsPort\" type=\"number\" value=\"" + String(config.aprs_port) + "\" /> *Support AMPR Host at <a href=\"http://aprs.hs5tqa.ampr.org:14501\" target=\"_t2thai\">aprs.hs5tqa.ampr.org:14580</a></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"1\" max=\"65535\" step=\"1\" id=\"aprsPort\" name=\"aprsPort\" type=\"number\" value=\"" + String(config.aprs_port) + "\" /> *AMPR Host at <a href=\"http://aprs.hs5tqa.ampr.org:14501\" target=\"_t2thai\">aprs.hs5tqa.ampr.org:14580</a></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Filter:</b></td>\n";

@@ -59,7 +59,7 @@ https://www.espressif.com/en/support/download/other-tools
 
 ## APRS Server service
 
-- APRS SERVER of T2THAI at [aprs.dprns.com:14580](http://aprs.dprns.com:14501)
+- APRS SERVER of T2THAI at [aprs.dprns.com:14580](http://aprs.dprns.com:14501), CBAPRS at [aprs.dprns.com:24580](http://aprs.dprns.com:24501)
 - APRS SERVER of T2THAI ampr host at [aprs.hs5tqa.ampr.org:14580](http://aprs.hs5tqa.ampr.org:14501)
 - APRS MAP SERVICE [http://aprs.dprns.com](http://aprs.dprns.com)
 

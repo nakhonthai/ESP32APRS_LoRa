@@ -1272,7 +1272,7 @@ uint8_t checkSum(uint8_t *ptr, size_t count)
     return lrc;
 }
 
-void logLocation(double lat, double lon, double speed, double course)
+void logTracker(double lat, double lon, double speed, double course)
 {
     char data[200];
     char datetime[30];
@@ -1372,12 +1372,433 @@ void logLocation(double lat, double lon, double speed, double course)
             col += ",Longitude";
             col += ",Speed(kph)";
             col += ",Course(°)";
-            col += ",Temp(°C)";
-            col += ",VBat(V)";
+            for (int i = 0; i < 5; i++)
+            {
+                if(config.trk_tlm_sensor[i] > 0){
+                    col += ","+String(config.trk_tlm_PARM[i])+"("+String(config.trk_tlm_UNIT[i])+")";
+                }
+            }            
             f.println(col);
         }
         sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-        sprintf(data, "%s,%0.5f,%0.5f,%0.2f,%d,%0.2f,%0.2f", datetime, lat, lon, speed, (int)course, TempNTC, VBat);
+        sprintf(data, "%s,%0.5f,%0.5f,%0.2f,%d", datetime, lat, lon, speed, (int)course);
+        for (int s = 0; s < 5; s++)
+        {
+            if (config.trk_tlm_sensor[s] == 0)
+            {
+                continue;
+                // strcat(tlm_data, "0");
+            }
+            else
+            {
+                strcat(data, ",");
+                int sen_idx = config.trk_tlm_sensor[s] - 1;
+                double val = 0;
+                if (sen[sen_idx].visable){
+                    if(config.trk_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
+                        val = sen[sen_idx].average;
+                    else
+                        val = sen[sen_idx].sample;
+                }
+                strcat(data, String(val,2).c_str());
+            }
+        }
+        f.println(data);
+        f.close();
+#ifdef DEBUG
+        log_d("Data file updated");
+#endif
+    }
+}
+
+void logIGate(double lat, double lon, double speed, double course)
+{
+    char data[200];
+    char datetime[30];
+    char dfName[30];
+    bool header = false;
+    double dist;
+    time_t nowTime;
+
+    if (gps.time.isValid())
+    {
+        time_t timeGps = getGpsTime(); // Local gps time
+        time(&nowTime);
+        int tdiff = abs(timeGps - nowTime);
+        if (timeGps > 1700000000 && tdiff > 2) // && timeGps < 2347462800)
+        {
+            nowTime = timeGps;
+            setTime(nowTime);
+            time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
+            timeval tv = {rtc, 0};
+            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            settimeofday(&tv, &tz);
+        }
+    }
+    else
+    {
+        time(&nowTime);
+    }
+
+    String col;
+    struct tm tmstruct;
+    getLocalTime(&tmstruct, 5000);
+    sprintf(dfName, "/igate_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
+
+    if (lastTimeStamp == 0)
+        lastTimeStamp = nowTime;
+    time_t tdiff = nowTime - lastTimeStamp;
+    double nowLat = gps.location.lat();
+    double nowLng = gps.location.lng();
+    double spd = gps.speed.kmph();
+
+    // dist = distance(LastLng, LastLat, nowLng, nowLat);
+
+    if (spd < 5)
+    {
+
+        dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
+        course = direction(LastLng, LastLat, nowLng, nowLat);
+        if (dist > 50.0F)
+            dist = 0;
+        if (tdiff > 10 && (nowTime > lastTimeStamp))
+            speed = dist / ((double)tdiff / 3600);
+        else
+            speed = 0.0F;
+
+        if (speed > 5)
+        {
+            speed = gps.speed.kmph();
+            course = gps.course.deg();
+        }
+    }
+    LastLat = nowLat;
+    LastLng = nowLng;
+    lastTimeStamp = nowTime;
+
+    if (!LITTLEFS.exists(dfName))
+    {
+        header = true;
+    }
+
+    File f = LITTLEFS.open(dfName, "a");
+#ifdef DEBUG
+    log_d("====== Writing to data file =========");
+    log_d("Open File %s", dfName);
+#endif
+    if (!f)
+    {
+#ifdef DEBUG
+        log_d("Data file open failed");
+#endif
+    }
+    else
+    {
+        if (header)
+        {
+            // col = "\"dd/mm/yyyy h:m\",\"Weight Origin(Kg)\",\"Weight(Kg)\",\"Water Drain(L)\",\"Water Height(mm)\",\"Temperature(C)\",\"Raw\"";
+            col = "dd/mm/yyyy h:m:s";
+            col += ",Latitude";
+            col += ",Longitude";
+            col += ",Speed(kph)";
+            col += ",Course(°)";
+            for (int i = 0; i < 5; i++)
+            {
+                if(config.igate_tlm_sensor[i] > 0){
+                    col += ","+String(config.igate_tlm_PARM[i])+"("+String(config.igate_tlm_UNIT[i])+")";
+                }
+            }            
+            f.println(col);
+        }
+        sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+        sprintf(data, "%s,%0.5f,%0.5f,%0.2f,%d", datetime, lat, lon, speed, (int)course);
+        for (int s = 0; s < 5; s++)
+        {
+            if (config.igate_tlm_sensor[s] == 0)
+            {
+                continue;
+                // strcat(tlm_data, "0");
+            }
+            else
+            {
+                strcat(data, ",");
+                int sen_idx = config.igate_tlm_sensor[s] - 1;
+                double val = 0;
+                if (sen[sen_idx].visable){
+                    if(config.igate_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
+                        val = sen[sen_idx].average;
+                    else
+                        val = sen[sen_idx].sample;
+                }
+                strcat(data, String(val,2).c_str());
+            }
+        }
+        f.println(data);
+        f.close();
+#ifdef DEBUG
+        log_d("Data file updated");
+#endif
+    }
+}
+
+void logDigi(double lat, double lon, double speed, double course)
+{
+    char data[200];
+    char datetime[30];
+    char dfName[30];
+    bool header = false;
+    double dist;
+    time_t nowTime;
+
+    if (gps.time.isValid())
+    {
+        time_t timeGps = getGpsTime(); // Local gps time
+        time(&nowTime);
+        int tdiff = abs(timeGps - nowTime);
+        if (timeGps > 1700000000 && tdiff > 2) // && timeGps < 2347462800)
+        {
+            nowTime = timeGps;
+            setTime(nowTime);
+            time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
+            timeval tv = {rtc, 0};
+            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            settimeofday(&tv, &tz);
+        }
+    }
+    else
+    {
+        time(&nowTime);
+    }
+
+    String col;
+    struct tm tmstruct;
+    getLocalTime(&tmstruct, 5000);
+    sprintf(dfName, "/digi_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
+
+    if (lastTimeStamp == 0)
+        lastTimeStamp = nowTime;
+    time_t tdiff = nowTime - lastTimeStamp;
+    double nowLat = gps.location.lat();
+    double nowLng = gps.location.lng();
+    double spd = gps.speed.kmph();
+
+    // dist = distance(LastLng, LastLat, nowLng, nowLat);
+
+    if (spd < 5)
+    {
+
+        dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
+        course = direction(LastLng, LastLat, nowLng, nowLat);
+        if (dist > 50.0F)
+            dist = 0;
+        if (tdiff > 10 && (nowTime > lastTimeStamp))
+            speed = dist / ((double)tdiff / 3600);
+        else
+            speed = 0.0F;
+
+        if (speed > 5)
+        {
+            speed = gps.speed.kmph();
+            course = gps.course.deg();
+        }
+    }
+    LastLat = nowLat;
+    LastLng = nowLng;
+    lastTimeStamp = nowTime;
+
+    if (!LITTLEFS.exists(dfName))
+    {
+        header = true;
+    }
+
+    File f = LITTLEFS.open(dfName, "a");
+#ifdef DEBUG
+    log_d("====== Writing to data file =========");
+    log_d("Open File %s", dfName);
+#endif
+    if (!f)
+    {
+#ifdef DEBUG
+        log_d("Data file open failed");
+#endif
+    }
+    else
+    {
+        if (header)
+        {
+            // col = "\"dd/mm/yyyy h:m\",\"Weight Origin(Kg)\",\"Weight(Kg)\",\"Water Drain(L)\",\"Water Height(mm)\",\"Temperature(C)\",\"Raw\"";
+            col = "dd/mm/yyyy h:m:s";
+            col += ",Latitude";
+            col += ",Longitude";
+            col += ",Speed(kph)";
+            col += ",Course(°)";
+            for (int i = 0; i < 5; i++)
+            {
+                if(config.digi_tlm_sensor[i] > 0){
+                    col += ","+String(config.digi_tlm_PARM[i])+"("+String(config.digi_tlm_UNIT[i])+")";
+                }
+            }            
+            f.println(col);
+        }
+        sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+        sprintf(data, "%s,%0.5f,%0.5f,%0.2f,%d", datetime, lat, lon, speed, (int)course);
+        for (int s = 0; s < 5; s++)
+        {
+            if (config.digi_tlm_sensor[s] == 0)
+            {
+                continue;
+                // strcat(tlm_data, "0");
+            }
+            else
+            {
+                strcat(data, ",");
+                int sen_idx = config.digi_tlm_sensor[s] - 1;
+                double val = 0;
+                if (sen[sen_idx].visable){
+                    if(config.digi_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
+                        val = sen[sen_idx].average;
+                    else
+                        val = sen[sen_idx].sample;
+                }
+                strcat(data, String(val,2).c_str());
+            }
+        }
+        f.println(data);
+        f.close();
+#ifdef DEBUG
+        log_d("Data file updated");
+#endif
+    }
+}
+
+void logWeather(double lat, double lon, double speed, double course)
+{
+    char data[500];
+    char datetime[30];
+    char dfName[30];
+    bool header = false;
+    double dist;
+    time_t nowTime;
+
+    if (gps.time.isValid())
+    {
+        time_t timeGps = getGpsTime(); // Local gps time
+        time(&nowTime);
+        int tdiff = abs(timeGps - nowTime);
+        if (timeGps > 1700000000 && tdiff > 2) // && timeGps < 2347462800)
+        {
+            nowTime = timeGps;
+            setTime(nowTime);
+            time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
+            timeval tv = {rtc, 0};
+            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            settimeofday(&tv, &tz);
+        }
+    }
+    else
+    {
+        time(&nowTime);
+    }
+
+    String col;
+    struct tm tmstruct;
+    getLocalTime(&tmstruct, 5000);
+    sprintf(dfName, "/wx_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
+
+    if (lastTimeStamp == 0)
+        lastTimeStamp = nowTime;
+    time_t tdiff = nowTime - lastTimeStamp;
+    double nowLat = gps.location.lat();
+    double nowLng = gps.location.lng();
+    double spd = gps.speed.kmph();
+
+    // dist = distance(LastLng, LastLat, nowLng, nowLat);
+
+    if (spd < 5)
+    {
+
+        dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
+        course = direction(LastLng, LastLat, nowLng, nowLat);
+        if (dist > 50.0F)
+            dist = 0;
+        if (tdiff > 10 && (nowTime > lastTimeStamp))
+            speed = dist / ((double)tdiff / 3600);
+        else
+            speed = 0.0F;
+
+        if (speed > 5)
+        {
+            speed = gps.speed.kmph();
+            course = gps.course.deg();
+        }
+    }
+    LastLat = nowLat;
+    LastLng = nowLng;
+    lastTimeStamp = nowTime;
+
+    if (!LITTLEFS.exists(dfName))
+    {
+        header = true;
+    }
+
+    File f = LITTLEFS.open(dfName, "a");
+#ifdef DEBUG
+    log_d("====== Writing to data file =========");
+    log_d("Open File %s", dfName);
+#endif
+    if (!f)
+    {
+#ifdef DEBUG
+        log_d("Data file open failed");
+#endif
+    }
+    else
+    {
+        if (header)
+        {
+            // col = "\"dd/mm/yyyy h:m\",\"Weight Origin(Kg)\",\"Weight(Kg)\",\"Water Drain(L)\",\"Water Height(mm)\",\"Temperature(C)\",\"Raw\"";
+            col = "dd/mm/yyyy h:m:s";
+            col += ",Latitude";
+            col += ",Longitude";
+            col += ",Speed(kph)";
+            col += ",Course(°)";
+            for (int s = 0; s < WX_SENSOR_NUM; s++)
+            {
+                int senIdx = config.wx_sensor_ch[s];
+                if ((config.wx_sensor_enable[s] == 0) || (senIdx == 0))
+                {
+                    continue;
+                }else{
+                    senIdx -= 1;
+                    col += ","+String(String(WX_SENSOR[s]))+"("+String(config.sensor[senIdx].unit)+")";
+                }
+            }            
+            f.println(col);
+        }
+        sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+        sprintf(data, "%s,%0.5f,%0.5f,%0.2f,%d", datetime, lat, lon, speed, (int)course);
+        for (int s = 0; s < WX_SENSOR_NUM; s++)
+        {
+            int senIdx = config.wx_sensor_ch[s];
+            if ((config.wx_sensor_enable[s] == 0) || (senIdx == 0))
+            {
+                continue;
+            }
+            else
+            {
+                strcat(data, ",");
+                senIdx -= 1;
+                double val = 0;
+                if (sen[senIdx].visable)
+                {
+                    if ((config.wx_sensor_avg[s] && (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate)) || (sen[senIdx].timeAvg == 0))
+                        val = sen[senIdx].sample;
+                    else
+                        val = sen[senIdx].average;
+                }
+                strcat(data, String(val,2).c_str());
+            }
+        }
         f.println(data);
         f.close();
 #ifdef DEBUG
@@ -1453,7 +1874,7 @@ void defaultConfig()
     sprintf(config.aprs_host, "aprs.dprns.com");
     memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
     sprintf(config.aprs_moniCall, "%s-%d", config.aprs_mycall, config.aprs_ssid);
-    sprintf(config.aprs_filter, "m/10");
+    sprintf(config.aprs_filter, "m/0");
     //--Position
     config.igate_gps = false;
     config.igate_lat = 13.7555;
@@ -1898,7 +2319,7 @@ void defaultConfig()
     config.rf_tx_active = 1;
     config.rf_rx_active = 1;
     config.rf_reset_active = 0;
-    config.rf_nss_active = 0;
+    config.rf_nss_active = 0;    
 #elif defined(ESP32_DIY_LoRa_GPS) || defined(TTGO_T_LORA32_V2_1_GPS)
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
@@ -2098,7 +2519,7 @@ void defaultConfig()
     config.log = 0;
 
 #ifdef BUOY
-    sprintf(config.wifi_ap_ssid, "BUOY");
+    sprintf(config.wifi_ap_ssid, "miniBUOY_0");
     config.wifi_mode |= WIFI_AP_FIX;
     config.log |= 1;
     config.pwr_gpio = 2;
@@ -2109,14 +2530,17 @@ void defaultConfig()
     config.trk_smartbeacon = false;
     config.trk_compress = true;
     config.trk_en = true;
-    config.trk_bat = true;
     config.trk_sat = false;
     config.trk_dx = false;
     config.trk_path = 2;
     config.trk_ssid = 11;
     config.trk_timestamp = false;
-    sprintf(config.trk_mycall, "HS5TQA");
-    sprintf(config.trk_item, "BTL0");
+    config.igate_en = true;
+    config.aprs_port = 24580;
+    sprintf(config.aprs_mycall, "CBBT0");
+    sprintf(config.trk_mycall, "CBBT0");
+    memset(config.trk_item,0,10);
+    //sprintf(config.trk_item, "BTL0");
     config.trk_comment[0] = 0;
     config.rf_power = 22;
     config.uart1_enable = true;
@@ -2126,6 +2550,55 @@ void defaultConfig()
     config.uart1_rts_gpio = -1;
     config.gnss_enable = true;
     config.gnss_channel = 2;
+    config.rf_en = true;
+
+    config.wifi_sta[1].enable = true;
+    sprintf(config.wifi_sta[1].wifi_ssid, "BUOY");
+    sprintf(config.wifi_sta[1].wifi_pass, "aprsthnetwork");
+
+    config.sensor[0].enable = true;
+    config.sensor[0].port = 2;
+    config.sensor[0].address = 1;
+    config.sensor[0].samplerate = 10;
+    config.sensor[0].averagerate = 60;
+    config.sensor[0].eqns[0] = 0; // a
+    config.sensor[0].eqns[1] = 1; // b
+    config.sensor[0].eqns[2] = 0; // c
+    config.sensor[0].type = SENSOR_TEMPERATURE;
+    sprintf(config.sensor[0].parm, "Temperature");
+    sprintf(config.sensor[0].unit, "°C");
+
+    config.sensor[1].enable = true;
+    config.sensor[1].port = 22;
+    config.sensor[1].address = 0;
+    config.sensor[1].samplerate = 10;
+    config.sensor[1].averagerate = 60;
+    config.sensor[1].eqns[0] = 0; // a
+    config.sensor[1].eqns[1] = 1; // b
+    config.sensor[1].eqns[2] = 0; // c
+    config.sensor[1].type = SENSOR_BAT_VOLTAGE;
+    sprintf(config.sensor[1].parm, "BAT");
+    sprintf(config.sensor[1].unit, "V");
+
+    config.trk_tlm_avg[0] = false;
+    config.trk_tlm_sensor[0] = 1;
+    config.trk_tlm_precision[0] = 2;
+    config.trk_tlm_offset[0] = 0;
+    sprintf(config.trk_tlm_UNIT[0], "°C");
+    sprintf(config.trk_tlm_PARM[0], "TEMP");
+    config.trk_tlm_EQNS[0][0] = 0;    // a av2 + bv + c
+    config.trk_tlm_EQNS[0][1] = 0.01; // b
+    config.trk_tlm_EQNS[0][2] = 0;    // c
+
+    config.trk_tlm_avg[1] = false;
+    config.trk_tlm_sensor[1] = 2;
+    config.trk_tlm_precision[1] = 2;
+    config.trk_tlm_offset[1] = 0;
+    sprintf(config.trk_tlm_UNIT[1], "V");
+    sprintf(config.trk_tlm_PARM[1], "BAT");
+    config.trk_tlm_EQNS[1][0] = 0;    // a av2 + bv + c
+    config.trk_tlm_EQNS[1][1] = 0.01; // b
+    config.trk_tlm_EQNS[1][2] = 0;    // c
 #endif
     // if(strlen(config.trk_item)>3)
     //     sprintf(config.wifi_ap_ssid,"%s",config.trk_item);
@@ -5809,18 +6282,22 @@ void taskAPRS(void *pvParameters)
                 {
                     cmn += " ?RSSI";
                 }
-
-                if (config.log & LOG_TRACKER)
-                {
-                    logLocation(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
-                }
+                
                 if (config.trk_gps) // TRACKER by GPS
                 {
                     rawData = trk_gps_postion(cmn);
+                    if (config.log & LOG_TRACKER)
+                    {
+                        logTracker(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
+                    }
                 }
                 else // TRACKER by FIX position
                 {
                     rawData = trk_fix_position(cmn);
+                    if (config.log & LOG_TRACKER)
+                    {
+                        logTracker(config.trk_lat, config.trk_lon, 0, 0);
+                    }
                 }
 
                 log_d("TRACKER RAW: %s\n", rawData.c_str());
@@ -6014,12 +6491,21 @@ void taskAPRS(void *pvParameters)
                     String rawData = "";
                     if (config.igate_gps)
                     { // IGATE Send GPS position
-                        if (gps.location.isValid())
+                        if (gps.location.isValid()){
                             rawData = igate_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                            if (config.log & LOG_IGATE)
+                            {
+                                logIGate(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
+                            }
+                        }
                     }
                     else
                     { // IGATE Send fix position
                         rawData = igate_position(config.igate_lat, config.igate_lon, config.igate_alt, "");
+                         if (config.log & LOG_TRACKER)
+                        {
+                            logIGate(config.igate_lat, config.igate_lon, 0, 0);
+                        }
                     }
                     if (rawData != "")
                     {
@@ -6231,12 +6717,21 @@ void taskAPRS(void *pvParameters)
                     String rawData;
                     if (config.digi_gps)
                     { // DIGI Send GPS position
-                        if (gps.location.isValid())
+                        if (gps.location.isValid()){
                             rawData = digi_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                            if (config.log & LOG_DIGI)
+                            {
+                                logDigi(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
+                            }
+                        }
                     }
                     else
                     { // DIGI Send fix position
                         rawData = digi_position(config.digi_lat, config.digi_lon, config.digi_alt, "");
+                        if (config.log & LOG_DIGI)
+                        {
+                            logDigi(config.digi_lat, config.digi_lon, 0, 0);
+                        }
                     }
                     if (rawData != "")
                     {
@@ -6477,12 +6972,21 @@ void taskAPRS(void *pvParameters)
                 String rawData = "";
                 if (config.wx_gps)
                 { // Wx Send GPS position
-                    if (gps.location.isValid())
+                    if (gps.location.isValid()){
                         rawData = wx_report(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                        if (config.log & LOG_WX)
+                        {
+                            logWeather(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
+                        }
+                    }
                 }
                 else
                 { // Wx Send fix position
                     rawData = wx_report(config.wx_lat, config.wx_lon, config.wx_alt, "");
+                    if (config.log & LOG_WX)
+                    {
+                        logWeather(config.wx_lat, config.wx_lon, 0, 0);
+                    }
                 }
                 if (rawData != "")
                 {

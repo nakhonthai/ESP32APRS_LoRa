@@ -25,6 +25,8 @@ extern WiFiClient aprsClient;
 extern ModbusMaster modbus;
 extern bool i2c_busy;
 extern TinyGPSPlus gps;
+extern double VBat;
+extern double TempNTC;
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
 #include <XPowersLib.h>
 extern XPowersAXP2101 PMU;
@@ -160,7 +162,11 @@ bool getBAT(uint8_t port)
             if (config.sensor[i].type == SENSOR_BAT_VOLTAGE)
             {
                 #ifdef TTGO_T_Beam_S3_SUPREME_V3
-                sensorUpdate(i, (double)PMU.getBattVoltage() / 1000);
+                VBat = (double)PMU.getBattVoltage() / 1000;
+                sensorUpdate(i, VBat);
+                #elif defined(BUOY)
+                VBat = (double)analogReadMilliVolts(0) / 595.24F;
+                sensorUpdate(i, VBat);
                 #endif
             }else if (config.sensor[i].type == SENSOR_BAT_PERCENT)
             {
@@ -191,7 +197,8 @@ bool getADC(uint8_t port)
             }
             else if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == PORT_ADC)
             {
-                sensorUpdate(i, (double)getTempNTC(val)); // NTC 10K
+                TempNTC = (double)getTempNTC(val);
+                sensorUpdate(i,TempNTC ); // NTC 10K
             }
         }
         return true;    
@@ -1045,6 +1052,17 @@ void taskSensor(void *pvParameters)
     if (config.i2c1_enable)
     {
         Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
+    }
+
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+    {
+        sen[i].timeTick =0 ;
+        sen[i].counter = 0;
+        sen[i].sum = 0;
+        sen[i].timeAvg = 0;
+        sen[i].visable = false;
+        sen[i].timeTick = 0;
+        sen[i].timeSample = 0;
     }
 
     for (;;)
