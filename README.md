@@ -63,6 +63,17 @@ https://www.espressif.com/en/support/download/other-tools
 - APRS SERVER of T2THAI ampr host at [aprs.hs5tqa.ampr.org:14580](http://aprs.hs5tqa.ampr.org:14501)
 - APRS MAP SERVICE [http://aprs.dprns.com](http://aprs.dprns.com)
 
+## WIKI How to
+# How to install firmware
+* [How to install firmware for TTGO LoRa32 V1.0](https://github.com/nakhonthai/ESP32APRS_LoRa/wiki/How-to-install-firmware-for-TTGO-LoRa32-V1.0)
+* [How to install firmware for LILYGO T‐Beam SUPREME (M)](https://github.com/nakhonthai/ESP32APRS_LoRa/wiki/How-to-install-firmware-for-LILYGO-T%E2%80%90Beam-SUPREME-(M))
+* [How to install firmware for HELTEC HTIT‐Tracker](https://github.com/nakhonthai/ESP32APRS_LoRa/wiki/How-to-install-firmware-for-HELTEC-HTIT%E2%80%90Tracker)
+* [How to install firmware for ESP32‐DevKit,DI](https://github.com/nakhonthai/ESP32APRS_LoRa/wiki/How-to-install-firmware-for-ESP32%E2%80%90DevKit,DIY)
+
+# How to configuration
+* [How to config WX:Weather Station Report](https://github.com/nakhonthai/ESP32APRS_LoRa/wiki/How-to-config-WX:Weather-Station-Report)
+* [How to config Telemetry on IGate Digi Tracker](https://github.com/nakhonthai/ESP32APRS_LoRa/wiki/How-to-config-Telemetry-on-IGate-Digi-Tracker)
+
 ## Developer/Support Information
 
 - Author:	Mr.Somkiat Nakhonthai
