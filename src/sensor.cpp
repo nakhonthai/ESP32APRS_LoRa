@@ -91,6 +91,18 @@ double getTempNTC(double Vout)
     return celsius;
 }
 
+/* Count RPM Function - takes first timestamp and last timestamp,
+number of pulses, and pulses per revolution */
+int countRPM(int firstTime, int lastTime, int pulseTotal, int pulsePerRev)
+{
+    int timeDelta = (lastTime - firstTime); // lastTime - firstTime
+    if (timeDelta <= 0)
+    { // This means we've gotten something wrong
+        return -1;
+    }
+    return ((60000 * (pulseTotal / pulsePerRev)) / timeDelta);
+}
+
 void dispSensor()
 {
     for (int i = 0; i < SENSOR_NUMBER; i++)

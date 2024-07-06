@@ -101,6 +101,11 @@ ICACHE_RAM_ATTR void disableInterrupt()
     eInterrupt = false;
 }
 
+void radioSleep()
+{
+    radioHal->sleep();
+}
+
 void startRx()
 {
     // put module back to listen mode
@@ -294,8 +299,9 @@ void APRS_init(Configuration *cfg)
     ax25_init(&AX25, aprs_msg_callback);
 }
 
-void APRS_poll(void)
+bool APRS_poll(void)
 {
+    bool ret = false;
     // check if the flag is set
     if (received)
     {
@@ -352,6 +358,7 @@ void APRS_poll(void)
                         }
                     }
                 }
+                ret = true;
             }
             else if (state == RADIOLIB_ERR_CRC_MISMATCH)
             {
@@ -398,6 +405,7 @@ void APRS_poll(void)
                 startRx();
                 // flagTx = false;
                 free(byteArr);
+                ret = true;
             }
         }
         else
@@ -405,6 +413,7 @@ void APRS_poll(void)
             ax25_poll(&AX25);
         }
     }
+    return ret;
 }
 
 void APRS_setCallsign(char *call, int ssid)

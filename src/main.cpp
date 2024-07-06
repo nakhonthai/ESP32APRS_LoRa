@@ -208,6 +208,8 @@ RTC_DATA_ATTR bool gps_mode;
 boolean KISS = false;
 bool aprsUpdate = false;
 
+long timeSleep = 0;
+
 boolean gotPacket = false;
 AX25Msg incomingPacket;
 
@@ -439,91 +441,6 @@ typedef struct
 //     pcnt_counter_resume(PCNT_UNIT);
 //     // pcnt_counter_resume(PCNT_UNIT_1);
 // }
-// Pins
-// #define THERMISTORPIN 1
-
-// // Series resistor value
-// #define SERIESRESISTOR 10000
-// // Number of samples to average
-// #define SAMPLERATE 5
-
-// // Nominal resistance at 25C
-// #define THERMISTORNOMINAL 10000
-
-// // Nominal temperature in degrees
-// #define TEMPERATURENOMINAL 25
-
-// // Beta coefficient
-// #define BCOEFFICIENT 3950
-
-// double getTempNTC()
-// {
-//     double Vout;
-//     double thermalSamples[SAMPLERATE];
-//     double average, kelvin, resistance, celsius;
-//     int i;
-
-//     // Collect SAMPLERATE (default 5) samples
-//     for (i = 0; i < SAMPLERATE; i++)
-//     {
-//         thermalSamples[i] = analogReadMilliVolts(THERMISTORPIN);
-//         delay(10);
-//     }
-
-//     // Calculate the average value of the samples
-//     average = 0;
-
-//     for (i = 0; i < SAMPLERATE; i++)
-//     {
-//         average += thermalSamples[i];
-//     }
-
-//     Vout = average / SAMPLERATE;
-
-//     resistance = SERIESRESISTOR * Vout / (3300 - Vout);
-//     log_d("ADC=%0.fmV R=%0.1f", Vout, resistance);
-//     // Convert to resistanceresistance = 4095 / average - 1;resistance = SERIESRESISTOR/resistance;
-//     /*
-//      * Use Steinhart equation (simplified B parameter equation) to convert resistance to kelvin
-//      * B param eq: T = 1/( 1/To + 1/B * ln(R/Ro) )
-//      * T = Temperature in Kelvin
-//      * R = Resistance measured
-//      * Ro = Resistance at nominal temperature
-//      * B = Coefficent of the thermistor
-//      * To = Nominal temperature in kelvin
-//      */
-//     double R1 = 10000.0;  // voltage divider resistor value
-//     double Beta = 3950.0; // Beta value
-//     double To = 298.15;   // Temperature in Kelvin for 25 degree Celsius
-//     double Ro = 10000.0;  // Resistance of Thermistor at 25 degree Celsius
-
-//     double T = 1 / (1 / To + log(resistance / Ro) / Beta); // Temperature in Kelvin
-//     celsius = T - 273.15F;                                 // Celsius
-
-//     // kelvin = resistance / THERMISTORNOMINAL;               // R/Ro
-//     // kelvin = log(kelvin);                                  // ln(R/Ro)
-//     // kelvin = (1 / BCOEFFICIENT) * kelvin;                  // 1/B * ln(R/Ro)
-//     // kelvin = (1 / (TEMPERATURENOMINAL + 273.15)) + kelvin; // 1/To + 1/B * ln(R/Ro)
-//     // kelvin = 1 / kelvin;                                   // 1/( 1/To + 1/B * ln(R/Ro) )​
-
-//     // // Convert Kelvin to Celsius
-//     // celsius = kelvin - 273.15;
-
-//     // Send the value back to be displayed
-//     return celsius;
-// }
-
-/* Count RPM Function - takes first timestamp and last timestamp,
-number of pulses, and pulses per revolution */
-int countRPM(int firstTime, int lastTime, int pulseTotal, int pulsePerRev)
-{
-    int timeDelta = (lastTime - firstTime); // lastTime - firstTime
-    if (timeDelta <= 0)
-    { // This means we've gotten something wrong
-        return -1;
-    }
-    return ((60000 * (pulseTotal / pulsePerRev)) / timeDelta);
-}
 
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
 void setupPower()
@@ -3102,6 +3019,7 @@ bool pkgTxSend()
                     log_d("TX->RF: %s", info);
                     if (config.trk_en)
                     {
+                        timeSleep = millis() + 5000;
                         Sleep_Activate &= ~ACTIVATE_TRACKER;
                     }
 
@@ -3256,7 +3174,7 @@ unsigned long timeTask;
 void setup()
 {
     byte *ptr;
-
+    int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
     pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
@@ -3420,14 +3338,14 @@ void setup()
         display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false); // initialize with the I2C addr 0x3C (for the 128x64)
     }
     // Initialising the UI will init the display too.
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
+    if(BootReason != ESP_RST_DEEPSLEEP){ 
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(WHITE);
 
-    if (config.pwr_mode == MODE_A)
-    {
         display.setTextSize(1);
         display.setFont(&FreeSansBold9pt7b);
+          
         display.setCursor(0, 15);
         display.print("APRS");
         display.setCursor(65, 32);
@@ -3483,6 +3401,8 @@ void setup()
                 digitalWrite(LED_RX, HIGH);
             }
         }
+    }else{
+        showDisp = true;
     }
     display.setFont();
     display.setTextColor(WHITE);
@@ -3496,63 +3416,70 @@ void setup()
     display.initR(ST7735_MODEL); // initialize a ST7735S chip, mini display
     display.setRotation(3);
     display.invertDisplay(false);
-    display.fillScreen(ST77XX_BLACK);
-    display.setTextSize(1);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setTextColor(ST77XX_YELLOW);
-    display.setCursor(10, 15);
-    display.print("APRS");
-    display.fillRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
-    display.setTextColor(ST77XX_RED);
-    display.setCursor(85, 32);
-    display.print("LoRa");
-    display.drawYBitmap(10, 26, LOGO, 48, 48, ST77XX_BLUE);
-    // display.drawRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
+    if(BootReason != ESP_RST_DEEPSLEEP){
+        display.fillScreen(ST77XX_BLACK);
+        display.setTextSize(1);
+        display.setFont(&FreeSansBold9pt7b);    
+    
+        display.setTextColor(ST77XX_YELLOW);
+        display.setCursor(10, 15);
+        display.print("APRS");
+        display.fillRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
+        display.setTextColor(ST77XX_RED);
+        display.setCursor(85, 32);
+        display.print("LoRa");
+        display.drawYBitmap(10, 26, LOGO, 48, 48, ST77XX_BLUE);
+        // display.drawRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
 
-    display.setFont();
-    display.setTextColor(ST77XX_GREEN);
+        display.setFont();
+        display.setTextColor(ST77XX_GREEN);
 
-    display.setCursor(80, 50);
-    display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
-    display.setCursor(85, 5);
-    display.print("Copy@2024");
+        display.setCursor(80, 50);
+        display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+        display.setCursor(85, 5);
+        display.print("Copy@2024");
 
-    delay(1000);
-    digitalWrite(LED_TX, HIGH);
-    display.fillRect(69, 59, 50, 8, 0);
-    display.setCursor(90, 60);
-    display.print("3 Sec");
-
-    delay(1000);
-    digitalWrite(LED_RX, HIGH);
-    display.fillRect(69, 59, 50, 8, 0);
-    display.setCursor(90, 60);
-    display.print("2 Sec");
-
-    delay(1000);
-    display.fillRect(69, 59, 50, 8, 0);
-    display.setCursor(90, 60);
-    display.print("1 Sec");
-
-    delay(1000);
-    if (digitalRead(BOOT_PIN) == LOW)
-    {
-        defaultConfig();
-        log_d("Manual Default configure!");
-#ifdef ST7735_160x80
+        delay(1000);
+        digitalWrite(LED_TX, HIGH);
         display.fillRect(69, 59, 50, 8, 0);
-        display.setCursor(70, 60);
-        display.print("Factory Reset!");
-#endif
-        while (digitalRead(BOOT_PIN) == LOW)
+        display.setCursor(90, 60);
+        display.print("3 Sec");
+
+        delay(1000);
+        digitalWrite(LED_RX, HIGH);
+        display.fillRect(69, 59, 50, 8, 0);
+        display.setCursor(90, 60);
+        display.print("2 Sec");
+
+        delay(1000);
+        display.fillRect(69, 59, 50, 8, 0);
+        display.setCursor(90, 60);
+        display.print("1 Sec");
+
+        delay(1000);
+    
+
+        if (digitalRead(BOOT_PIN) == LOW)
         {
-            delay(500);
-            digitalWrite(LED_TX, LOW);
-            digitalWrite(LED_RX, LOW);
-            delay(500);
-            digitalWrite(LED_TX, HIGH);
-            digitalWrite(LED_RX, HIGH);
+            defaultConfig();
+            log_d("Manual Default configure!");
+    #ifdef ST7735_160x80
+            display.fillRect(69, 59, 50, 8, 0);
+            display.setCursor(70, 60);
+            display.print("Factory Reset!");
+    #endif
+            while (digitalRead(BOOT_PIN) == LOW)
+            {
+                delay(500);
+                digitalWrite(LED_TX, LOW);
+                digitalWrite(LED_RX, LOW);
+                delay(500);
+                digitalWrite(LED_TX, HIGH);
+                digitalWrite(LED_RX, HIGH);
+            }
         }
+    }else{
+        showDisp = true;
     }
     digitalWrite(LED_TX, LOW);
     digitalWrite(LED_RX, LOW);
@@ -3666,7 +3593,6 @@ void setup()
 #endif
 
     showDisp = true;
-    curTab = 3;
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
 
     // enableLoopWDT();
@@ -3775,7 +3701,7 @@ void setup()
         &taskSensorHandle, /* Task handle. */
         0);                /* Core where the task should run */
 
-    StandByTick = millis();
+    StandByTick = millis() + (config.pwr_stanby_delay*1000);
     timeTask = millis() + 10000;
 }
 
@@ -4545,7 +4471,6 @@ void flash_morse_text(char *text, size_t len)
 
 long sendTimer = 0;
 int btn_count = 0;
-long timeCheck = 0;
 int timeHalfSec = 0;
 
 unsigned long timeSec;
@@ -4615,7 +4540,7 @@ void loop()
         log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
         // log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
 
-        if (WiFi.isConnected() == false && WiFi.softAPgetStationNum() == 0)
+        if (!((WiFi.isConnected() == true) || (WiFi.softAPgetStationNum() > 0)))
         {
             Sleep_Activate &= ~ACTIVATE_WIFI;
         }
@@ -4831,12 +4756,12 @@ void loop()
 #endif
 
     // Tick one secound
-    if (millis() > timeCheck)
+    if (millis() > timeSleep)
     {
 #ifndef TTGO_T_Beam_S3_SUPREME_V3
         esp_task_wdt_reset();
 #endif
-        timeCheck = millis() + 1000;
+        timeSleep = millis() + 1000;
 
         if (config.pwr_en)
         {
@@ -4844,11 +4769,13 @@ void loop()
             {
                 if (config.pwr_mode == MODE_B) // Wake up and wait for delay time to sleep
                 {
-                    if (StandByTick > millis())
+                    if (millis()>StandByTick)
                     {
                         log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
                         digitalWrite(led_pin, HIGH);
                         digitalWrite(config.pwr_gpio, LOW);
+                        delay(100);
+                        esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio,HIGH);
                         esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
                         esp_deep_sleep_start();
                     }
@@ -4858,8 +4785,13 @@ void loop()
                     if (Sleep_Activate == ACTIVATE_OFF)
                     {
                         log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
+                        //radioSleep();
+                        //esp_deep_sleep_enable_gpio_wakeup(BIT(DEFAULT_WAKEUP_PIN), DEFAULT_WAKEUP_LEVEL));                        
                         digitalWrite(led_pin, HIGH);
                         digitalWrite(config.pwr_gpio, LOW);
+                        //delay(100);
+                        //esp_sleep_enable_ext0_wakeup(GPIO_NUM_14,LOW);
+                        radioSleep();
                         esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
                         esp_deep_sleep_start();
                     }
@@ -6002,11 +5934,7 @@ void taskAPRS(void *pvParameters)
     PacketBuffer.clean();
 
     APRS_init(&config);
-    // APRS_setFreq(config.rf_freq);
     APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
-    // APRS_setPath1("WIDE1-1", 1);
-    // APRS_setPreamble(300);
-    // APRS_setTail(0);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
     igateTLM.TeleTimeout = millis() + 60000; // 1Min
 
@@ -7129,7 +7057,9 @@ void taskAPRSPoll(void *pvParameters)
 
         if (AFSKInitAct == true)
         {
-            APRS_poll();
+            if(APRS_poll()){
+                StandByTick = millis() + (config.pwr_stanby_delay*1000);
+            }
         }
     }
 }
@@ -7138,7 +7068,7 @@ int mqttRetry = 0;
 long wifiTTL = 0;
 
 // WiFi connect timeout per AP. Increase when connecting takes longer.
-const uint32_t connectTimeoutMs = 10000;
+const uint32_t connectTimeoutMs = 5000;
 uint8_t APStationNum = 0;
 
 void taskNetwork(void *pvParameters)
@@ -7229,7 +7159,7 @@ void taskNetwork(void *pvParameters)
             APStationNum = WiFi.softAPgetStationNum();
             if (APStationNum > 0)
             {
-                config.pwr_sleep_activate |= ACTIVATE_WIFI;
+                //config.pwr_sleep_activate |= ACTIVATE_WIFI;
                 if (WiFi.isConnected() == false)
                 {
                     vTaskDelay(9 / portTICK_PERIOD_MS);
@@ -7240,7 +7170,7 @@ void taskNetwork(void *pvParameters)
 
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
         {
-            config.pwr_sleep_activate |= ACTIVATE_WIFI;
+            //config.pwr_sleep_activate |= ACTIVATE_WIFI;
             if (millis() > NTP_Timeout)
             {
                 NTP_Timeout = millis() + 86400000;

@@ -15,7 +15,7 @@
 #include "../../include/config.h"
 
 void APRS_init(Configuration *cfg);
-void APRS_poll(void);
+bool APRS_poll(void);
 
 void APRS_setCallsign(char *call, int ssid);
 void APRS_setDestination(char *call, int ssid);
@@ -51,5 +51,6 @@ void APRS_setFreq(float freq);
 int APRS_getTNC2Pkt(uint8_t *raw,String info);
 
 int freeMemory();
+void radioSleep();
 
 #endif
