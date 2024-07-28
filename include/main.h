@@ -27,7 +27,7 @@
 #include "HardwareSerial.h"
 
 #include "config.h"
-#ifndef TTGO_T_Beam_S3_SUPREME_V3
+#ifndef CONFIG_IDF_TARGET_ESP32S3
 #include "soc/rtc_wdt.h"
 #endif
 
