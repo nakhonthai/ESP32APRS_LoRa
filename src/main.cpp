@@ -4365,13 +4365,13 @@ uint8_t led_pin = 9;
 // (i.e. an array of pointers to strings composed of dots and dashes)
 // Done to preserve memory because strings are not equal in size. A 2D array
 // would be a waste of space.
-char *letters[] = {
+const char *letters[] = {
     // The letters A-Z in Morse code
     ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..",
     ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
     "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--.."};
 
-char *numbers[] = {
+const char *numbers[] = {
     // The numbers 0-9 in Morse code
     "-----", ".----", "..---", "...--", "....-", ".....", "-....",
     "--...", "---..", "----."};
@@ -4412,13 +4412,13 @@ void flash_dot_or_dash(char dot_or_dash)
  *  Flashes the Morse code for the input letter or number
  *  @param morse_code pointer to the morse code
  */
-void flash_morse_code(char *morse_code)
+void flash_morse_code(const char *morse_code)
 {
 
     unsigned int i = 0;
 
     // Read the dots and dashes and flash accordingly
-    while (morse_code[i] != NULL)
+    while (morse_code[i] != '\0')
     {
         flash_dot_or_dash(morse_code[i]);
         i++;
@@ -5652,7 +5652,7 @@ void taskGPS(void *pvParameters)
                             setTime(timeGps);
                             time_t rtc = timeGps - (config.timeZone * SECS_PER_HOUR);
                             timeval tv = {rtc, 0};
-                            timezone tz = {(config.timeZone * SECS_PER_HOUR), 0};
+                            timezone tz = {static_cast<int>(config.timeZone * SECS_PER_HOUR), 0};
                             settimeofday(&tv, &tz);
 #ifdef DEBUG
                             log_d("\nSET GPS Timestamp = %u Year=%d\n", timeGps, year());
