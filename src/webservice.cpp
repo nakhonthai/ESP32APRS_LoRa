@@ -7705,6 +7705,7 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>ESP32 Model: </b></td><td align=\"left\"> " + String(ESP.getChipModel()) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Revision: </b></td><td align=\"left\"> " + String(ESP.getChipRevision()) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Chip ID: </b></td><td align=\"left\"> " + String(strCID) + "</td></tr>";
+	webString += "<tr><td align=\"right\"><b>ESP32 CPU freq: </b></td><td align=\"left\"> " + String(ESP.getCpuFreqMHz()) + "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Flash: </b></td><td align=\"left\">" + String(ESP.getFlashChipSize() / 1024) + " KByte</td></tr>";
 	webString += "<tr><td align=\"right\"><b>PSRAM: </b></td><td align=\"left\">" + String((float)ESP.getFreePsram() / 1024, 1) + "/" + String((float)ESP.getPsramSize() / 1024, 1) + " KByte</td></tr>";
 	webString += "<tr><td align=\"right\"><b>FILE SYSTEM: </b></td><td align=\"left\">" + String((float)LITTLEFS.usedBytes() / 1024, 1) + "/" + String((float)LITTLEFS.totalBytes() / 1024, 1) + " KByte</td></tr>";
