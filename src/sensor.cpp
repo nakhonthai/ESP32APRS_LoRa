@@ -179,6 +179,11 @@ bool getBAT(uint8_t port)
                 #elif defined(BUOY)
                 VBat = (double)analogReadMilliVolts(0) / 595.24F;
                 sensorUpdate(i, VBat);
+                #elif defined(HELTEC_HTIT_TRACKER)
+                digitalWrite(2, HIGH); //ADC_Ctrl PIN 2
+                VBat = (double)analogReadMilliVolts(1) / 204.08F;  //390k/100k Voltage divider
+                sensorUpdate(i, VBat + 0.285F); //Add offset 0.285V
+                digitalWrite(2, LOW);
                 #endif
             }else if (config.sensor[i].type == SENSOR_BAT_PERCENT)
             {
