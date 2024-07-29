@@ -3219,7 +3219,7 @@ void setup()
 
 #ifdef HELTEC_HTIT_TRACKER
     pinMode(2, OUTPUT); // ADC_Ctl
-    digitalWrite(2, HIGH);
+    //digitalWrite(2, HIGH);
 #endif
 
     // Set up serial port
