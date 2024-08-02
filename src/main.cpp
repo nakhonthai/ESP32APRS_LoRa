@@ -199,7 +199,7 @@ time_t systemUptime = 0;
 time_t wifiUptime = 0;
 
 uint8_t Sleep_Activate = 0;
-unsigned int StandByTick = 0;
+unsigned long StandByTick = 0;
 
 bool lastHeard_Flag = 0;
 
@@ -612,10 +612,11 @@ void setupPower()
     - XPOWERS_CHG_LED_ON,
     - XPOWERS_CHG_LED_CTRL_CHG,
     * */
-    PMU.setChargingLedMode(XPOWERS_CHG_LED_BLINK_1HZ);
+    //PMU.setChargingLedMode(XPOWERS_CHG_LED_BLINK_1HZ);
+    PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 
     // Force add pull-up
-    pinMode(PMU_IRQ, INPUT_PULLUP);
+    pinMode(PMU_IRQ, INPUT);
     // attachInterrupt(PMU_IRQ, setFlag, FALLING);
 
     // Disable all interrupts
@@ -629,6 +630,7 @@ void setupPower()
         XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ |     // POWER KEY
         XPOWERS_AXP2101_BAT_CHG_DONE_IRQ | XPOWERS_AXP2101_BAT_CHG_START_IRQ // CHARGE
     );
+    PMU.setIrqLevel(2);
 
     // Set the precharge charging current
     PMU.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_150MA);
@@ -1220,7 +1222,7 @@ void logTracker(double lat, double lon, double speed, double course)
 
     String col;
     struct tm tmstruct;
-    getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 100);
     sprintf(dfName, "/trk_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
 
     if (lastTimeStamp == 0)
@@ -1359,7 +1361,7 @@ void logIGate(double lat, double lon, double speed, double course)
 
     String col;
     struct tm tmstruct;
-    getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 100);
     sprintf(dfName, "/igate_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
 
     if (lastTimeStamp == 0)
@@ -1489,7 +1491,7 @@ void logDigi(double lat, double lon, double speed, double course)
 
     String col;
     struct tm tmstruct;
-    getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 100);
     sprintf(dfName, "/digi_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
 
     if (lastTimeStamp == 0)
@@ -1619,7 +1621,7 @@ void logWeather(double lat, double lon, double speed, double course)
 
     String col;
     struct tm tmstruct;
-    getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 100);
     sprintf(dfName, "/wx_%02d%d.csv", (tmstruct.tm_mon) + 1, (tmstruct.tm_year) + 1900);
 
     if (lastTimeStamp == 0)
@@ -3070,7 +3072,7 @@ void aprs_msg_callback(struct AX25Msg *msg)
 void printTime()
 {
     struct tm tmstruct;
-    getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 100);
     Serial.print("[");
     Serial.print(tmstruct.tm_hour);
     Serial.print(":");
@@ -3167,7 +3169,7 @@ void postTransmission()
 }
 
 // 3 seconds WDT
-#define WDT_TIMEOUT 10
+#define WDT_TIMEOUT 30
 
 bool AFSKInitAct = false;
 unsigned long timeTask;
@@ -3598,10 +3600,8 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-    // #ifndef TTGO_T_Beam_S3_SUPREME_V3
-    //     esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
-    //     esp_task_wdt_add(NULL);               // add current thread to WDT watch
-    // #endif
+    esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL);               // add current thread to WDT watch
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -3627,6 +3627,8 @@ void setup()
             }
         }
     }
+    
+    StandByTick = millis() + (config.pwr_stanby_delay*1000);
 
     // Task 1
     xTaskCreatePinnedToCore(
@@ -3695,13 +3697,12 @@ void setup()
     xTaskCreatePinnedToCore(
         taskSensor,        /* Function to implement the task */
         "taskSensor",      /* Name of the task */
-        2048,              /* Stack size in words */
+        3000,              /* Stack size in words */
         NULL,              /* Task input parameter */
         6,                 /* Priority of the task */
         &taskSensorHandle, /* Task handle. */
         0);                /* Core where the task should run */
-
-    StandByTick = millis() + (config.pwr_stanby_delay*1000);
+    
     timeTask = millis() + 10000;
 }
 
@@ -3819,14 +3820,14 @@ String trk_gps_postion(String comment)
     double nowLat, nowLng;
     char rawTNC[300];
     char aprs_table, aprs_symbol;
-    char timestamp[10];
+    //char timestamp[10];
     struct tm tmstruct;
     double dist, course, speed;
     time_t nowTime;
 
     memset(rawTNC, 0, sizeof(rawTNC));
-    getLocalTime(&tmstruct, 5000);
-    sprintf(timestamp, "%02d%02d%02d%02d", (tmstruct.tm_mon + 1), tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min);
+    //getLocalTime(&tmstruct, 5000);
+    //sprintf(timestamp, "%02d%02d%02d%02d", (tmstruct.tm_mon + 1), tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min);
     time(&nowTime);
     // nowTime = gps.time.value();
     if (lastTimeStamp == 0)
@@ -4360,7 +4361,7 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
     return tnc2.length();
 }
 
-uint8_t led_pin = 9;
+uint8_t led_pin = BOOT_PIN;
 // Declare an array named letters that holds addresses of string literals
 // (i.e. an array of pointers to strings composed of dots and dashes)
 // Done to preserve memory because strings are not equal in size. A 2D array
@@ -4462,10 +4463,7 @@ void flash_morse_text(char *text, size_t len)
             // delay(dot_duration * 7);
             vTaskDelay(dot_duration * 7 / portTICK_PERIOD_MS);
         }
-
-#ifndef TTGO_T_Beam_S3_SUPREME_V3
         esp_task_wdt_reset();
-#endif
     }
 }
 
@@ -4485,7 +4483,17 @@ void loop()
     if (millis() > timeTask)
     {
         timeTask = millis() + 10000;
-#ifdef BUOY
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+        VBat = (double)PMU.getBattVoltage() / 1000;
+#elif defined(HELTEC_HTIT_TRACKER)
+        analogReadResolution(12);
+        analogSetAttenuation(ADC_11db);
+        digitalWrite(2, HIGH);
+        VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+#elif defined(APRS_LORA_HT)
+        VBat = (double)analogReadMilliVolts(3) / 595.24F;        
+#elif defined(BUOY)
+        // #ifdef BUOY
         VBat = (double)analogReadMilliVolts(0) / 595.24F;
         // TempNTC = getTempNTC();
 
@@ -4536,13 +4544,38 @@ void loop()
         // delay(1);
         // temp_sensor_read_celsius(&tempCpu);
         // temp_sensor_stop();
-        log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\t TempCPU=%0.2f\n", timerAPRS, timerNetwork, timerGPS, timerSerial, tempCpu);
+        log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\t \n", timerAPRS, timerNetwork, timerGPS, timerSerial);
         log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
         // log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
 
         if (!((WiFi.isConnected() == true) || (WiFi.softAPgetStationNum() > 0)))
         {
             Sleep_Activate &= ~ACTIVATE_WIFI;
+        }
+
+        if ((config.pwr_mode == MODE_B) && config.gnss_enable) // expand sleep delay from GPS moving
+        {
+            if ((gps.satellites.value() > 3) && (gps.hdop.hdop() < 5) && (gps.speed.kmph() > 10))
+            {
+                if (config.trk_en)
+                {
+                    if (config.trk_gps){
+                        if(SB_SPEED > 10) StandByTick = millis() + (config.trk_slowinterval * 1000);
+                    }else{
+                        StandByTick = millis() + (config.trk_interval * 1000) + 1000;
+                    }
+                }
+                else if (config.igate_en)
+                {
+                    if (config.igate_gps)
+                        StandByTick = millis() + (config.igate_interval * 1000) + 1000;
+                }
+                else if (config.digi_en)
+                {
+                    if (config.digi_gps)
+                        StandByTick = millis() + (config.digi_interval * 1000) + 1000;
+                }
+            }
         }
     }
 
@@ -4578,8 +4611,6 @@ void loop()
         if (btn_count > 200) // Push BOOT 10sec
         {
             btn_count = 0;
-            // digitalWrite(LED_PIN, HIGH);
-            // digitalWrite(LED_TX_PIN, HIGH);
             if (curTab == 0)
             {
                 showDisp = true;
@@ -4609,6 +4640,7 @@ void loop()
             }
             else
             {
+                StandByTick = millis() + (config.pwr_stanby_delay*1000);
                 showDisp = true;
                 timeSec = timeHalfSec = millis();
                 // if (oledSleepTimeout > 0)
@@ -4758,43 +4790,109 @@ void loop()
     // Tick one secound
     if (millis() > timeSleep)
     {
-#ifndef TTGO_T_Beam_S3_SUPREME_V3
         esp_task_wdt_reset();
-#endif
         timeSleep = millis() + 1000;
 
         if (config.pwr_en)
         {
-            if (config.pwr_mode != MODE_A)
+            if (config.pwr_mode == MODE_A) // CPU and Radio active, power down control
             {
-                if (config.pwr_mode == MODE_B) // Wake up and wait for delay time to sleep
+                if (millis() > StandByTick)
                 {
-                    if (millis()>StandByTick)
-                    {
-                        log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
-                        digitalWrite(led_pin, HIGH);
-                        digitalWrite(config.pwr_gpio, LOW);
-                        delay(100);
-                        esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio,HIGH);
-                        esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
-                        esp_deep_sleep_start();
-                    }
+                    log_d("System to Power down save mode %d Sec", config.pwr_sleep_interval);
+                    digitalWrite(config.pwr_gpio, LOW);
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                    PMU.disableDC5();
+                    PMU.disableALDO1(); //QMC6310,BME280,OLED
+                    //PMU.disableALDO3(); //LoRa
+                    PMU.disableBLDO2();
+                    PMU.disableALDO2();
+                    //PMU.disableALDO4(); //GNSS,
+                    PMU.disableBLDO1(); //TF Card
+                    PMU.disableDC3();
+#endif
                 }
-                else if (config.pwr_mode == MODE_C) // Wake up and wait for event to sleep
+                else if (millis() > (StandByTick * config.pwr_sleep_interval * 1000))
+                { // Wakeup
+                    StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+                    digitalWrite(config.pwr_gpio, HIGH);
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                    PMU.enableDC5();
+                    PMU.enableALDO1();
+                    PMU.enableALDO3();
+                    PMU.enableBLDO2();
+                    PMU.enableALDO2();
+                    PMU.enableALDO4();
+                    PMU.enableBLDO1();
+                    PMU.enableDC3();
+#endif                    
+                }
+            }
+            else if (config.pwr_mode == MODE_B) // Wake up and wait for delay time to sleepp
+            {
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)                
+                if(PMU.isCharging()){
+                    StandByTick = millis() + (config.pwr_stanby_delay*1000);
+                }
+#endif                
+                if (millis() > StandByTick)
                 {
-                    if (Sleep_Activate == ACTIVATE_OFF)
-                    {
-                        log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
-                        //radioSleep();
-                        //esp_deep_sleep_enable_gpio_wakeup(BIT(DEFAULT_WAKEUP_PIN), DEFAULT_WAKEUP_LEVEL));                        
-                        digitalWrite(led_pin, HIGH);
-                        digitalWrite(config.pwr_gpio, LOW);
-                        //delay(100);
-                        //esp_sleep_enable_ext0_wakeup(GPIO_NUM_14,LOW);
-                        radioSleep();
-                        esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
-                        esp_deep_sleep_start();
-                    }
+                    log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
+                    digitalWrite(config.pwr_gpio, LOW);
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                    PMU.disableDC5();
+                    PMU.disableALDO1(); //QMC6310,BME280,OLED
+                    //PMU.disableALDO3(); //LoRa
+                    PMU.disableBLDO2();
+                    PMU.disableALDO2();
+                    PMU.disableALDO4(); //GNSS,
+                    PMU.disableBLDO1(); //TF Card
+                    PMU.disableDC3();
+                    esp_sleep_enable_ext0_wakeup((gpio_num_t)PMU_IRQ, LOW);
+#else
+                    esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
+#endif
+                    delay(100);
+#ifdef __XTENSA__
+                    esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
+#else
+                    esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+#endif
+                    esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
+                    esp_deep_sleep_start();
+                }
+            }
+            else if (config.pwr_mode == MODE_C) // Wake up and wait for event to sleep
+            {
+                if (Sleep_Activate == ACTIVATE_OFF)
+                {
+                    log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
+                    // radioSleep();
+                    // esp_deep_sleep_enable_gpio_wakeup(BIT(DEFAULT_WAKEUP_PIN), DEFAULT_WAKEUP_LEVEL));
+                    digitalWrite(config.pwr_gpio, LOW);
+                    // delay(100);
+                    // esp_sleep_enable_ext0_wakeup(GPIO_NUM_14,LOW);
+                    radioSleep();
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                    PMU.disableDC5();
+                    PMU.disableALDO1();
+                    PMU.disableALDO3();
+                    PMU.disableBLDO2();
+                    PMU.disableALDO2();
+                    PMU.disableALDO4();
+                    PMU.disableBLDO1();
+                    PMU.disableDC3();
+#else
+                    esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
+#endif
+                    delay(100);
+#ifdef __XTENSA__
+                    esp_sleep_enable_ext1_wakeup(1, ESP_EXT1_WAKEUP_ALL_LOW);
+#else
+                    esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+#endif
+                    esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
+                    esp_deep_sleep_start();
                 }
             }
         }
@@ -5654,9 +5752,7 @@ void taskGPS(void *pvParameters)
                             timeval tv = {rtc, 0};
                             timezone tz = {(config.timeZone * SECS_PER_HOUR), 0};
                             settimeofday(&tv, &tz);
-#ifdef DEBUG
                             log_d("\nSET GPS Timestamp = %u Year=%d\n", timeGps, year());
-#endif
                             // firstGpsTime = false;
                             firstGpsTime = false;
                             if (startTime == 0)
@@ -5942,8 +6038,8 @@ void taskAPRS(void *pvParameters)
     timeAprs = 0;
 
     timeSlot = millis();
+    
     tx_interval = config.trk_interval;
-    tx_counter = tx_interval - 10;
     initInterval = true;
     AFSKInitAct = true;
     log_d("Task APRS init susses....");
@@ -5959,8 +6055,17 @@ void taskAPRS(void *pvParameters)
             systemTLM.ParmTimeout = millis() + 20000;
             systemTLM.TeleTimeout = millis() + 30000;
             initInterval = false;
-            tx_interval = config.trk_interval;
-            tx_counter = tx_interval - 10;
+            //tx_interval = config.trk_interval;
+            // if (config.pwr_en)
+            // {
+            //     if (config.pwr_mode == MODE_A || config.pwr_mode == MODE_B) // CPU and Radio active, power down control
+            //     {
+            //             tx_interval = config.pwr_stanby_delay;
+            //             tx_counter = 10;
+            //     }
+            // }else{
+                tx_counter = tx_interval - 10;
+            //}
         }
         timerAPRS = micros() - timerAPRS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -6006,16 +6111,19 @@ void taskAPRS(void *pvParameters)
                 //   Check interval timeout
                 if (config.trk_smartbeacon && config.trk_gps)
                 {
-                    if (tx_counter > tx_interval)
+                    if((gps.satellites.value() > 3) && (gps.hdop.hdop() < 10))
                     {
-                        if (tx_counter > config.trk_mininterval)
-                            EVENT_TX_POSITION = 4;
-                    }
-                    else
-                    {
-                        if (tx_counter >= (tx_interval + 5))
+                        if (tx_counter > tx_interval)
                         {
-                            EVENT_TX_POSITION = 5;
+                            if (tx_counter > config.trk_mininterval)
+                                EVENT_TX_POSITION = 4;
+                        }
+                        else
+                        {
+                            if (tx_counter >= (tx_interval + 5))
+                            {
+                                EVENT_TX_POSITION = 5;
+                            }
                         }
                     }
                 }
@@ -6039,6 +6147,9 @@ void taskAPRS(void *pvParameters)
                         // if (gps.course.isUpdated())
                         if (gps.speed.kmph() > config.trk_lspeed)
                             SB_HEADING = (int16_t)gps.course.deg();
+                    }else{
+                        if(SB_SPEED>0)
+                            SB_SPEED--;
                     }
                     if (config.trk_smartbeacon) // SMART BEACON CAL
                     {
@@ -6046,8 +6157,10 @@ void taskAPRS(void *pvParameters)
                         {                                                                     // STOPING
                             SB_SPEED_OLD = 0;
                             if (tx_counter > config.trk_mininterval)
+                            {
                                 EVENT_TX_POSITION = 7;
-                            tx_interval = config.trk_slowinterval;
+                                tx_interval = config.trk_slowinterval;
+                            }
                         }
                         else
                         {
@@ -7058,7 +7171,7 @@ void taskAPRSPoll(void *pvParameters)
         if (AFSKInitAct == true)
         {
             if(APRS_poll()){
-                StandByTick = millis() + (config.pwr_stanby_delay*1000);
+                //StandByTick += millis() + 10000;
             }
         }
     }
@@ -7178,21 +7291,26 @@ void taskNetwork(void *pvParameters)
                 log_d("Contacting Time Server\n");
                 configTime(3600 * config.timeZone, 0, config.ntp_host);
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
-                time_t systemTime;
-                time(&systemTime);
-                setTime(systemTime);
-                if (systemUptime == 0)
-                {
-                    systemUptime = time(NULL);
-                }
-                pingTimeout = millis() + 2000;
-                if (config.vpn)
-                {
-                    if (!wireguard_active())
+                struct tm tmstruct;
+                if(getLocalTime(&tmstruct, 1000)){
+                    time_t systemTime;
+                    time(&systemTime);
+                    setTime(systemTime);
+                    if (systemUptime == 0)
                     {
-                        log_d("Setup Wiregurad VPN!");
-                        wireguard_setup();
+                        systemUptime = time(NULL);
                     }
+                    pingTimeout = millis() + 2000;
+                    if (config.vpn)
+                    {
+                        if (!wireguard_active())
+                        {
+                            log_d("Setup Wiregurad VPN!");
+                            wireguard_setup();
+                        }
+                    }
+                }else{
+                    NTP_Timeout = millis() + 5000;
                 }
             }
 
@@ -10047,9 +10165,8 @@ void gpsDisp()
     }
     else
     {
-        // display.clearDisplay();
-        display.fillRect(0, 0, 160, 80, BLACK);
-        // display.fillScreen(ST77XX_BLACK);
+        //display.fillRect(0, 0, 160, 80, BLACK);
+        display.fillScreen(ST77XX_BLACK);
         display.setTextColor(ST77XX_CYAN);
         display.drawYBitmap(120, 0, &Icon_TableB[50][0], 16, 16, ST77XX_BLUE);
         display.setCursor(140, 7);

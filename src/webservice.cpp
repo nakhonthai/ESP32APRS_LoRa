@@ -544,6 +544,9 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<th><span>SPIFFS(KByte)</span></th>\n";
 	html += "<th><span>VBat(V)</span></th>\n";
 	html += "<th><span>Temp(C)</span></th>\n";
+#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) ||defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE)
+	html += "<th><span>SPIFFS(KByte)</span></th>\n";
+	html += "<th><span>VBat(V)</span></th>\n";
 #else
 	html += "<th><span>Free PSRAM(KByte)</span></th>\n";
 	html += "<th><span>SD CARD(MByte)</span></th>\n";
@@ -563,6 +566,11 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
 	html += "<td><b>" + String(VBat, 2) + "</b></td>\n";
 	html += "<td><b>" + String(TempNTC, 2) + "</b></td>\n";
+#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) ||defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE)
+	unsigned long cardTotal = LITTLEFS.totalBytes();
+	unsigned long cardUsed = LITTLEFS.usedBytes();
+	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
+	html += "<td><b>" + String(VBat, 2) + "</b></td>\n";
 #else
 	html += "<td><b>" + String((float)ESP.getFreePsram() / 1000, 1) + "/" + String((float)ESP.getPsramSize() / 1000, 1) + "</b></td>\n";
 	uint32_t cardTotal = LITTLEFS.totalBytes() / (1024 * 1024);
@@ -3454,11 +3462,10 @@ void handle_system(AsyncWebServerRequest *request)
 	}
 	else
 	{
-
 		struct tm tmstruct;
 		char strTime[20];
 		tmstruct.tm_year = 0;
-		getLocalTime(&tmstruct, 5000);
+		getLocalTime(&tmstruct, 100);
 		sprintf(strTime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
 
 		String html = "<script type=\"text/javascript\">\n";
@@ -3721,7 +3728,7 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "<div><button type='submit' id='submitPath'  name=\"commitPath\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitPath\"/>\n";
 		html += "</form><br /><br />";
-		delay(1);
+		//delay(1);
 // log_d("%s",html.c_str());
 // log_d("Length: %d",html.length());
 #if defined OLED || defined ST7735_160x80
@@ -3862,7 +3869,18 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "<input type=\"hidden\" name=\"commitDISP\"/>\n";
 		html += "</form><br />";
 #endif
-		request->send(200, "text/html", html); // send to someones browser when asked
+
+		if ((ESP.getFreeHeap() / 1000) > 100)
+		{			
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+			response->addHeader("System", "content");
+			request->send(response);
+		}
+		html.clear();
 	}
 }
 
@@ -6164,6 +6182,8 @@ void handle_tlm(AsyncWebServerRequest *request)
 	}
 }
 
+extern TaskHandle_t taskSensorHandle;
+
 void handle_sensor(AsyncWebServerRequest *request)
 {
 	if (!request->authenticate(config.http_username, config.http_password))
@@ -6172,6 +6192,8 @@ void handle_sensor(AsyncWebServerRequest *request)
 	}
 	String arg = "";
 
+	vTaskSuspend(taskSensorHandle);
+	
 	if (request->hasArg("commitSENSOR"))
 	{
 		for (int x = 0; x < SENSOR_NUMBER; x++)
@@ -6252,9 +6274,10 @@ void handle_sensor(AsyncWebServerRequest *request)
 			}
 		}
 
-		saveEEPROM();
+		saveEEPROM();		
 		String html = "OK";
 		request->send(200, "text/html", html);
+		vTaskResume(taskSensorHandle);
 	}
 	else
 	{
@@ -6333,23 +6356,29 @@ void handle_sensor(AsyncWebServerRequest *request)
 		html += "document.getElementById(\"param\"+idx).value=\"WaterLevel\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\"mm\";\n";
 		html += "}else if (x==18) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"WaterFlow\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"L/min\";\n";
+		html += "}else if (x==19) {\n";
 		html += "document.getElementById(\"param\"+idx).value=\"Voltage\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\"V\";\n";
-		html += "}else if (x==19) {\n";
+		html += "}else if (x==20) {\n";
 		html += "document.getElementById(\"param\"+idx).value=\"Current\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\"A\";\n";
-		html += "}else if (x==20) {\n";
+		html += "}else if (x==21) {\n";
 		html += "document.getElementById(\"param\"+idx).value=\"Power\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\"W\";\n";
-		html += "}else if (x==21) {\n";
+		html += "}else if (x==22) {\n";
 		html += "document.getElementById(\"param\"+idx).value=\"Satellite\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\" \";\n";
-		html += "}else if (x==22) {\n";
+		html += "}else if (x==23) {\n";
 		html += "document.getElementById(\"param\"+idx).value=\"HDOP\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\" \";\n";
-		html += "}else if (x==23) {\n";
+		html += "}else if (x==24) {\n";
 		html += "document.getElementById(\"param\"+idx).value=\"Battery\";\n";
 		html += "document.getElementById(\"unit\"+idx).value=\"V\";\n";
+		html += "}else if (x==25) {\n";
+		html += "document.getElementById(\"param\"+idx).value=\"BattLevel\";\n";
+		html += "document.getElementById(\"unit\"+idx).value=\"%\";\n";
 		html += "}\n}\n";
 
 		html += "function selSensor(idx) {\n";
