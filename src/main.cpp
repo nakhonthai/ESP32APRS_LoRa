@@ -4366,13 +4366,13 @@ uint8_t led_pin = BOOT_PIN;
 // (i.e. an array of pointers to strings composed of dots and dashes)
 // Done to preserve memory because strings are not equal in size. A 2D array
 // would be a waste of space.
-char *letters[] = {
+const char *letters[] = {
     // The letters A-Z in Morse code
     ".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..",
     ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
     "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--.."};
 
-char *numbers[] = {
+const char *numbers[] = {
     // The numbers 0-9 in Morse code
     "-----", ".----", "..---", "...--", "....-", ".....", "-....",
     "--...", "---..", "----."};
@@ -4413,13 +4413,13 @@ void flash_dot_or_dash(char dot_or_dash)
  *  Flashes the Morse code for the input letter or number
  *  @param morse_code pointer to the morse code
  */
-void flash_morse_code(char *morse_code)
+void flash_morse_code(const char *morse_code)
 {
 
     unsigned int i = 0;
 
     // Read the dots and dashes and flash accordingly
-    while (morse_code[i] != NULL)
+    while (morse_code[i] != '\0')
     {
         flash_dot_or_dash(morse_code[i]);
         i++;
@@ -4850,13 +4850,19 @@ void loop()
                     PMU.disableDC3();
                     esp_sleep_enable_ext0_wakeup((gpio_num_t)PMU_IRQ, LOW);
 #else
+#if defined(__XTENSA__)
                     esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
+#else
+                    //esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+                    esp_deep_sleep_enable_gpio_wakeup((1<<config.rf_dio1_gpio), ESP_GPIO_WAKEUP_GPIO_HIGH);                   
 #endif
+#endif
+
                     delay(100);
 #ifdef __XTENSA__
                     esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
 #else
-                    esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+                    esp_deep_sleep_enable_gpio_wakeup((1<<9), ESP_GPIO_WAKEUP_GPIO_LOW);
 #endif
                     esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
                     esp_deep_sleep_start();
@@ -4883,13 +4889,19 @@ void loop()
                     PMU.disableBLDO1();
                     PMU.disableDC3();
 #else
+#if defined(__XTENSA__)
                     esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
+#else
+                    //esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+                    esp_deep_sleep_enable_gpio_wakeup((1<<config.rf_dio1_gpio), ESP_GPIO_WAKEUP_GPIO_HIGH);                   
 #endif
+#endif
+
                     delay(100);
 #ifdef __XTENSA__
-                    esp_sleep_enable_ext1_wakeup(1, ESP_EXT1_WAKEUP_ALL_LOW);
+                    esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
 #else
-                    esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+                    esp_deep_sleep_enable_gpio_wakeup((1<<9), ESP_GPIO_WAKEUP_GPIO_LOW);
 #endif
                     esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
                     esp_deep_sleep_start();

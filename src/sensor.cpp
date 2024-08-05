@@ -214,8 +214,8 @@ bool getBAT(uint8_t port)
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);
             digitalWrite(2, HIGH);
-            VBat = (double)analogReadMilliVolts(1) / 201.15357F;
-            sensorUpdate(i, VBat);
+            VBat = (double)analogReadMilliVolts(1) / 204.08F;  //390k/100k Voltage divider
+            sensorUpdate(i, VBat + 0.285F); //Add offset 0.285V
 #elif defined(APRS_LORA_HT)
             VBat = (double)analogReadMilliVolts(3) / 595.24F;
             sensorUpdate(i, VBat);
