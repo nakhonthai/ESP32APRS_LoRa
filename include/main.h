@@ -11,8 +11,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.2"
-#define VERSION_BUILD 'c'
+#define VERSION "0.3"
+#define VERSION_BUILD ' '
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
@@ -52,8 +52,8 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 
 #ifdef BOARD_HAS_PSRAM
-#define TLMLISTSIZE 10
-#define PKGLISTSIZE 100
+#define TLMLISTSIZE 100
+#define PKGLISTSIZE 1000
 #define PKGTXSIZE 100
 #else
 #define TLMLISTSIZE 5
@@ -98,6 +98,88 @@
 #define TXCH_RF 1
 #define TXCH_DIGI 2
 #define TXCH_3PTY 3
+
+// APRS data type identifiers
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_NO_MSG         "!"
+#define RADIOLIB_APRS_DATA_TYPE_GPS_RAW                         "$"
+#define RADIOLIB_APRS_DATA_TYPE_ITEM                            ")"
+#define RADIOLIB_APRS_DATA_TYPE_TEST                            ","
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_TIME_NO_MSG            "/"
+#define RADIOLIB_APRS_DATA_TYPE_MSG                             ":"
+#define RADIOLIB_APRS_DATA_TYPE_OBJECT                          ";"
+#define RADIOLIB_APRS_DATA_TYPE_STATION_CAPABILITES             "<"
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_MSG            "="
+#define RADIOLIB_APRS_DATA_TYPE_STATUS                          ">"
+#define RADIOLIB_APRS_DATA_TYPE_QUERY                           "?"
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_TIME_MSG               "@"
+#define RADIOLIB_APRS_DATA_TYPE_TELEMETRY                       "T"
+#define RADIOLIB_APRS_DATA_TYPE_MAIDENHEAD_BEACON               "["
+#define RADIOLIB_APRS_DATA_TYPE_WEATHER_REPORT                  "_"
+#define RADIOLIB_APRS_DATA_TYPE_USER_DEFINED                    "{"
+#define RADIOLIB_APRS_DATA_TYPE_THIRD_PARTY                     "}"
+
+/*!
+  \defgroup mic_e_message_types Mic-E message types.
+  \{
+*/
+
+/*! \brief Mic-E "Off duty" message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_OFF_DUTY                       0b00000111
+
+/*! \brief Mic-E "En route" message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_EN_ROUTE                       0b00000110
+
+/*! \brief Mic-E "In service" message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_IN_SERVICE                     0b00000101
+
+/*! \brief Mic-E "Returning" message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_RETURNING                      0b00000100
+
+/*! \brief Mic-E "Commited" message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_COMMITTED                      0b00000011
+
+/*! \brief Mic-E special message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_SPECIAL                        0b00000010
+
+/*! \brief Mic-E priority message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_PRIORITY                       0b00000001
+
+/*! \brief Mic-E emergency message. */
+#define RADIOLIB_APRS_MIC_E_TYPE_EMERGENCY                      0b00000000
+
+/*!
+  \}
+*/
+
+// magic offset applied to encode extra bits in the Mic-E destination field
+#define RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET                     25
+
+// Mic-E data types
+#define RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT                    '`'
+#define RADIOLIB_APRS_MIC_E_GPS_DATA_OLD                        '\''
+
+// Mic-E telemetry flags
+#define RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_2                     '`'
+#define RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_5                     '\''
+
+// alias for unused altitude in Mic-E
+#define RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED                     -1000000
+
+    /*!
+      \brief Transmit position using Mic-E encoding.
+      \param lat Geographical latitude, positive for north, negative for south.
+      \param lon Geographical longitude, positive for east, negative for west.
+      \param heading Heading in degrees.
+      \param speed Speed in knots.
+      \param type Mic-E message type - see \ref mic_e_message_types.
+      \param telem Pointer to telemetry array (either 2 or 5 bytes long). NULL when telemetry is not used.
+      \param telemLen Telemetry length, 2 or 5. 0 when telemetry is not used.
+      \param grid Maidenhead grid locator. NULL when not used.
+      \param status Status message to send. NULL when not used.
+      \param alt Altitude to send. RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED when not used.
+    */
+    int16_t sendMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t* telem = NULL, size_t telemLen = 0, char* grid = NULL, char* status = NULL, int32_t alt = RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED);
+
 
 typedef struct igateTLM_struct
 {
@@ -184,10 +266,16 @@ typedef struct Telemetry_struct
 typedef struct txQueue_struct
 {
 	bool Active;
+	uint8_t Channel;
 	long timeStamp;
 	int Delay;
-	char Info[300];
+	size_t length;
+	char Info[250];
 } txQueueType;
+
+#define RF_CHANNEL	(1<<0)
+#define INET_CHANNEL	(1<<1)
+#define TNC_CHANNEL	(1<<2)
 
 typedef struct txDispStruct
 {
@@ -279,7 +367,7 @@ bool powerStatus();
 int packet2Raw(String &tnc2, AX25Msg &Packet);
 bool waitResponse(String &data, String rsp = "\r\n", uint32_t timeout = 1000);
 String sendIsAckMsg(String toCallSign, char *msgId);
-bool pkgTxPush(const char *info, size_t len, int dly);
+bool pkgTxPush(const char *info, size_t len, int dly,uint8_t Ch);
 bool pkgTxUpdate(const char *info, int delay);
 void dispWindow(String line, uint8_t mode, bool filter);
 void dispTxWindow(txDisp txs);
@@ -295,5 +383,6 @@ void gpsDisp();
 void radioDisp();
 void wifiDisp();
 void sensorDisp();
+void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b);
 
 #endif

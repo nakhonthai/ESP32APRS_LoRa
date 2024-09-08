@@ -104,6 +104,9 @@ extern double TempNTC;
 extern bool lastHeard_Flag;
 extern SensorData sen[SENSOR_NUMBER];
 extern uint16_t TLM_SEQ;
+extern uint16_t IGATE_TLM_SEQ;
+extern uint16_t DIGI_TLM_SEQ;
+extern unsigned long StandByTick;
 
 #ifdef __cplusplus
 extern "C"

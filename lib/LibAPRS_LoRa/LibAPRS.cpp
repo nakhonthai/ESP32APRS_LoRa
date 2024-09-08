@@ -304,10 +304,12 @@ bool APRS_poll(void)
     bool ret = false;
     // check if the flag is set
     if (received)
-    {
+    {        
         // disable the interrupt service routine while
         // processing the data
         disableInterrupt();
+
+        LED_Status(0,200,0);
 
         received = false;
         uint8_t *byteArr = (uint8_t *)calloc(350, sizeof(uint8_t));
@@ -375,12 +377,14 @@ bool APRS_poll(void)
         }
         startRx();
         ax25_poll(&AX25);
+        LED_Status(0,0,0);
     }
     else
     {
         if (ax25_stateTx)
-        {
+        {            
             ax25_stateTx = false;
+            LED_Status(200,0,0);
             // flagTx = true;
             uint8_t *byteArr = (uint8_t *)calloc(250, sizeof(uint8_t));
             if (byteArr)
@@ -407,6 +411,7 @@ bool APRS_poll(void)
                 free(byteArr);
                 ret = true;
             }
+            LED_Status(0,0,0);
         }
         else
         {

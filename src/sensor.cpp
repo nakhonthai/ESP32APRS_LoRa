@@ -214,8 +214,10 @@ bool getBAT(uint8_t port)
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);
             digitalWrite(2, HIGH);
+            delay(10);
             VBat = (double)analogReadMilliVolts(1) / 204.08F;  //390k/100k Voltage divider
             sensorUpdate(i, VBat + 0.285F); //Add offset 0.285V
+            digitalWrite(2, LOW);
 #elif defined(APRS_LORA_HT)
             VBat = (double)analogReadMilliVolts(3) / 595.24F;
             sensorUpdate(i, VBat);
@@ -236,11 +238,30 @@ bool getBAT(uint8_t port)
     return true;
 }
 
+bool getLOGIC(uint8_t port)
+{
+
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+    {
+        if(!config.sensor[i].enable) continue;
+        if (config.sensor[i].port == port)
+        {
+            double val=0;
+            if(digitalRead((uint8_t)config.sensor[i].address)) val=1;
+            sensorUpdate(i, (double)val);
+            cnt0 = 0;
+            break;
+        }
+    }
+    return true;
+}
+
 bool getCNT0(uint8_t port)
 {
 
     for (int i = 0; i < SENSOR_NUMBER; i++)
     {
+        if(!config.sensor[i].enable) continue;
         if (config.sensor[i].type == SENSOR_RAIN && config.sensor[i].port == port)
         {
             sensorUpdateSum(i, (double)cnt0);
@@ -262,6 +283,7 @@ bool getCNT1(uint8_t port)
 
     for (int i = 0; i < SENSOR_NUMBER; i++)
     {
+        if(!config.sensor[i].enable) continue;
         if (config.sensor[i].type == SENSOR_RAIN && config.sensor[i].port == port)
         {
             sensorUpdateSum(i, (double)cnt1);
@@ -278,33 +300,36 @@ bool getCNT1(uint8_t port)
     return true;
 }
 
-bool getADC(uint8_t port)
+bool getADC(uint8_t pin)
 {
+    double val = 0;
+    //set the resolution to 12 bits (0-4095)
     analogReadResolution(12);
+    // Optional: Set different attenaution (default is ADC_11db)
     analogSetAttenuation(ADC_11db);
-    double val = (double)analogReadMilliVolts(port);
     for (int i = 0; i < SENSOR_NUMBER; i++)
     {
-        if (config.sensor[i].type == SENSOR_VOLTAGE && config.sensor[i].port == PORT_ADC)
+        if(!config.sensor[i].enable) continue;     
+        if (((config.sensor[i].type == SENSOR_VOLTAGE)||(config.sensor[i].type == SENSOR_BAT_VOLTAGE)) && (config.sensor[i].port == PORT_ADC))
         {
+            val = (double)analogReadMilliVolts(config.sensor[i].address);
             sensorUpdate(i, (double)val); // mV /595.24F; 4.2V=>> *0.0016799946
         }
         else if (config.sensor[i].type == SENSOR_CURRENT && config.sensor[i].port == PORT_ADC)
         {
+            val = (double)analogReadMilliVolts(config.sensor[i].address);
             sensorUpdate(i, (double)val); // mA
         }
         else if (config.sensor[i].type == SENSOR_POWER && config.sensor[i].port == PORT_ADC)
         {
+            val = (double)analogReadMilliVolts(config.sensor[i].address);
             sensorUpdate(i, (double)val); // mW
         }
-        else if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == PORT_ADC)
+        else if (((config.sensor[i].type == SENSOR_TEMPERATURE)||(config.sensor[i].type == SENSOR_WATER_TEMPERATURE)) && (config.sensor[i].port == PORT_ADC))
         {
+            val = (double)analogReadMilliVolts(config.sensor[i].address);
             TempNTC = (double)getTempNTC(val);
             sensorUpdate(i, TempNTC); // NTC 10K
-        }
-        else
-        {
-            sensorUpdate(i, (double)val);
         }
     }
     return true;
@@ -323,6 +348,7 @@ bool getBME_I2C(Adafruit_BME280 &node, uint8_t port)
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
             {
                 sensorUpdate(i, node.readTemperature()); // Temperature
@@ -389,6 +415,7 @@ bool getBMP_I2C(Adafruit_BMP280 &node, uint8_t port)
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
             {
                 sensorUpdate(i, node.readTemperature()); // Temperature
@@ -411,6 +438,7 @@ bool getSI7021_I2C(Adafruit_Si7021 &node, uint8_t port)
 {
     for (int i = 0; i < SENSOR_NUMBER; i++)
     {
+        if(!config.sensor[i].enable) continue;
         if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
         {
             sensorUpdate(i, node.readTemperature()); // Temperature
@@ -430,6 +458,7 @@ bool getSHT_I2C(SHTSensor &node, uint8_t port)
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
             {
                 sensorUpdate(i, node.getTemperature()); // Temperature
@@ -450,6 +479,7 @@ bool getCCS_I2C(Adafruit_CCS811 &node, uint8_t port)
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_CO2 && config.sensor[i].port == port)
             {
                 sensorUpdate(i, (double)node.geteCO2()); // Co2
@@ -471,6 +501,7 @@ bool getSAT()
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_SAT_NUM)
             {
                 sensorUpdate(i, (double)gps.satellites.value()); // gps num
@@ -494,6 +525,7 @@ bool getM701Modbus(ModbusMaster &node)
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_CO2 && config.sensor[i].port == PORT_M701)
             {
                 sensorUpdate(i, node.getResponseBuffer(0)); // Co2
@@ -552,6 +584,7 @@ bool getM702Modbus(ModbusMaster &node)
     {
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
+            if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_TVOC && config.sensor[i].port == PORT_M702)
             {
                 sen[i].visable = true;
@@ -663,6 +696,103 @@ bool getM702Modbus(ModbusMaster &node)
     return false;
 }
 
+bool getPZEMModbus(ModbusMaster &node)
+{
+    uint8_t result;
+
+    result = node.readHoldingRegisters(0x0000, 9);
+    if (result == node.ku8MBSuccess)
+    {
+        for (int i = 0; i < SENSOR_NUMBER; i++)
+        {
+            if(!config.sensor[i].enable) continue;
+            if (config.sensor[i].type == SENSOR_VOLTAGE && config.sensor[i].port == PORT_PZEM)
+            {
+                double val = (double)node.getResponseBuffer(0); // Voltage 0x0000
+                val *= 0.1F; //to value 0.1V
+                sensorUpdate(i, val);
+            }
+            else if (config.sensor[i].type == SENSOR_CURRENT && config.sensor[i].port == PORT_PZEM)
+            {
+                uint32_t val32 = (uint32_t)node.getResponseBuffer(2); // Current 0x0002 MSB
+                val32 <<= 16;
+                val32 |= (uint32_t)node.getResponseBuffer(1); // Current 0x000 LSB
+                double val = (double)val32*0.001F; //to value 0.001A
+                sensorUpdate(i, val);
+            }
+            else if (config.sensor[i].type == SENSOR_POWER && config.sensor[i].port == PORT_PZEM)
+            {
+                uint32_t val32 = (uint32_t)node.getResponseBuffer(4); // Power 0x0004 MSB
+                val32 <<= 16;
+                val32 |= (uint32_t)node.getResponseBuffer(3); // Power 0x0003 LSB
+                double val = (double)val32*0.1F; //to value 0.1W
+                sensorUpdate(i, val);
+            }
+            else if (config.sensor[i].type == SENSOR_ENERGY && config.sensor[i].port == PORT_PZEM)
+            {
+                uint32_t val32 = (uint32_t)node.getResponseBuffer(6); // Energy 0x0006 MSB
+                val32 <<= 16;
+                val32 |= (uint32_t)node.getResponseBuffer(5); // Energy 0x0005 LSB
+                double val = (double)val32; //to value 1W
+                sensorUpdate(i, val);
+            }
+            else if (config.sensor[i].type == SENSOR_FREQ && config.sensor[i].port == PORT_PZEM)
+            {
+                double val = (double)node.getResponseBuffer(7); // Frequency 0x0007
+                val *= 0.1F; //to value 0.1Hz
+                sensorUpdate(i, val);
+            }
+            else if (config.sensor[i].type == SENSOR_PF && config.sensor[i].port == PORT_PZEM)
+            {
+                double val = (double)node.getResponseBuffer(8); // Frequency 0x0008
+                val *= 0.01F; //to value 0.01
+                sensorUpdate(i, val);
+            }            
+        }
+        return true;
+    }
+    return false;
+}
+
+bool getModbus16Bit(ModbusMaster &node, int i)
+{
+    uint8_t result;
+    uint16_t addr = config.sensor[i].address % 1000;
+
+    result = node.readHoldingRegisters(addr, 1);
+    if (result == node.ku8MBSuccess)
+    {
+        if (config.sensor[i].port == PORT_MODBUS_16)
+        {
+            double val = (double)node.getResponseBuffer(0); // 0x0000
+            sensorUpdate(i, val);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool getModbus32Bit(ModbusMaster &node, int i)
+{
+    uint8_t result;
+    uint16_t addr = config.sensor[i].address % 1000;
+
+    result = node.readHoldingRegisters(addr, 2);
+    if (result == node.ku8MBSuccess)
+    {
+        if (config.sensor[i].port == PORT_MODBUS_32)
+        {
+            uint32_t val32 = (uint32_t)node.getResponseBuffer(0); // MSB
+            val32 <<= 16;
+            val32 |= (uint32_t)node.getResponseBuffer(1); // LSB
+            double val = (double)val32;                   // to value double
+            sensorUpdate(i, val);
+            return true;
+        }
+    }
+    return false;
+}
+
 bool getSensor(int cfgIdx)
 {
     bool status;
@@ -671,7 +801,9 @@ bool getSensor(int cfgIdx)
     switch (port)
     {
     case PORT_ADC:
-        getADC(config.sensor[cfgIdx].address);
+        if(getADC(config.sensor[cfgIdx].address)){
+            return true;
+        }
         break;
     case PORT_M701:
         if (config.modbus_channel == 1)
@@ -715,6 +847,72 @@ bool getSensor(int cfgIdx)
             return false;
         }
         if (getM702Modbus(modbus))
+            return true;
+        break;
+    case PORT_PZEM:
+        if (config.modbus_channel == 1)
+        {
+            modbus.begin(config.sensor[cfgIdx].address, Serial);
+        }
+        else if (config.modbus_channel == 2)
+        {
+            modbus.begin(config.sensor[cfgIdx].address, Serial1);
+        }
+#ifndef CONFIG_IDF_TARGET_ESP32C3
+        else if (config.modbus_channel == 3)
+        {
+            modbus.begin(config.sensor[cfgIdx].address, Serial2);
+        }
+#endif
+        else
+        {
+            return false;
+        }
+        if (getPZEMModbus(modbus))
+            return true;
+        break;
+    case PORT_MODBUS_16:
+        if (config.modbus_channel == 1)
+        {
+            modbus.begin(config.sensor[cfgIdx].address/1000, Serial);
+        }
+        else if (config.modbus_channel == 2)
+        {
+            modbus.begin(config.sensor[cfgIdx].address/1000, Serial1);
+        }
+#ifndef CONFIG_IDF_TARGET_ESP32C3
+        else if (config.modbus_channel == 3)
+        {
+            modbus.begin(config.sensor[cfgIdx].address/1000, Serial2);
+        }
+#endif
+        else
+        {
+            return false;
+        }
+        if (getModbus16Bit(modbus,cfgIdx))
+            return true;
+        break;
+    case PORT_MODBUS_32:
+        if (config.modbus_channel == 1)
+        {
+            modbus.begin(config.sensor[cfgIdx].address/1000, Serial);
+        }
+        else if (config.modbus_channel == 2)
+        {
+            modbus.begin(config.sensor[cfgIdx].address/1000, Serial1);
+        }
+#ifndef CONFIG_IDF_TARGET_ESP32C3
+        else if (config.modbus_channel == 3)
+        {
+            modbus.begin(config.sensor[cfgIdx].address/1000, Serial2);
+        }
+#endif
+        else
+        {
+            return false;
+        }
+        if (getModbus32Bit(modbus,cfgIdx))
             return true;
         break;
     case PORT_BME280_I2C0:
@@ -850,6 +1048,9 @@ bool getSensor(int cfgIdx)
     case PORT_CNT_1:
         getCNT1(port);
         break;
+    case PORT_LOGIC:
+        getLOGIC(port);
+        break;        
     default:
         log_d("Sensor Not config");
         break;
@@ -879,48 +1080,18 @@ void pulse_ch1() // measure the quantity of square wave
     cnt1++;
 }
 
-void taskSensor(void *pvParameters)
+void sensorInit(bool resetAll)
 {
-    bool cntEnable = false;
-    log_d("Sensor Task Init");
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-#ifdef HELTEC_HTIT_TRACKER
-    pinMode(2, INPUT_PULLUP);
-    pinMode(1, ANALOG);
-    digitalWrite(2, HIGH);
-#elif defined(BUOY)
-    pinMode(0, ANALOG);
-#endif
-
-    if (config.i2c_enable)
-    {
-        int i2c_timeout = 0;
-        while (i2c_busy)
-        {
-            delay(10);
-            if (++i2c_timeout > 50)
-                break;
-        }
-        i2c_busy = true;
-        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
-        // ccs = new Adafruit_CCS811();
-        // ccs->begin(90, &Wire); // 0x5A=90
-        i2c_busy = false;
-    }
-    if (config.i2c1_enable)
-    {
-        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
-    }
-
     // Initialize with the begin sensor
     for (int i = 0; i < SENSOR_NUMBER; i++)
     {
-        sen[i].timeTick = 0;
-        sen[i].counter = 0;
-        sen[i].sum = 0;
-        sen[i].timeAvg = 0;
+        if(resetAll){
+            sen[i].counter = 0;
+            sen[i].sum = 0;
+            sen[i].timeAvg = 0;
+            sen[i].timeTick = 0;
+        }
         sen[i].visable = false;
-        sen[i].timeTick = 0;
         sen[i].timeSample = 0;
 
         if (!config.sensor[i].enable) continue;
@@ -928,6 +1099,10 @@ void taskSensor(void *pvParameters)
         uint8_t port = config.sensor[i].port;
         switch (port)
         {
+        case PORT_ADC:
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            break;
         case PORT_CNT_0:
             pinMode(config.sensor[i].address, INPUT);
             attachInterrupt(config.sensor[i].address, pulse_ch0, RISING);
@@ -1140,6 +1315,42 @@ void taskSensor(void *pvParameters)
             break;
         }
     }
+}
+
+void taskSensor(void *pvParameters)
+{
+    bool cntEnable = false;
+    log_d("Sensor Task Init");
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+#ifdef HELTEC_HTIT_TRACKER
+    pinMode(2, INPUT_PULLUP);
+    pinMode(1, ANALOG);
+    digitalWrite(2, HIGH);
+#elif defined(BUOY)
+    pinMode(0, ANALOG);
+#endif
+
+    if (config.i2c_enable)
+    {
+        int i2c_timeout = 0;
+        while (i2c_busy)
+        {
+            delay(10);
+            if (++i2c_timeout > 50)
+                break;
+        }
+        i2c_busy = true;
+        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
+        // ccs = new Adafruit_CCS811();
+        // ccs->begin(90, &Wire); // 0x5A=90
+        i2c_busy = false;
+    }
+    if (config.i2c1_enable)
+    {
+        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
+    }
+
+    sensorInit(true);
 
     // if(cntEnable){
     //     TaskHandle_t counterTaskHandle;
@@ -1149,22 +1360,24 @@ void taskSensor(void *pvParameters)
     int dp=0;
     for (;;)
     {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        unsigned long tick=millis();
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
             if (config.sensor[i].enable)
             {
-                if (millis() > sen[i].timeTick)
-                {
-                    sen[i].timeTick = millis() + ((unsigned long)config.sensor[i].samplerate * 1000);
-                    //log_d("Request getSensor [%d] for %s", i, config.sensor[i].parm);
-                    getSensor(i);
+                if (tick > sen[i].timeTick)
+                {   
+                    if(getSensor(i)){
+                        sen[i].timeTick = millis() + ((unsigned long)config.sensor[i].samplerate * 1000);
+                    }
+                    log_d("Request getSensor [%d] for %s timeTick=%d/%d", i, config.sensor[i].parm,tick,sen[i].timeTick);
                     //dispSensor(i);
-                    vTaskDelay(10 / portTICK_PERIOD_MS);
+                    //vTaskDelay(10 / portTICK_PERIOD_MS);
                 }
             }
         }
-        if(++dp>1000){
+        if(++dp>100){
             dp=0;
             dispSensor();
         }

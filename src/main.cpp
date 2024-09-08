@@ -83,6 +83,45 @@ XPowersAXP2101 PMU;
 #include "BluetoothSerial.h"
 #endif
 
+#define PIXELS_PIN 45
+
+#define LED_TX -1
+#define LED_RX -1
+
+#ifdef APRS_LORA_DONGLE
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
+
+// portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
+void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+{
+    // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
+    strip.setPixelColor(0, strip.Color(r, g, b));
+    strip.show();
+    // portEXIT_CRITICAL_ISR(&ledMux);
+}
+#else
+void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+{
+    // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
+    if (LED_TX > -1)
+    {
+        if (r > 0)
+            digitalWrite(LED_TX, HIGH);
+        else
+            digitalWrite(LED_TX, LOW);
+    }
+    if (LED_RX > -1)
+    {
+        if (g > 0)
+            digitalWrite(LED_RX, HIGH);
+        else
+            digitalWrite(LED_RX, LOW);
+    }
+    // portEXIT_CRITICAL_ISR(&ledMux);
+}
+#endif
+
 bool i2c_busy = false;
 #include <Wire.h>
 #ifdef OLED
@@ -102,9 +141,6 @@ bool i2c_busy = false;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #endif
-
-// #define LED_TX -1
-#define LED_RX -1
 
 #ifdef ST7735_160x80
 #include <Adafruit_GFX.h>    // Core graphics library
@@ -127,12 +163,16 @@ Adafruit_miniTFTWing ss;
 #define ST7735_DC_Pin 40
 #define ST7735_SCLK_Pin 41
 #define ST7735_MOSI_Pin 42
-#define ST7735_LED_K_Pin 21
 #define ST7735_VTFT_CTRL_Pin 3
 #define ST7735_WIDTH 160
 #define ST7735_HEIGHT 80
 // mini 160x80, rotate left (INITR_MINI160x80_PLUGIN)
 #define ST7735_MODEL INITR_MINI160x80_PLUGIN
+#if defined(HELTEC_HTIT_TRACKER)
+#define ST7735_LED_K_Pin 21
+#elif defined(APRS_LORA_DONGLE)
+#define ST7735_LED_K_Pin 16
+#endif
 
 SPIClass TFT_SPI(HSPI);
 // class Adafruit_ST7735{
@@ -153,10 +193,6 @@ SPIClass TFT_SPI(HSPI);
 
 // Adafruit_ST7735 display = Adafruit_ST7735(ST7735_CS_Pin,  ST7735_DC_Pin,ST7735_MOSI_Pin,ST7735_SCLK_Pin, ST7735_REST_Pin);
 Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
-
-#define LED_TX -1
-#else
-#define LED_TX -1
 #endif
 
 #define FORMAT_LITTLEFS_IF_FAILED true
@@ -254,11 +290,6 @@ statusType status;
 RTC_DATA_ATTR igateTLMType igateTLM;
 RTC_DATA_ATTR dataTLMType systemTLM;
 txQueueType *txQueue;
-// #ifdef BOARD_HAS_PSRAM
-// txQueueType *txQueue;
-// #else
-// RTC_DATA_ATTR txQueueType txQueue[PKGTXSIZE];
-// #endif
 RTC_DATA_ATTR double LastLat, LastLng;
 RTC_DATA_ATTR time_t lastTimeStamp;
 RTC_DATA_ATTR uint32_t COUNTER0_RAW;
@@ -612,7 +643,7 @@ void setupPower()
     - XPOWERS_CHG_LED_ON,
     - XPOWERS_CHG_LED_CTRL_CHG,
     * */
-    //PMU.setChargingLedMode(XPOWERS_CHG_LED_BLINK_1HZ);
+    // PMU.setChargingLedMode(XPOWERS_CHG_LED_BLINK_1HZ);
     PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 
     // Force add pull-up
@@ -1293,10 +1324,11 @@ void logTracker(double lat, double lon, double speed, double course)
             col += ",Course(°)";
             for (int i = 0; i < 5; i++)
             {
-                if(config.trk_tlm_sensor[i] > 0){
-                    col += ","+String(config.trk_tlm_PARM[i])+"("+String(config.trk_tlm_UNIT[i])+")";
+                if (config.trk_tlm_sensor[i] > 0)
+                {
+                    col += "," + String(config.trk_tlm_PARM[i]) + "(" + String(config.trk_tlm_UNIT[i]) + ")";
                 }
-            }            
+            }
             f.println(col);
         }
         sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -1313,13 +1345,14 @@ void logTracker(double lat, double lon, double speed, double course)
                 strcat(data, ",");
                 int sen_idx = config.trk_tlm_sensor[s] - 1;
                 double val = 0;
-                if (sen[sen_idx].visable){
-                    if(config.trk_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
+                if (sen[sen_idx].visable)
+                {
+                    if (config.trk_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
                         val = sen[sen_idx].average;
                     else
                         val = sen[sen_idx].sample;
                 }
-                strcat(data, String(val,2).c_str());
+                strcat(data, String(val, 2).c_str());
             }
         }
         f.println(data);
@@ -1423,10 +1456,11 @@ void logIGate(double lat, double lon, double speed, double course)
             col += ",Course(°)";
             for (int i = 0; i < 5; i++)
             {
-                if(config.igate_tlm_sensor[i] > 0){
-                    col += ","+String(config.igate_tlm_PARM[i])+"("+String(config.igate_tlm_UNIT[i])+")";
+                if (config.igate_tlm_sensor[i] > 0)
+                {
+                    col += "," + String(config.igate_tlm_PARM[i]) + "(" + String(config.igate_tlm_UNIT[i]) + ")";
                 }
-            }            
+            }
             f.println(col);
         }
         sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -1443,13 +1477,14 @@ void logIGate(double lat, double lon, double speed, double course)
                 strcat(data, ",");
                 int sen_idx = config.igate_tlm_sensor[s] - 1;
                 double val = 0;
-                if (sen[sen_idx].visable){
-                    if(config.igate_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
+                if (sen[sen_idx].visable)
+                {
+                    if (config.igate_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
                         val = sen[sen_idx].average;
                     else
                         val = sen[sen_idx].sample;
                 }
-                strcat(data, String(val,2).c_str());
+                strcat(data, String(val, 2).c_str());
             }
         }
         f.println(data);
@@ -1553,10 +1588,11 @@ void logDigi(double lat, double lon, double speed, double course)
             col += ",Course(°)";
             for (int i = 0; i < 5; i++)
             {
-                if(config.digi_tlm_sensor[i] > 0){
-                    col += ","+String(config.digi_tlm_PARM[i])+"("+String(config.digi_tlm_UNIT[i])+")";
+                if (config.digi_tlm_sensor[i] > 0)
+                {
+                    col += "," + String(config.digi_tlm_PARM[i]) + "(" + String(config.digi_tlm_UNIT[i]) + ")";
                 }
-            }            
+            }
             f.println(col);
         }
         sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -1573,13 +1609,14 @@ void logDigi(double lat, double lon, double speed, double course)
                 strcat(data, ",");
                 int sen_idx = config.digi_tlm_sensor[s] - 1;
                 double val = 0;
-                if (sen[sen_idx].visable){
-                    if(config.digi_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
+                if (sen[sen_idx].visable)
+                {
+                    if (config.digi_tlm_avg[s] && (sen[sen_idx].timeAvg > 0))
                         val = sen[sen_idx].average;
                     else
                         val = sen[sen_idx].sample;
                 }
-                strcat(data, String(val,2).c_str());
+                strcat(data, String(val, 2).c_str());
             }
         }
         f.println(data);
@@ -1687,11 +1724,13 @@ void logWeather(double lat, double lon, double speed, double course)
                 if ((config.wx_sensor_enable[s] == 0) || (senIdx == 0))
                 {
                     continue;
-                }else{
-                    senIdx -= 1;
-                    col += ","+String(String(WX_SENSOR[s]))+"("+String(config.sensor[senIdx].unit)+")";
                 }
-            }            
+                else
+                {
+                    senIdx -= 1;
+                    col += "," + String(String(WX_SENSOR[s])) + "(" + String(config.sensor[senIdx].unit) + ")";
+                }
+            }
             f.println(col);
         }
         sprintf(datetime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
@@ -1715,7 +1754,7 @@ void logWeather(double lat, double lon, double speed, double course)
                     else
                         val = sen[senIdx].average;
                 }
-                strcat(data, String(val,2).c_str());
+                strcat(data, String(val, 2).c_str());
             }
         }
         f.println(data);
@@ -1863,7 +1902,7 @@ void defaultConfig()
     sprintf(config.trk_symstop, "\\>");
     // sprintf(config.trk_btext, "");
     sprintf(config.trk_mycall, "NOCALL");
-    sprintf(config.trk_comment, "TRACKER MODE");
+    sprintf(config.trk_comment, "");
     memset(config.trk_item, 0, sizeof(config.trk_item));
 
     // WX
@@ -1991,7 +2030,7 @@ void defaultConfig()
     config.sensor[0].port = 0;
     config.sensor[0].address = 2;
     config.sensor[0].samplerate = 10;
-    config.sensor[0].averagerate = 60;
+    config.sensor[0].averagerate = 600;
     config.sensor[0].eqns[0] = 0; // a
     config.sensor[0].eqns[1] = 1; // b
     config.sensor[0].eqns[2] = 0; // c
@@ -2003,7 +2042,7 @@ void defaultConfig()
     config.sensor[1].port = 0;
     config.sensor[1].address = 2;
     config.sensor[1].samplerate = 10;
-    config.sensor[1].averagerate = 60;
+    config.sensor[1].averagerate = 600;
     config.sensor[1].eqns[0] = 0; // a
     config.sensor[1].eqns[1] = 1; // b
     config.sensor[1].eqns[2] = 0; // c
@@ -2015,7 +2054,7 @@ void defaultConfig()
     config.sensor[2].port = 0;
     config.sensor[2].address = 2;
     config.sensor[2].samplerate = 10;
-    config.sensor[2].averagerate = 60;
+    config.sensor[2].averagerate = 600;
     config.sensor[2].eqns[0] = 0; // a
     config.sensor[2].eqns[1] = 1; // b
     config.sensor[2].eqns[2] = 0; // c
@@ -2027,7 +2066,7 @@ void defaultConfig()
     config.sensor[3].port = 0;
     config.sensor[3].address = 2;
     config.sensor[3].samplerate = 10;
-    config.sensor[3].averagerate = 60;
+    config.sensor[3].averagerate = 600;
     config.sensor[3].eqns[0] = 0; // a
     config.sensor[3].eqns[1] = 1; // b
     config.sensor[3].eqns[2] = 0; // c
@@ -2039,7 +2078,7 @@ void defaultConfig()
     config.sensor[4].port = 0;
     config.sensor[4].address = 2;
     config.sensor[4].samplerate = 10;
-    config.sensor[4].averagerate = 60;
+    config.sensor[4].averagerate = 600;
     config.sensor[4].eqns[0] = 0; // a
     config.sensor[4].eqns[1] = 1; // b
     config.sensor[4].eqns[2] = 0; // c
@@ -2051,7 +2090,7 @@ void defaultConfig()
     config.sensor[5].port = 0;
     config.sensor[5].address = 2;
     config.sensor[5].samplerate = 10;
-    config.sensor[5].averagerate = 60;
+    config.sensor[5].averagerate = 600;
     config.sensor[5].eqns[0] = 0; // a
     config.sensor[5].eqns[1] = 1; // b
     config.sensor[5].eqns[2] = 0; // c
@@ -2063,7 +2102,7 @@ void defaultConfig()
     config.sensor[6].port = 0;
     config.sensor[6].address = 2;
     config.sensor[6].samplerate = 10;
-    config.sensor[6].averagerate = 60;
+    config.sensor[6].averagerate = 600;
     config.sensor[6].eqns[0] = 0; // a
     config.sensor[6].eqns[1] = 1; // b
     config.sensor[6].eqns[2] = 0; // c
@@ -2075,7 +2114,7 @@ void defaultConfig()
     config.sensor[7].port = 0;
     config.sensor[7].address = 2;
     config.sensor[7].samplerate = 10;
-    config.sensor[7].averagerate = 60;
+    config.sensor[7].averagerate = 600;
     config.sensor[7].eqns[0] = 0; // a
     config.sensor[7].eqns[1] = 1; // b
     config.sensor[7].eqns[2] = 0; // c
@@ -2087,7 +2126,7 @@ void defaultConfig()
     config.sensor[8].port = 0;
     config.sensor[8].address = 2;
     config.sensor[8].samplerate = 10;
-    config.sensor[8].averagerate = 60;
+    config.sensor[8].averagerate = 600;
     config.sensor[8].eqns[0] = 0;   // a
     config.sensor[8].eqns[1] = 0.2; // b
     config.sensor[8].eqns[2] = 0;   // c
@@ -2099,7 +2138,7 @@ void defaultConfig()
     config.sensor[9].port = 0;
     config.sensor[9].address = 2;
     config.sensor[9].samplerate = 10;
-    config.sensor[9].averagerate = 60;
+    config.sensor[9].averagerate = 600;
     config.sensor[9].eqns[0] = 0; // a
     config.sensor[9].eqns[1] = 1; // b
     config.sensor[9].eqns[2] = 0; // c
@@ -2238,7 +2277,7 @@ void defaultConfig()
     config.rf_tx_active = 1;
     config.rf_rx_active = 1;
     config.rf_reset_active = 0;
-    config.rf_nss_active = 0;    
+    config.rf_nss_active = 0;
 #elif defined(ESP32_DIY_LoRa_GPS) || defined(TTGO_T_LORA32_V2_1_GPS)
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
@@ -2410,6 +2449,45 @@ void defaultConfig()
     config.i2c_sda_pin = -1;
     config.i2c_sck_pin = -1;
     config.pwr_gpio = 3;
+#elif defined(APRS_LORA_DONGLE)
+    config.rf_en = true;
+    config.rf_type = RF_SX1276;
+#ifdef VHF
+    config.rf_freq = 144.415;
+    config.rf_freq_offset = 0;
+    config.rf_bw = 10.4F;
+    config.rf_sf = 8;
+    config.rf_cr = 5;
+    config.rf_power = 20;
+#endif
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 13;
+    config.rf_reset_gpio = 12;
+    config.rf_busy_gpio = -1;
+    config.rf_nss_gpio = 11;
+    config.rf_sclk_gpio = 18;
+    config.rf_miso_gpio = 8;
+    config.rf_mosi_gpio = 10;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_nss_active = 0;
+    config.rf_reset_active = 0;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart0_enable = true;
+    config.uart0_baudrate = 9600;
+    config.uart0_rx_gpio = 44;
+    config.uart0_tx_gpio = 43;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 4;
+    config.uart1_tx_gpio = 5;
+    config.uart1_rts_gpio = -1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 47;
+    config.pwr_gpio = 17;
 #endif
 
     config.i2c_freq = 400000;
@@ -2438,7 +2516,7 @@ void defaultConfig()
     config.log = 0;
 
 #ifdef BUOY
-    sprintf(config.wifi_ap_ssid, "miniBUOY_0");
+    sprintf(config.wifi_ap_ssid, "CBBT00");
     config.wifi_mode |= WIFI_AP_FIX;
     config.log |= 1;
     config.pwr_gpio = 2;
@@ -2458,8 +2536,8 @@ void defaultConfig()
     config.aprs_port = 24580;
     sprintf(config.aprs_mycall, "CBBT0");
     sprintf(config.trk_mycall, "CBBT0");
-    memset(config.trk_item,0,10);
-    //sprintf(config.trk_item, "BTL0");
+    memset(config.trk_item, 0, 10);
+    // sprintf(config.trk_item, "BTL0");
     config.trk_comment[0] = 0;
     config.rf_power = 22;
     config.uart1_enable = true;
@@ -2919,6 +2997,8 @@ bool pkgTxDuplicate(AX25Msg ax25)
     {
         if (txQueue[i].Active)
         {
+            if (txQueue[i].Channel & INET_CHANNEL) continue;
+
             if (ax25.src.ssid > 0)
                 sprintf(callsign, "%s-%d", ax25.src.call, ax25.src.ssid);
             else
@@ -2943,7 +3023,20 @@ bool pkgTxDuplicate(AX25Msg ax25)
     return false;
 }
 
-bool pkgTxPush(const char *info, size_t len, int dly)
+int pkgTxCount()
+{
+    int count = 0;
+    for (int i = 0; i < PKGTXSIZE; i++)
+    {
+        if (txQueue[i].Active)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+bool pkgTxPush(const char *info, size_t len, int dly, uint8_t Ch)
 {
     char *ecs = strstr(info, ">");
     if (ecs == NULL)
@@ -2975,11 +3068,14 @@ bool pkgTxPush(const char *info, size_t len, int dly)
     {
         if (txQueue[i].Active == false)
         {
+            if(len>250) len=250;
             memset(txQueue[i].Info, 0, sizeof(txQueue[i].Info));
             memcpy(&txQueue[i].Info[0], info, len);
+            txQueue[i].length = len;
             txQueue[i].Delay = dly;
             txQueue[i].Active = true;
             txQueue[i].timeStamp = millis();
+            txQueue[i].Channel = Ch;            
             break;
         }
     }
@@ -3002,42 +3098,62 @@ bool pkgTxSend()
         if (txQueue[i].Active)
         {
             int decTime = millis() - txQueue[i].timeStamp;
+            if (txQueue[i].Channel & INET_CHANNEL)
+            {
+                if(config.igate_en==false){
+                    txQueue[i].Channel &= ~INET_CHANNEL;
+                }else{
+                    if (aprsClient.connected())
+                    {
+                        status.txCount++;
+                        //aprsClient.printf("%s\r\n", txQueue[i].Info); // Send packet to Inet
+                        aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
+                        aprsClient.write("\r\n");     // Send CR LF the end frame packet
+                        txQueue[i].Channel &= ~INET_CHANNEL;
+                        log_d("TX->INET: %s", txQueue[i].Info);
+                        continue;
+                    }
+                }
+            }
             if (decTime > txQueue[i].Delay)
             {
-                txQueue[i].Active = false;
-                char *info = (char *)calloc(350, sizeof(char));
-                if (info)
+                if (txQueue[i].Channel & RF_CHANNEL)
                 {
-                    memset(info, 0, 350);
-                    strcpy(info, txQueue[i].Info);
-                    psramBusy = false;
-                    // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
-                    status.txCount++;
-
-                    // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
-                    APRS_sendTNC2Pkt(String(info));
-                    txQueue[i].Active = false;
-                    igateTLM.TX++;
-                    log_d("TX->RF: %s", info);
-                    if (config.trk_en)
+                    char *info = (char *)calloc(350, sizeof(char));
+                    if (info)
                     {
-                        timeSleep = millis() + 5000;
-                        Sleep_Activate &= ~ACTIVATE_TRACKER;
-                    }
+                        memset(info, 0, 350);
+                        strcpy(info, txQueue[i].Info);
+                        psramBusy = false;
+                        // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
+                        status.txCount++;
 
-                    // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
-                    free(info);
-                    return true;
+                        // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
+                        APRS_sendTNC2Pkt(String(info));
+                        igateTLM.TX++;
+                        log_d("TX->RF: %s", info);
+                        if (config.trk_en)
+                        {
+                            timeSleep = millis() + 5000;
+                            // Sleep_Activate &= ~ACTIVATE_TRACKER;
+                        }
+
+                        // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
+                        free(info);
+                        txQueue[i].Channel &= ~RF_CHANNEL;
+                    }
                 }
-                else
-                {
-                    return false;
-                }
+            }
+
+            if ((txQueue[i].Channel == 0) || (decTime > 60000))
+            {
+                txQueue[i].Channel = 0;
+                txQueue[i].Active = false;
             }
         }
     }
     psramBusy = false;
-    return false;
+    return true;
 }
 
 uint8_t *packetData;
@@ -3053,14 +3169,10 @@ void aprs_msg_callback(struct AX25Msg *msg)
         int idx = info.lastIndexOf("?RSSI");
         if (idx > 0)
         {
-            info.remove(idx, 5);
+            info.remove(idx, 5);        
             info += "[RSSI:" + String((int)rssi) + "dBm] ";
             info.toCharArray((char *)msg->info, info.length(), 0);
             msg->len = info.length() - 1;
-            // char str[20];
-            // sprintf(str, " [RSSI:%ddBm]", (int)dBm);
-            // strcat((char *)msg->info, str);
-            // msg->len += strlen(str);
         }
         info.clear();
     }
@@ -3194,13 +3306,15 @@ void setup()
     memset(txQueue, 0, sizeof(txQueueType) * PKGTXSIZE);
 
     // pinMode(9, INPUT_PULLUP); // BOOT Button
-    pinMode(LED_RX, OUTPUT);
-    pinMode(LED_TX, OUTPUT);
+    if (LED_RX > -1)
+        pinMode(LED_RX, OUTPUT);
+    if (LED_TX > -1)
+        pinMode(LED_TX, OUTPUT);
 
-    // pinMode(0, INPUT);
-    // pinMode(1, INPUT);
-    //  Set the CPU frequency to 80 MHz for power optimization
-    //setCpuFrequencyMhz(80);
+        // pinMode(0, INPUT);
+        // pinMode(1, INPUT);
+        //  Set the CPU frequency to 80 MHz for power optimization
+        // setCpuFrequencyMhz(80);
 
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
@@ -3220,7 +3334,7 @@ void setup()
 #endif
 
 #ifdef HELTEC_HTIT_TRACKER
-    pinMode(2, OUTPUT); // ADC_Ctl
+    pinMode(2, INPUT_PULLUP); // ADC_Ctl
     digitalWrite(2, HIGH);
 #endif
 
@@ -3340,14 +3454,15 @@ void setup()
         display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false); // initialize with the I2C addr 0x3C (for the 128x64)
     }
     // Initialising the UI will init the display too.
-    if(BootReason != ESP_RST_DEEPSLEEP){ 
+    if (BootReason != ESP_RST_DEEPSLEEP)
+    {
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(WHITE);
 
         display.setTextSize(1);
         display.setFont(&FreeSansBold9pt7b);
-          
+
         display.setCursor(0, 15);
         display.print("APRS");
         display.setCursor(65, 32);
@@ -3365,13 +3480,13 @@ void setup()
         display.display();
 
         delay(1000);
-        digitalWrite(LED_TX, HIGH);
+        LED_Status(255, 0, 0);
         display.fillRect(49, 49, 50, 8, 0);
         display.setCursor(70, 50);
         display.print("3 Sec");
         display.display();
         delay(1000);
-        digitalWrite(LED_RX, HIGH);
+        LED_Status(0, 255, 0);
         display.fillRect(49, 49, 50, 8, 0);
         display.setCursor(70, 50);
         display.print("2 Sec");
@@ -3396,14 +3511,14 @@ void setup()
             while (digitalRead(BOOT_PIN) == LOW)
             {
                 delay(500);
-                digitalWrite(LED_TX, LOW);
-                digitalWrite(LED_RX, LOW);
+                LED_Status(255, 255, 255);
                 delay(500);
-                digitalWrite(LED_TX, HIGH);
-                digitalWrite(LED_RX, HIGH);
+                LED_Status(0, 0, 0);
             }
         }
-    }else{
+    }
+    else
+    {
         showDisp = true;
     }
     display.setFont();
@@ -3416,13 +3531,14 @@ void setup()
     pinMode(ST7735_LED_K_Pin, OUTPUT);
     digitalWrite(ST7735_LED_K_Pin, HIGH);
     display.initR(ST7735_MODEL); // initialize a ST7735S chip, mini display
-    display.setRotation(3);
+    display.setRotation(1);
     display.invertDisplay(false);
-    if(BootReason != ESP_RST_DEEPSLEEP){
+    if (BootReason != ESP_RST_DEEPSLEEP)
+    {
         display.fillScreen(ST77XX_BLACK);
         display.setTextSize(1);
-        display.setFont(&FreeSansBold9pt7b);    
-    
+        display.setFont(&FreeSansBold9pt7b);
+
         display.setTextColor(ST77XX_YELLOW);
         display.setCursor(10, 15);
         display.print("APRS");
@@ -3442,88 +3558,90 @@ void setup()
         display.print("Copy@2024");
 
         delay(1000);
-        digitalWrite(LED_TX, HIGH);
+        LED_Status(255, 0, 0);
         display.fillRect(69, 59, 50, 8, 0);
         display.setCursor(90, 60);
         display.print("3 Sec");
 
         delay(1000);
         digitalWrite(LED_RX, HIGH);
+        LED_Status(0, 255, 0);
         display.fillRect(69, 59, 50, 8, 0);
         display.setCursor(90, 60);
         display.print("2 Sec");
 
         delay(1000);
+        LED_Status(0, 0, 255);
         display.fillRect(69, 59, 50, 8, 0);
         display.setCursor(90, 60);
         display.print("1 Sec");
 
         delay(1000);
-    
+        LED_Status(0, 0, 0);
 
         if (digitalRead(BOOT_PIN) == LOW)
         {
             defaultConfig();
             log_d("Manual Default configure!");
-    #ifdef ST7735_160x80
+#ifdef ST7735_160x80
             display.fillRect(69, 59, 50, 8, 0);
             display.setCursor(70, 60);
             display.print("Factory Reset!");
-    #endif
+#endif
             while (digitalRead(BOOT_PIN) == LOW)
             {
                 delay(500);
-                digitalWrite(LED_TX, LOW);
-                digitalWrite(LED_RX, LOW);
+                LED_Status(255, 255, 255);
                 delay(500);
-                digitalWrite(LED_TX, HIGH);
-                digitalWrite(LED_RX, HIGH);
+                LED_Status(0, 0, 0);
             }
         }
-    }else{
+    }
+    else
+    {
         showDisp = true;
     }
-    digitalWrite(LED_TX, LOW);
-    digitalWrite(LED_RX, LOW);
+    LED_Status(0, 0, 0);
 #endif
     if (config.i2c_enable)
     {
         Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
     }
-    if (config.pwr_mode != MODE_A)
-    {
-        delay(1000);
-        digitalWrite(LED_TX, LOW);
-        delay(1000);
-        digitalWrite(LED_RX, LOW);
-        delay(1000);
-    }
+    // if (config.pwr_mode != MODE_A)
+    // {
+    //     delay(1000);
+    //     digitalWrite(LED_TX, LOW);
+    //     delay(1000);
+    //     digitalWrite(LED_RX, LOW);
+    //     delay(1000);
+    // }
 #endif
-    if (config.pwr_mode != MODE_A)
-    {
-        //         if (digitalRead(9) == LOW)
-        //         {
-        //             defaultConfig();
-        //             log_d("Manual Default configure!");
-        // #ifdef OLED
-        //             display.clearDisplay();
-        //             display.setCursor(10, 22);
-        //             display.print("Factory Reset!");
-        //             display.display();
-        // #endif
-        //             while (digitalRead(9) == LOW)
-        //             {
-        //                 delay(500);
-        //                 digitalWrite(LED_TX, LOW);
-        //                 digitalWrite(LED_RX, LOW);
-        //                 delay(500);
-        //                 digitalWrite(LED_TX, HIGH);
-        //                 digitalWrite(LED_RX, HIGH);
-        //             }
-        //         }
-        digitalWrite(LED_TX, LOW);
-        digitalWrite(LED_RX, LOW);
-    }
+    LED_Status(0, 0, 0);
+    // if (config.pwr_mode != MODE_A)
+    // {
+    //     //         if (digitalRead(9) == LOW)
+    //     //         {
+    //     //             defaultConfig();
+    //     //             log_d("Manual Default configure!");
+    //     // #ifdef OLED
+    //     //             display.clearDisplay();
+    //     //             display.setCursor(10, 22);
+    //     //             display.print("Factory Reset!");
+    //     //             display.display();
+    //     // #endif
+    //     //             while (digitalRead(9) == LOW)
+    //     //             {
+    //     //                 delay(500);
+    //     //                 digitalWrite(LED_TX, LOW);
+    //     //                 digitalWrite(LED_RX, LOW);
+    //     //                 delay(500);
+    //     //                 digitalWrite(LED_TX, HIGH);
+    //     //                 digitalWrite(LED_RX, HIGH);
+    //     //             }
+    //     //         }
+    //     digitalWrite(LED_TX, LOW);
+    //     digitalWrite(LED_RX, LOW);
+    // }
 
     if (config.uart0_enable)
     {
@@ -3602,6 +3720,7 @@ void setup()
     // enableCore1WDT();
     esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
     esp_task_wdt_add(NULL);               // add current thread to WDT watch
+    // esp_task_wdt_deinit
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -3627,8 +3746,8 @@ void setup()
             }
         }
     }
-    
-    StandByTick = millis() + (config.pwr_stanby_delay*1000);
+
+    StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
     // Task 1
     xTaskCreatePinnedToCore(
@@ -3650,15 +3769,33 @@ void setup()
         0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
         1);                 /* Core where the task should run */
+
+    xTaskCreatePinnedToCore(
+        taskSensor,        /* Function to implement the task */
+        "taskSensor",      /* Name of the task */
+        4096,              /* Stack size in words */
+        NULL,              /* Task input parameter */
+        1,                 /* Priority of the task */
+        &taskSensorHandle, /* Task handle. */
+        1);                /* Core where the task should run */
 #else
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        16384,              /* Stack size in words */
+        12000,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
         0);                 /* Core where the task should run */
+
+    xTaskCreatePinnedToCore(
+        taskSensor,        /* Function to implement the task */
+        "taskSensor",      /* Name of the task */
+        4096,              /* Stack size in words */
+        NULL,              /* Task input parameter */
+        4,                 /* Priority of the task */
+        &taskSensorHandle, /* Task handle. */
+        0);                /* Core where the task should run */
 #endif
 
     xTaskCreatePinnedToCore(
@@ -3677,7 +3814,7 @@ void setup()
             "taskGPS",      /* Name of the task */
             3072,           /* Stack size in words */
             NULL,           /* Task input parameter */
-            4,              /* Priority of the task */
+            5,              /* Priority of the task */
             &taskGPSHandle, /* Task handle. */
             0);             /* Core where the task should run */
     }
@@ -3689,20 +3826,11 @@ void setup()
             "taskSerial",      /* Name of the task */
             2048,              /* Stack size in words */
             NULL,              /* Task input parameter */
-            5,                 /* Priority of the task */
+            6,                 /* Priority of the task */
             &taskSerialHandle, /* Task handle. */
             0);                /* Core where the task should run */
     }
 
-    xTaskCreatePinnedToCore(
-        taskSensor,        /* Function to implement the task */
-        "taskSensor",      /* Name of the task */
-        3000,              /* Stack size in words */
-        NULL,              /* Task input parameter */
-        6,                 /* Priority of the task */
-        &taskSensorHandle, /* Task handle. */
-        0);                /* Core where the task should run */
-    
     timeTask = millis() + 10000;
 }
 
@@ -3820,14 +3948,14 @@ String trk_gps_postion(String comment)
     double nowLat, nowLng;
     char rawTNC[300];
     char aprs_table, aprs_symbol;
-    //char timestamp[10];
+    // char timestamp[10];
     struct tm tmstruct;
     double dist, course, speed;
     time_t nowTime;
 
     memset(rawTNC, 0, sizeof(rawTNC));
-    //getLocalTime(&tmstruct, 5000);
-    //sprintf(timestamp, "%02d%02d%02d%02d", (tmstruct.tm_mon + 1), tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min);
+    // getLocalTime(&tmstruct, 5000);
+    // sprintf(timestamp, "%02d%02d%02d%02d", (tmstruct.tm_mon + 1), tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min);
     time(&nowTime);
     // nowTime = gps.time.value();
     if (lastTimeStamp == 0)
@@ -4190,7 +4318,7 @@ String igate_position(double lat, double lon, double alt, String comment)
     tnc2Raw += ":";
     tnc2Raw += String(loc);
     tnc2Raw += String(config.igate_phg) + String(strAltitude);
-    tnc2Raw += comment + " " + String(config.igate_comment);
+    // tnc2Raw += comment + " " + String(config.igate_comment);
     return tnc2Raw;
 }
 
@@ -4242,7 +4370,7 @@ String digi_position(double lat, double lon, double alt, String comment)
     tnc2Raw += ":";
     tnc2Raw += String(loc);
     tnc2Raw += String(config.digi_phg) + String(strAltitude);
-    tnc2Raw += comment + " " + String(config.digi_comment);
+    // tnc2Raw += comment + " " + String(config.digi_comment);
     return tnc2Raw;
 }
 
@@ -4267,11 +4395,14 @@ String wx_report(double lat, double lon, double alt, String comment)
     // {
     //     sprintf(strAltitude, "/A=%06d", (int)(alt * 3.28F));
     // }
-    if(config.wx_gps){
-        if(gps.satellites.value()>5 && gps.hdop.hdop()<5)
-            mslAltitude=alt;
-    }else{
-        mslAltitude=alt;
+    if (config.wx_gps)
+    {
+        if (gps.satellites.value() > 5 && gps.hdop.hdop() < 5)
+            mslAltitude = alt;
+    }
+    else
+    {
+        mslAltitude = alt;
     }
     if (strlen(config.wx_object) >= 3)
     {
@@ -4355,8 +4486,8 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
         if (Packet.rpt_flags & (1 << i))
             tnc2 += "*";
     }
-    tnc2 += String(F(":"));
-    tnc2 += String((const char *)Packet.info);
+    tnc2 += String(F(":"));    
+    tnc2 += String((const char *)Packet.info,Packet.len+1);
 
     return tnc2.length();
 }
@@ -4477,6 +4608,9 @@ char nmea[100];
 int nmea_idx = 0;
 char morse[50];
 uint8_t morseState = 0;
+long int sleep_timer = 0;
+bool save_mode = false;
+bool save_act = false;
 
 void loop()
 {
@@ -4491,10 +4625,10 @@ void loop()
         digitalWrite(2, HIGH);
         VBat = (double)analogReadMilliVolts(1) / 201.15357F;
 #elif defined(APRS_LORA_HT)
-        VBat = (double)analogReadMilliVolts(3) / 595.24F;        
+        VBat = (double)analogReadMilliVolts(3) / 595.24F;
 #elif defined(BUOY)
         // #ifdef BUOY
-        VBat = (double)analogReadMilliVolts(0) / 595.24F;
+        VBat = (double)analogReadMilliVolts(0) * 0.0028F;
         // TempNTC = getTempNTC();
 
         // if (WiFi.isConnected() || WiFi.softAPgetStationNum()){
@@ -4559,21 +4693,35 @@ void loop()
             {
                 if (config.trk_en)
                 {
-                    if (config.trk_gps){
-                        if(SB_SPEED > 10) StandByTick = millis() + (config.trk_slowinterval * 1000);
-                    }else{
+                    if (config.trk_gps)
+                    {
+                        if (SB_SPEED > 10)
+                            StandByTick = millis() + (config.trk_slowinterval * 1000);
+                    }
+                    else
+                    {
                         StandByTick = millis() + (config.trk_interval * 1000) + 1000;
+                        if (save_mode)
+                            save_act = true;
                     }
                 }
                 else if (config.igate_en)
                 {
                     if (config.igate_gps)
+                    {
                         StandByTick = millis() + (config.igate_interval * 1000) + 1000;
+                        if (save_mode)
+                            save_act = true;
+                    }
                 }
                 else if (config.digi_en)
                 {
                     if (config.digi_gps)
+                    {
                         StandByTick = millis() + (config.digi_interval * 1000) + 1000;
+                        if (save_mode)
+                            save_act = true;
+                    }
                 }
             }
         }
@@ -4640,7 +4788,9 @@ void loop()
             }
             else
             {
-                StandByTick = millis() + (config.pwr_stanby_delay*1000);
+                StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+                if (save_mode)
+                    save_act = true;
                 showDisp = true;
                 timeSec = timeHalfSec = millis();
                 // if (oledSleepTimeout > 0)
@@ -4657,7 +4807,7 @@ void loop()
 
 #if defined OLED || defined ST7735_160x80
     // Popup Display
-    if (config.oled_enable == true)
+    if ((config.oled_enable == true) && (save_mode == false))
     {
         if (dispBuffer.getCount() > 0)
         {
@@ -4797,80 +4947,205 @@ void loop()
         {
             if (config.pwr_mode == MODE_A) // CPU and Radio active, power down control
             {
-                if (millis() > StandByTick)
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                if (PMU.isCharging())
                 {
-                    log_d("System to Power down save mode %d Sec", config.pwr_sleep_interval);
-                    digitalWrite(config.pwr_gpio, LOW);
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
-                    PMU.disableDC5();
-                    PMU.disableALDO1(); //QMC6310,BME280,OLED
-                    //PMU.disableALDO3(); //LoRa
-                    PMU.disableBLDO2();
-                    PMU.disableALDO2();
-                    //PMU.disableALDO4(); //GNSS,
-                    PMU.disableBLDO1(); //TF Card
-                    PMU.disableDC3();
-#endif
-                }
-                else if (millis() > (StandByTick * config.pwr_sleep_interval * 1000))
-                { // Wakeup
                     StandByTick = millis() + (config.pwr_stanby_delay * 1000);
-                    digitalWrite(config.pwr_gpio, HIGH);
+                }
+#endif
+                if (((millis() > StandByTick) || (save_act)) && (pkgTxCount() == 0))
+                {
+                    save_act = false;
+                    if (save_mode == false)
+                    {
+                        save_mode = true;
+                        log_d("System to save mode A %d Sec", config.pwr_sleep_interval);
+                        StandByTick = millis() + (config.pwr_sleep_interval * 1000);
+                        vTaskSuspend(taskSensorHandle);
+                        digitalWrite(config.pwr_gpio, LOW);
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
-                    PMU.enableDC5();
-                    PMU.enableALDO1();
-                    PMU.enableALDO3();
-                    PMU.enableBLDO2();
-                    PMU.enableALDO2();
-                    PMU.enableALDO4();
-                    PMU.enableBLDO1();
-                    PMU.enableDC3();
-#endif                    
+                        PMU.disableDC5();
+                        PMU.disableALDO1(); // QMC6310,BME280,OLED
+                        // PMU.disableALDO3(); //LoRa
+                        PMU.disableBLDO2();
+                        PMU.disableALDO2();
+                        // PMU.disableALDO4(); //GNSS,
+                        PMU.disableBLDO1(); // TF Card
+                        PMU.disableDC3();
+#endif
+                        setCpuFrequencyMhz(80);
+                        esp_task_wdt_reset();
+                        delay(100);
+                    }
+                    else
+                    {
+                        // Wakeup
+                        save_mode = false;
+                        log_d("System to Wakeup save mode A %d Sec", config.pwr_sleep_interval);
+                        // sleep_timer = millis() + (config.pwr_sleep_interval * 1000);
+                        StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+#if defined(__XTENSA__)
+                        setCpuFrequencyMhz(240);
+#else
+                        setCpuFrequencyMhz(160);
+#endif
+                        digitalWrite(config.pwr_gpio, HIGH);
+                        sensorInit(false);
+                        delay(100);
+                        vTaskResume(taskSensorHandle);
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                        PMU.enableDC5();
+                        PMU.enableALDO1();
+                        PMU.enableALDO3();
+                        PMU.enableBLDO2();
+                        PMU.enableALDO2();
+                        PMU.enableALDO4();
+                        PMU.enableBLDO1();
+                        PMU.enableDC3();
+#endif
+                    }
                 }
             }
             else if (config.pwr_mode == MODE_B) // Wake up and wait for delay time to sleepp
             {
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)                
-                if(PMU.isCharging()){
-                    StandByTick = millis() + (config.pwr_stanby_delay*1000);
-                }
-#endif                
-                if (millis() > StandByTick)
-                {
-                    log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
-                    digitalWrite(config.pwr_gpio, LOW);
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
-                    PMU.disableDC5();
-                    PMU.disableALDO1(); //QMC6310,BME280,OLED
-                    //PMU.disableALDO3(); //LoRa
-                    PMU.disableBLDO2();
-                    PMU.disableALDO2();
-                    PMU.disableALDO4(); //GNSS,
-                    PMU.disableBLDO1(); //TF Card
-                    PMU.disableDC3();
-                    esp_sleep_enable_ext0_wakeup((gpio_num_t)PMU_IRQ, LOW);
+                if (PMU.isCharging())
+                {
+                    StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+                }
+#endif
+                if (((millis() > StandByTick) || (save_act)) && (pkgTxCount() == 0))
+                {
+                    save_act = false;
+                    if (!save_mode)
+                    {
+                        save_mode = true;
+                        log_d("System to light sleep Mode B %d Sec", config.pwr_sleep_interval);
+                        // sleep_timer = millis() + (config.pwr_sleep_interval * 1000);
+                        StandByTick = millis() + (config.pwr_sleep_interval * 1000);
+                        vTaskDelete(taskSensorHandle);
+                        digitalWrite(config.pwr_gpio, LOW);
+                        adc_power_off();
+                        vTaskDelete(taskNetworkHandle);
+                        WiFi.disconnect(true); // Disconnect from the network
+                        WiFi.mode(WIFI_OFF);   // Switch WiFi off
+
+                        // vTaskSuspend(taskNetworkHandle);
+                        // delay(100);
+                        setCpuFrequencyMhz(80);
+                        // esp_task_wdt_deinit();
+                        esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                        PMU.disableDC5();
+                        PMU.disableALDO1(); // QMC6310,BME280,OLED
+                        // PMU.disableALDO3(); //LoRa
+                        PMU.disableBLDO2();
+                        PMU.disableALDO2();
+                        PMU.disableALDO4(); // GNSS,
+                        PMU.disableBLDO1(); // TF Card
+                        PMU.disableDC3();
+                        // esp_sleep_enable_ext0_wakeup((gpio_num_t)PMU_IRQ, LOW);
+                        gpio_wakeup_enable((gpio_num_t)PMU_IRQ, GPIO_INTR_LOW_LEVEL);
 #else
 #if defined(__XTENSA__)
-                    esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
+                        esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
+                        // gpio_wakeup_enable ((gpio_num_t)config.rf_dio1_gpio, GPIO_INTR_HIGH_LEVEL);
 #else
-                    //esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
-                    esp_deep_sleep_enable_gpio_wakeup((1<<config.rf_dio1_gpio), ESP_GPIO_WAKEUP_GPIO_HIGH);                   
+                        // esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
+                        esp_deep_sleep_enable_gpio_wakeup((1 << config.rf_dio1_gpio), ESP_GPIO_WAKEUP_GPIO_HIGH);
 #endif
 #endif
 
-                    delay(100);
+                        delay(100);
 #ifdef __XTENSA__
-                    esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
+                        esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
+                        // gpio_wakeup_enable ((gpio_num_t)0, GPIO_INTR_LOW_LEVEL);
 #else
-                    esp_deep_sleep_enable_gpio_wakeup((1<<9), ESP_GPIO_WAKEUP_GPIO_LOW);
+                        // esp_deep_sleep_enable_gpio_wakeup((1<<9), ESP_GPIO_WAKEUP_GPIO_LOW);
+                        gpio_wakeup_enable((gpio_num_t)9, GPIO_INTR_LOW_LEVEL);
 #endif
-                    esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
-                    esp_deep_sleep_start();
+                        esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
+                        esp_sleep_enable_gpio_wakeup();
+                        esp_light_sleep_start();
+                        save_mode = true;
+                        save_act = true;
+                        StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+                    }
+                    else
+                    {
+                        // Wakeup
+                        save_mode = false;
+                        log_d("System to wakeup sleep Mode B %d Sec", config.pwr_sleep_interval);
+                        // sleep_timer = millis() + (config.pwr_sleep_interval * 1000);
+                        StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+#if defined(__XTENSA__)
+                        setCpuFrequencyMhz(240);
+#else
+                        setCpuFrequencyMhz(160);
+#endif
+                        esp_task_wdt_reset();
+                        // esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
+                        // esp_task_wdt_add(NULL);               // add current thread to WDT watch
+                        // esp_task_wdt_reset();
+                        adc_power_on();
+                        // WiFi.disconnect(false);  // Reconnect the network
+                        // WiFi.mode(WIFI_STA);    // Switch WiFi off
+                        digitalWrite(config.pwr_gpio, HIGH);
+                        sensorInit(false);
+                        delay(100);
+                        vTaskResume(taskSensorHandle);
+#ifdef __XTENSA__
+                        xTaskCreatePinnedToCore(
+                            taskNetwork,        /* Function to implement the task */
+                            "taskNetwork",      /* Name of the task */
+                            12000,              /* Stack size in words */
+                            NULL,               /* Task input parameter */
+                            0,                  /* Priority of the task */
+                            &taskNetworkHandle, /* Task handle. */
+                            1);                 /* Core where the task should run */
+                        xTaskCreatePinnedToCore(
+                            taskSensor,        /* Function to implement the task */
+                            "taskSensor",      /* Name of the task */
+                            4096,              /* Stack size in words */
+                            NULL,              /* Task input parameter */
+                            1,                 /* Priority of the task */
+                            &taskSensorHandle, /* Task handle. */
+                            1);                /* Core where the task should run */
+#else
+                        xTaskCreatePinnedToCore(
+                            taskNetwork,        /* Function to implement the task */
+                            "taskNetwork",      /* Name of the task */
+                            12000,              /* Stack size in words */
+                            NULL,               /* Task input parameter */
+                            1,                  /* Priority of the task */
+                            &taskNetworkHandle, /* Task handle. */
+                            0);                 /* Core where the task should run */
+                        xTaskCreatePinnedToCore(
+                            taskSensor,        /* Function to implement the task */
+                            "taskSensor",      /* Name of the task */
+                            4096,              /* Stack size in words */
+                            NULL,              /* Task input parameter */
+                            4,                 /* Priority of the task */
+                            &taskSensorHandle, /* Task handle. */
+                            0);                /* Core where the task should run */
+#endif
+                        // vTaskResume(taskNetworkHandle);
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+                        PMU.enableDC5();
+                        PMU.enableALDO1();
+                        PMU.enableALDO3();
+                        PMU.enableBLDO2();
+                        PMU.enableALDO2();
+                        PMU.enableALDO4();
+                        PMU.enableBLDO1();
+                        PMU.enableDC3();
+#endif
+                    }
                 }
             }
             else if (config.pwr_mode == MODE_C) // Wake up and wait for event to sleep
             {
-                if (Sleep_Activate == ACTIVATE_OFF)
+                if ((Sleep_Activate == ACTIVATE_OFF) && (millis() > StandByTick) && (pkgTxCount() == 0))
                 {
                     log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
                     // radioSleep();
@@ -4888,35 +5163,28 @@ void loop()
                     PMU.disableALDO4();
                     PMU.disableBLDO1();
                     PMU.disableDC3();
-#else
-#if defined(__XTENSA__)
-                    esp_sleep_enable_ext0_wakeup((gpio_num_t)config.rf_dio1_gpio, HIGH);
-#else
-                    //esp_sleep_enable_ext1_wakeup(0x200, ESP_EXT1_WAKEUP_ALL_LOW);
-                    esp_deep_sleep_enable_gpio_wakeup((1<<config.rf_dio1_gpio), ESP_GPIO_WAKEUP_GPIO_HIGH);                   
-#endif
 #endif
 
                     delay(100);
 #ifdef __XTENSA__
                     esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
 #else
-                    esp_deep_sleep_enable_gpio_wakeup((1<<9), ESP_GPIO_WAKEUP_GPIO_LOW);
+                    esp_deep_sleep_enable_gpio_wakeup((1 << 9), ESP_GPIO_WAKEUP_GPIO_LOW);
 #endif
                     esp_sleep_enable_timer_wakeup((uint64_t)config.pwr_sleep_interval * uS_TO_S_FACTOR);
                     esp_deep_sleep_start();
                 }
             }
         }
-        if (ESP.getFreeHeap() < 60000)
-            esp_restart();
+        // if (ESP.getFreeHeap() < 60000)
+        //     esp_restart();
         // Serial.println(String(ESP.getFreeHeap()));
     }
 }
 
 String sendIsAckMsg(String toCallSign, int msgId)
 {
-    char str[300];
+    char str[250];
     char call[11];
     int i;
     memset(&call[0], 0, 11);
@@ -4925,7 +5193,7 @@ String sendIsAckMsg(String toCallSign, int msgId)
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
-    memset(&str[0], 0, 300);
+    memset(&str[0], 0, 250);
 
     sprintf(str, "%s-%d>APE32L%s::%s:ack%d", config.aprs_mycall, config.aprs_ssid, VERSION, call, msgId);
     //	client.println(str);
@@ -4941,7 +5209,7 @@ void sendIsPkg(char *raw)
     if (aprsClient.connected())
         aprsClient.println(tnc2Raw); // Send packet to Inet
     if (config.digi_en)
-        pkgTxPush(str, strlen(str), 0);
+        pkgTxPush(str, strlen(str), 0, RF_CHANNEL);
 }
 
 void sendIsPkgMsg(char *raw)
@@ -5055,24 +5323,33 @@ void sendTelemetry_0(char *raw, bool header)
         }
     }
 
+    uint8_t SendMode = 0;
     if (config.tlm0_2rf)
-    { // TLM SEND TO RF
-        // char *rawP = (char *)malloc(rawData.length());
-        //  rawData.toCharArray(rawP, rawData.length());
-        // memcpy(rawP, rawData.c_str(), rawData.length());
-        pkgTxPush(str, strlen(str), 0);
-        // pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
-        // free(rawP);
-    }
+        SendMode |= RF_CHANNEL;
     if (config.tlm0_2inet)
-    { // TLM SEND TO APRS-IS
-        if (aprsClient.connected())
-        {
-            status.txCount++;
-            aprsClient.printf("%s\r\n", str); // Send packet to Inet
-            // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
-        }
-    }
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(str, strlen(str), 0, SendMode);
+
+    // if (config.tlm0_2rf)
+    // { // TLM SEND TO RF
+    //     SendMode |= RF_CHANNEL;
+    //     // char *rawP = (char *)malloc(rawData.length());
+    //     //  rawData.toCharArray(rawP, rawData.length());
+    //     // memcpy(rawP, rawData.c_str(), rawData.length());
+    //     pkgTxPush(str, strlen(str), 0,RF_CHANNEL);
+    //     // pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
+    //     // free(rawP);
+    // }
+    // if (config.tlm0_2inet)
+    // { // TLM SEND TO APRS-IS
+
+    //     if (aprsClient.connected())
+    //     {
+    //         status.txCount++;
+    //         aprsClient.printf("%s\r\n", str); // Send packet to Inet
+    //         // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
+    //     }
+    // }
 }
 
 void sendTelemetry_trk(char *raw)
@@ -5125,19 +5402,26 @@ void sendTelemetry_trk(char *raw)
         }
     }
 
+    uint8_t SendMode = 0;
     if (config.trk_loc2rf)
-    { // TLM SEND TO RF
-        pkgTxPush(str, strlen(str), 0);
-    }
+        SendMode |= RF_CHANNEL;
     if (config.trk_loc2inet)
-    { // TLM SEND TO APRS-IS
-        if (aprsClient.connected())
-        {
-            status.txCount++;
-            aprsClient.printf("%s\r\n", str); // Send packet to Inet
-            delay(2000);
-        }
-    }
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(str, strlen(str), 0, SendMode);
+
+    // if (config.trk_loc2rf)
+    // { // TLM SEND TO RF
+    //     pkgTxPush(str, strlen(str), 0);
+    // }
+    // if (config.trk_loc2inet)
+    // { // TLM SEND TO APRS-IS
+    //     if (aprsClient.connected())
+    //     {
+    //         status.txCount++;
+    //         aprsClient.printf("%s\r\n", str); // Send packet to Inet
+    //         delay(2000);
+    //     }
+    // }
 }
 
 void sendTelemetry_igate(char *raw)
@@ -5190,19 +5474,25 @@ void sendTelemetry_igate(char *raw)
         }
     }
 
+    uint8_t SendMode = 0;
     if (config.igate_loc2rf)
-    { // TLM SEND TO RF
-        pkgTxPush(str, strlen(str), 0);
-    }
+        SendMode |= RF_CHANNEL;
     if (config.igate_loc2inet)
-    { // TLM SEND TO APRS-IS
-        if (aprsClient.connected())
-        {
-            status.txCount++;
-            aprsClient.printf("%s\r\n", str); // Send packet to Inet
-            delay(2000);
-        }
-    }
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(str, strlen(str), 0, SendMode);
+    // if (config.igate_loc2rf)
+    // { // TLM SEND TO RF
+    //     pkgTxPush(str, strlen(str), 0);
+    // }
+    // if (config.igate_loc2inet)
+    // { // TLM SEND TO APRS-IS
+    //     if (aprsClient.connected())
+    //     {
+    //         status.txCount++;
+    //         aprsClient.printf("%s\r\n", str); // Send packet to Inet
+    //         delay(2000);
+    //     }
+    // }
 }
 
 void sendTelemetry_digi(char *raw)
@@ -5249,19 +5539,25 @@ void sendTelemetry_digi(char *raw)
         }
     }
 
+    uint8_t SendMode = 0;
     if (config.digi_loc2rf)
-    { // TLM SEND TO RF
-        pkgTxPush(str, strlen(str), 0);
-    }
+        SendMode |= RF_CHANNEL;
     if (config.digi_loc2inet)
-    { // TLM SEND TO APRS-IS
-        if (aprsClient.connected())
-        {
-            status.txCount++;
-            aprsClient.printf("%s\r\n", str); // Send packet to Inet
-            delay(2000);
-        }
-    }
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(str, strlen(str), 0, SendMode);
+    // if (config.digi_loc2rf)
+    // { // TLM SEND TO RF
+    //     pkgTxPush(str, strlen(str), 0);
+    // }
+    // if (config.digi_loc2inet)
+    // { // TLM SEND TO APRS-IS
+    //     if (aprsClient.connected())
+    //     {
+    //         status.txCount++;
+    //         aprsClient.printf("%s\r\n", str); // Send packet to Inet
+    //         delay(2000);
+    //     }
+    // }
 }
 
 RTC_DATA_ATTR statusType statOld;
@@ -6050,7 +6346,7 @@ void taskAPRS(void *pvParameters)
     timeAprs = 0;
 
     timeSlot = millis();
-    
+
     tx_interval = config.trk_interval;
     initInterval = true;
     AFSKInitAct = true;
@@ -6067,26 +6363,26 @@ void taskAPRS(void *pvParameters)
             systemTLM.ParmTimeout = millis() + 20000;
             systemTLM.TeleTimeout = millis() + 30000;
             initInterval = false;
-            //tx_interval = config.trk_interval;
-            // if (config.pwr_en)
-            // {
-            //     if (config.pwr_mode == MODE_A || config.pwr_mode == MODE_B) // CPU and Radio active, power down control
-            //     {
-            //             tx_interval = config.pwr_stanby_delay;
-            //             tx_counter = 10;
-            //     }
-            // }else{
-                tx_counter = tx_interval - 10;
+            // tx_interval = config.trk_interval;
+            //  if (config.pwr_en)
+            //  {
+            //      if (config.pwr_mode == MODE_A || config.pwr_mode == MODE_B) // CPU and Radio active, power down control
+            //      {
+            //              tx_interval = config.pwr_stanby_delay;
+            //              tx_counter = 10;
+            //      }
+            //  }else{
+            tx_counter = tx_interval - 10;
             //}
         }
         timerAPRS = micros() - timerAPRS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerAPRS_old = micros();
 
-        if (config.rf_en)
-        { // RF Module enable
+        //if (config.rf_en)
+        //{ // RF Module enable
             // SEND RF in time slot
-            if (now > (timeSlot + 10))
+            if (now > timeSlot)
             {
                 // Transmit in timeslot if enabled
                 // if (config.rf_sql_gpio > -1)
@@ -6104,12 +6400,13 @@ void taskAPRS(void *pvParameters)
                 //     }
                 // }
                 // else
-                if (pkgTxSend())
+                //if (pkgTxSend())
+                pkgTxSend();
                     //     timeSlot = millis() + config.tx_timeslot; // Tx Time Slot > 2sec.
                     // else
-                    timeSlot = millis() + 2000;
+                timeSlot = millis() + 100;
             }
-        }
+        //}
 
         if (config.trk_en)
         { // TRACKER MODE
@@ -6123,7 +6420,7 @@ void taskAPRS(void *pvParameters)
                 //   Check interval timeout
                 if (config.trk_smartbeacon && config.trk_gps)
                 {
-                    if((gps.satellites.value() > 3) && (gps.hdop.hdop() < 10))
+                    if ((gps.satellites.value() > 3) && (gps.hdop.hdop() < 10))
                     {
                         if (tx_counter > tx_interval)
                         {
@@ -6159,8 +6456,10 @@ void taskAPRS(void *pvParameters)
                         // if (gps.course.isUpdated())
                         if (gps.speed.kmph() > config.trk_lspeed)
                             SB_HEADING = (int16_t)gps.course.deg();
-                    }else{
-                        if(SB_SPEED>0)
+                    }
+                    else
+                    {
+                        if (SB_SPEED > 0)
                             SB_SPEED--;
                     }
                     if (config.trk_smartbeacon) // SMART BEACON CAL
@@ -6194,6 +6493,8 @@ void taskAPRS(void *pvParameters)
             {
                 String rawData;
                 String cmn = "";
+                Sleep_Activate &= ~ACTIVATE_TRACKER;
+                StandByTick = millis() + (5000);
                 if (config.trk_tlm_sensor[0] | config.trk_tlm_sensor[1] | config.trk_tlm_sensor[2] | config.trk_tlm_sensor[3] | config.trk_tlm_sensor[4])
                 {
                     char tlm_result[100];
@@ -6335,7 +6636,7 @@ void taskAPRS(void *pvParameters)
                 {
                     cmn += " ?RSSI";
                 }
-                
+
                 if (config.trk_gps) // TRACKER by GPS
                 {
                     rawData = trk_gps_postion(cmn);
@@ -6383,28 +6684,35 @@ void taskAPRS(void *pvParameters)
                         sprintf(name, "%s", config.trk_mycall);
                 }
 #endif
+                uint8_t SendMode = 0;
                 if (config.trk_loc2rf)
-                { // TRACKER SEND TO RF
-                    char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-                    memcpy(rawP, rawData.c_str(), rawData.length());
-                    // rawData.toCharArray(rawP, rawData.length());
-                    pkgTxPush(rawP, rawData.length(), 0);
+                    SendMode |= RF_CHANNEL;
+                if (config.trk_loc2inet)
+                    SendMode |= INET_CHANNEL;
+                pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
+
+                //                 if (config.trk_loc2rf)
+                //                 { // TRACKER SEND TO RF
+                //                     char *rawP = (char *)calloc(rawData.length(), sizeof(char));
+                //                     memcpy(rawP, rawData.c_str(), rawData.length());
+                //                     // rawData.toCharArray(rawP, rawData.length());
+                //                     pkgTxPush(rawP, rawData.length(), 0);
 
 #if defined OLED || defined ST7735_160x80
-                    pushTxDisp(TXCH_RF, name, sts);
+                pushTxDisp(TXCH_RF, name, sts);
 #endif
-                    free(rawP);
-                }
-                if (config.trk_loc2inet)
-                { // TRACKER SEND TO APRS-IS
-                    if (aprsClient.connected())
-                    {
-                        aprsClient.println(rawData); // Send packet to Inet
-#if defined OLED || defined ST7735_160x80
-                        // pushTxDisp(TXCH_TCP, "TX TRACKER", sts);
-#endif
-                    }
-                }
+                //                     free(rawP);
+                //                 }
+                //                 if (config.trk_loc2inet)
+                //                 { // TRACKER SEND TO APRS-IS
+                //                     if (aprsClient.connected())
+                //                     {
+                //                         aprsClient.println(rawData); // Send packet to Inet
+                // #if defined OLED || defined ST7735_160x80
+                //                         // pushTxDisp(TXCH_TCP, "TX TRACKER", sts);
+                // #endif
+                //                     }
+                //                 }
                 rawData.clear();
                 cmn.clear();
             }
@@ -6418,7 +6726,6 @@ void taskAPRS(void *pvParameters)
             String tnc2 = "";
             // นำข้อมูลแพ็จเกจจาก TNC ออกจากคิว
             PacketBuffer.pop(&incomingPacket);
-            // igateProcess(incomingPacket);
             packet2Raw(tnc2, incomingPacket);
             newIGatePkg = true;
             newDigiPkg = true;
@@ -6544,7 +6851,8 @@ void taskAPRS(void *pvParameters)
                     String rawData = "";
                     if (config.igate_gps)
                     { // IGATE Send GPS position
-                        if (gps.location.isValid()){
+                        if (gps.location.isValid())
+                        {
                             rawData = igate_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
                             if (config.log & LOG_IGATE)
                             {
@@ -6555,7 +6863,7 @@ void taskAPRS(void *pvParameters)
                     else
                     { // IGATE Send fix position
                         rawData = igate_position(config.igate_lat, config.igate_lon, config.igate_alt, "");
-                         if (config.log & LOG_TRACKER)
+                        if (config.log & LOG_TRACKER)
                         {
                             logIGate(config.igate_lat, config.igate_lon, 0, 0);
                         }
@@ -6563,6 +6871,8 @@ void taskAPRS(void *pvParameters)
                     if (rawData != "")
                     {
                         iGatetickInterval = millis() + (config.igate_interval * 1000);
+                        Sleep_Activate &= ~ACTIVATE_IGATE;
+                        StandByTick = millis() + (5000);
 
                         if (config.igate_tlm_sensor[0] | config.igate_tlm_sensor[1] | config.igate_tlm_sensor[2] | config.igate_tlm_sensor[3] | config.igate_tlm_sensor[4])
                         {
@@ -6700,6 +7010,10 @@ void taskAPRS(void *pvParameters)
                             telemetry_base91(tlm_data, tlm_result, tlm_sz);
                             rawData += String(tlm_result);
                         }
+                        if (strlen(config.igate_comment) > 0)
+                        {
+                            rawData += String(config.igate_comment);
+                        }
 
                         log_d("IGATE_POSITION: %s", rawData.c_str());
 
@@ -6707,28 +7021,35 @@ void taskAPRS(void *pvParameters)
                             sprintf(sts, "POSITION GPS\nINTERVAL %ds", tx_interval);
                         else
                             sprintf(sts, "POSITION FIX\nINTERVAL %ds", tx_interval);
+
+                        uint8_t SendMode = 0;
                         if (config.igate_loc2rf)
-                        { // IGATE SEND POSITION TO RF
-                            char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-                            // rawData.toCharArray(rawP, rawData.length());
-                            memcpy(rawP, rawData.c_str(), rawData.length());
-                            pkgTxPush(rawP, rawData.length(), 0);
-#if defined OLED || defined ST7735_160x80
-                            pushTxDisp(TXCH_RF, "TX IGATE", sts);
-#endif
-                            free(rawP);
-                        }
+                            SendMode |= RF_CHANNEL;
                         if (config.igate_loc2inet)
-                        { // IGATE SEND TO APRS-IS
-                            if (aprsClient.connected())
-                            {
-                                status.txCount++;
-                                aprsClient.println(rawData); // Send packet to Inet
+                            SendMode |= INET_CHANNEL;
+                        pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
+//                         if (config.igate_loc2rf)
+//                         { // IGATE SEND POSITION TO RF
+//                             char *rawP = (char *)calloc(rawData.length(), sizeof(char));
+//                             // rawData.toCharArray(rawP, rawData.length());
+//                             memcpy(rawP, rawData.c_str(), rawData.length());
+//                             pkgTxPush(rawP, rawData.length(), 0);
 #if defined OLED || defined ST7735_160x80
-                                pushTxDisp(TXCH_TCP, "TX IGATE", sts);
+                        pushTxDisp(TXCH_RF, "TX IGATE", sts);
 #endif
-                            }
-                        }
+                        //                             free(rawP);
+                        //                         }
+                        //                         if (config.igate_loc2inet)
+                        //                         { // IGATE SEND TO APRS-IS
+                        //                             if (aprsClient.connected())
+                        //                             {
+                        //                                 status.txCount++;
+                        //                                 aprsClient.println(rawData); // Send packet to Inet
+                        // #if defined OLED || defined ST7735_160x80
+                        //                                 pushTxDisp(TXCH_TCP, "TX IGATE", sts);
+                        // #endif
+                        //                             }
+                        //                         }
                     }
                 }
             }
@@ -6736,7 +7057,8 @@ void taskAPRS(void *pvParameters)
             if (newIGatePkg)
             {
                 newIGatePkg = false;
-                if (config.rf2inet && aprsClient.connected())
+                //if (config.rf2inet && aprsClient.connected())
+                if (config.rf2inet)
                 {
                     int ret = 0;
                     uint16_t type = pkgType((const char *)&incomingPacket.info[0]);
@@ -6770,7 +7092,8 @@ void taskAPRS(void *pvParameters)
                     String rawData;
                     if (config.digi_gps)
                     { // DIGI Send GPS position
-                        if (gps.location.isValid()){
+                        if (gps.location.isValid())
+                        {
                             rawData = digi_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
                             if (config.log & LOG_DIGI)
                             {
@@ -6789,6 +7112,8 @@ void taskAPRS(void *pvParameters)
                     if (rawData != "")
                     {
                         DiGiInterval = millis() + (config.digi_interval * 1000);
+                        Sleep_Activate &= ~ACTIVATE_DIGI;
+                        StandByTick = millis() + (5000);
 
                         if (config.digi_tlm_sensor[0] | config.digi_tlm_sensor[1] | config.digi_tlm_sensor[2] | config.digi_tlm_sensor[3] | config.digi_tlm_sensor[4])
                         {
@@ -6926,6 +7251,10 @@ void taskAPRS(void *pvParameters)
                             telemetry_base91(tlm_data, tlm_result, tlm_sz);
                             rawData += String(tlm_result);
                         }
+                        if (strlen(config.igate_comment) > 0)
+                        {
+                            rawData += String(config.digi_comment);
+                        }
 
                         log_d("DIGI_POSITION: %s", rawData.c_str());
 
@@ -6933,28 +7262,35 @@ void taskAPRS(void *pvParameters)
                             sprintf(sts, "POSITION GPS\nINTERVAL %ds", tx_interval);
                         else
                             sprintf(sts, "POSITION FIX\nINTERVAL %ds", tx_interval);
+
+                        uint8_t SendMode = 0;
                         if (config.digi_loc2rf)
-                        { // DIGI SEND POSITION TO RF
-                            char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-                            // rawData.toCharArray(rawP, rawData.length());
-                            memcpy(rawP, rawData.c_str(), rawData.length());
-                            pkgTxPush(rawP, rawData.length(), 0);
-#if defined OLED || defined ST7735_160x80
-                            pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
-#endif
-                            free(rawP);
-                        }
+                            SendMode |= RF_CHANNEL;
                         if (config.digi_loc2inet)
-                        { // DIGI SEND TO APRS-IS
-                            if (aprsClient.connected())
-                            {
-                                status.txCount++;
-                                aprsClient.println(rawData); // Send packet to Inet
+                            SendMode |= INET_CHANNEL;
+                        pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
+//                         if (config.digi_loc2rf)
+//                         { // DIGI SEND POSITION TO RF
+//                             char *rawP = (char *)calloc(rawData.length(), sizeof(char));
+//                             // rawData.toCharArray(rawP, rawData.length());
+//                             memcpy(rawP, rawData.c_str(), rawData.length());
+//                             pkgTxPush(rawP, rawData.length(), 0);
 #if defined OLED || defined ST7735_160x80
-                                pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
+                        pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
 #endif
-                            }
-                        }
+                        //                             free(rawP);
+                        //                         }
+                        //                         if (config.digi_loc2inet)
+                        //                         { // DIGI SEND TO APRS-IS
+                        //                             if (aprsClient.connected())
+                        //                             {
+                        //                                 status.txCount++;
+                        //                                 aprsClient.println(rawData); // Send packet to Inet
+                        // #if defined OLED || defined ST7735_160x80
+                        //                                 pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
+                        // #endif
+                        //                             }
+                        //                         }
                     }
                     rawData.clear();
                 }
@@ -6965,6 +7301,8 @@ void taskAPRS(void *pvParameters)
             {
                 newDigiPkg = false;
                 uint16_t type = pkgType((const char *)&incomingPacket.info[0]);
+                Sleep_Activate &= ~ACTIVATE_DIGI;
+                StandByTick = millis() + (config.pwr_stanby_delay * 1000);
                 // Digi repeater filter
                 if ((type & config.digiFilter))
                 {
@@ -7002,15 +7340,17 @@ void taskAPRS(void *pvParameters)
                         packet2Raw(digiPkg, incomingPacket);
                         log_d("DIGI_REPEAT: %s", digiPkg.c_str());
                         log_d("DIGI delay=%d ms.", digiDelay);
-                        char *rawP = (char *)calloc(digiPkg.length(), sizeof(char));
+                        //char *rawP = (char *)calloc(digiPkg.length()+1, sizeof(char));
                         // digiPkg.toCharArray(rawP, digiPkg.length());
-                        memcpy(rawP, digiPkg.c_str(), digiPkg.length());
-                        pkgTxPush(rawP, digiPkg.length(), digiDelay);
+                        //memcpy(rawP, digiPkg.c_str(), digiPkg.length());
+                        pkgTxPush(digiPkg.c_str(), digiPkg.length(), digiDelay, RF_CHANNEL);
+                        digiPkg.clear();
+                        //pkgTxPush(rawP, digiPkg.length(), digiDelay, RF_CHANNEL);
                         sprintf(sts, "--src call--\n%s\nDelay: %dms.", incomingPacket.src.call, digiDelay);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_DIGI, "DIGI REPEAT", sts);
 #endif
-                        free(rawP);
+                        //free(rawP);
                     }
                 }
             }
@@ -7025,7 +7365,8 @@ void taskAPRS(void *pvParameters)
                 String rawData = "";
                 if (config.wx_gps)
                 { // Wx Send GPS position
-                    if (gps.location.isValid()){
+                    if (gps.location.isValid())
+                    {
                         rawData = wx_report(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
                         if (config.log & LOG_WX)
                         {
@@ -7044,30 +7385,38 @@ void taskAPRS(void *pvParameters)
                 if (rawData != "")
                 {
                     WxInterval = millis() + (config.wx_interval * 1000);
+                    Sleep_Activate &= ~ACTIVATE_WX;
+                    StandByTick = millis() + (5000);
                     log_d("WX_REPORT: %s", rawData.c_str());
+                    uint8_t SendMode = 0;
                     if (config.wx_2rf)
-                    { // WX SEND POSITION TO RF
-                        char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-                        // rawData.toCharArray(rawP, rawData.length());
-                        memcpy(rawP, rawData.c_str(), rawData.length());
-                        pkgTxPush(rawP, rawData.length(), 0);
-#ifdef OLED
-                        sprintf(sts, "--src call--\n%s\nDelay: %dms.", config.wx_mycall, (config.wx_interval * 1000));
-                        pushTxDisp(TXCH_RF, "WX REPORT", sts);
-#endif
-                        free(rawP);
-                    }
+                        SendMode |= RF_CHANNEL;
                     if (config.wx_2inet)
-                    { // WX SEND TO APRS-IS
-                        if (aprsClient.connected())
-                        {
-                            status.txCount++;
-                            aprsClient.println(rawData); // Send packet to Inet
+                        SendMode |= INET_CHANNEL;
+                    pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
+//                     if (config.wx_2rf)
+//                     { // WX SEND POSITION TO RF
+//                         char *rawP = (char *)calloc(rawData.length(), sizeof(char));
+//                         // rawData.toCharArray(rawP, rawData.length());
+//                         memcpy(rawP, rawData.c_str(), rawData.length());
+//                         pkgTxPush(rawP, rawData.length(), 0);
 #ifdef OLED
-                            // pushTxDisp(TXCH_TCP, "WX REPORT", sts);
+                    sprintf(sts, "--src call--\n%s\nDelay: %dms.", config.wx_mycall, (config.wx_interval * 1000));
+                    pushTxDisp(TXCH_RF, "WX REPORT", sts);
 #endif
-                        }
-                    }
+                    //                         free(rawP);
+                    //                     }
+                    //                     if (config.wx_2inet)
+                    //                     { // WX SEND TO APRS-IS
+                    //                         if (aprsClient.connected())
+                    //                         {
+                    //                             status.txCount++;
+                    //                             aprsClient.println(rawData); // Send packet to Inet
+                    // #ifdef OLED
+                    //                             // pushTxDisp(TXCH_TCP, "WX REPORT", sts);
+                    // #endif
+                    //                         }
+                    //                     }
                 }
                 else
                 {
@@ -7148,6 +7497,8 @@ void taskAPRS(void *pvParameters)
             if (systemTLM.TeleTimeout < millis())
             {
                 systemTLM.TeleTimeout = millis() + (config.tlm0_data_interval * 1000);
+                Sleep_Activate &= ~ACTIVATE_TELEMETRY;
+                StandByTick = millis() + (5000);
                 char rawTlm[100];
                 if (systemTLM.Sequence > 999)
                     systemTLM.Sequence = 0;
@@ -7182,8 +7533,12 @@ void taskAPRSPoll(void *pvParameters)
 
         if (AFSKInitAct == true)
         {
-            if(APRS_poll()){
-                //StandByTick += millis() + 10000;
+            if (APRS_poll())
+            {
+                // StandByTick += millis() + 10000;
+                StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+                if (save_mode)
+                    save_act = true;
             }
         }
     }
@@ -7284,7 +7639,7 @@ void taskNetwork(void *pvParameters)
             APStationNum = WiFi.softAPgetStationNum();
             if (APStationNum > 0)
             {
-                //config.pwr_sleep_activate |= ACTIVATE_WIFI;
+                // config.pwr_sleep_activate |= ACTIVATE_WIFI;
                 if (WiFi.isConnected() == false)
                 {
                     vTaskDelay(9 / portTICK_PERIOD_MS);
@@ -7295,7 +7650,7 @@ void taskNetwork(void *pvParameters)
 
         if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
         {
-            //config.pwr_sleep_activate |= ACTIVATE_WIFI;
+            // config.pwr_sleep_activate |= ACTIVATE_WIFI;
             if (millis() > NTP_Timeout)
             {
                 NTP_Timeout = millis() + 86400000;
@@ -7304,7 +7659,8 @@ void taskNetwork(void *pvParameters)
                 configTime(3600 * config.timeZone, 0, config.ntp_host);
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 struct tm tmstruct;
-                if(getLocalTime(&tmstruct, 1000)){
+                if (getLocalTime(&tmstruct, 1000))
+                {
                     time_t systemTime;
                     time(&systemTime);
                     setTime(systemTime);
@@ -7321,7 +7677,9 @@ void taskNetwork(void *pvParameters)
                             wireguard_setup();
                         }
                     }
-                }else{
+                }
+                else
+                {
                     NTP_Timeout = millis() + 5000;
                 }
             }
@@ -7414,7 +7772,7 @@ void taskNetwork(void *pvParameters)
                                                     tnc2Raw += ",RFONLY"; // fix path to rf only not send loop to inet
                                                     tnc2Raw += ":}";      // 3rd-party frame
                                                     tnc2Raw += line;
-                                                    pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0);
+                                                    pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, RF_CHANNEL);
                                                     char sts[50];
                                                     sprintf(sts, "--SRC CALL--\n%s\n", src_call.c_str());
 #if defined OLED || defined ST7735_160x80
@@ -10177,7 +10535,7 @@ void gpsDisp()
     }
     else
     {
-        //display.fillRect(0, 0, 160, 80, BLACK);
+        // display.fillRect(0, 0, 160, 80, BLACK);
         display.fillScreen(ST77XX_BLACK);
         display.setTextColor(ST77XX_CYAN);
         display.drawYBitmap(120, 0, &Icon_TableB[50][0], 16, 16, ST77XX_BLUE);

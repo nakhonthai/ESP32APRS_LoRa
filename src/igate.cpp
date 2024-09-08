@@ -190,9 +190,10 @@ int igateProcess(AX25Msg &Packet)
         }
         Raw[i] = 0;
         log_d("RF2INET: %s", Raw);
-        aprsClient.write(&Raw[0], i); // Send binary frame packet to APRS-IS (aprsc)
-        aprsClient.write("\r\n");     // Send CR LF the end frame packet
-        status.txCount++;
+        pkgTxPush(Raw, i, 0,INET_CHANNEL);
+        // aprsClient.write(&Raw[0], i); // Send binary frame packet to APRS-IS (aprsc)
+        // aprsClient.write("\r\n");     // Send CR LF the end frame packet
+        //status.txCount++;
         free(Raw);
     }
     return 1;

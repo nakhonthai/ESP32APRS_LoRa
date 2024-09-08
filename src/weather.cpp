@@ -85,163 +85,28 @@ bool getCSV2Wx(String stream)
         char strData[300];
         size_t lng = getRawWx(strData);
 
-        if (config.wx_2rf)
-        { // WX SEND POSITION TO RF
-            pkgTxPush(strData, lng, 0);
-        }
-        if (config.wx_2inet)
-        { // WX SEND TO APRS-IS
-            if (aprsClient.connected())
-            {
-                // status.txCount++;
-                aprsClient.println(strData); // Send packet to Inet
-            }
-        }
+        uint8_t SendMode = 0;
+        if (config.wx_2rf) SendMode |= RF_CHANNEL;
+        if (config.wx_2inet) SendMode |= INET_CHANNEL;
+        pkgTxPush(strData, lng, 0,SendMode);
+        // if (config.wx_2rf)
+        // { // WX SEND POSITION TO RF
+        //     pkgTxPush(strData, lng, 0);
+        // }
+        // if (config.wx_2inet)
+        // { // WX SEND TO APRS-IS
+        //     if (aprsClient.connected())
+        //     {
+        //         // status.txCount++;
+        //         aprsClient.println(strData); // Send packet to Inet
+        //     }
+        // }
         // Serial.printf("APRS: %s\r\n",strData);
         return true;
     }
     return false;
     // ModbusSerial.flush();
 }
-
-// bool getM70xModbus(ModbusMaster &node)
-// {
-//     uint8_t result;
-//     weather.visable = 0;
-
-//     result = node.readHoldingRegisters(0x0002, 7);
-//     if (result == node.ku8MBSuccess)
-//     {
-//         weather.co2 = node.getResponseBuffer(0);                        // Co2 PPM
-//         weather.ch2o = node.getResponseBuffer(1);                       // ug
-//         weather.tvoc = node.getResponseBuffer(2);                       // ug
-//         weather.pm25 = node.getResponseBuffer(3);                       // PM2.5ug
-//         weather.pm100 = node.getResponseBuffer(4);                      // PM10 ug
-//         weather.temperature = (float)node.getResponseBuffer(5) / 10.0f; // C
-//         weather.humidity = (float)node.getResponseBuffer(6) / 10.0f;    //%RH
-
-//         weather.visable |= WX_CO2;
-//         weather.visable |= WX_CH2O;
-//         weather.visable |= WX_TVOC;
-//         weather.visable |= WX_PM25;
-//         weather.visable |= WX_PM100;
-//         weather.visable |= WX_TEMP;
-//         weather.visable |= WX_HUMIDITY;
-//         return true;
-//     }
-//     return false;
-// }
-
-// bool getM70xModbus(ModbusMaster &node, uint32_t sensor)
-// {
-//     uint8_t result;
-//     weather.visable = 0;
-
-//     if (sensor == 0)
-//     { // Read All
-//         result = node.readHoldingRegisters(0x0002, 7);
-//         if (result == node.ku8MBSuccess)
-//         {
-//             weather.co2 = node.getResponseBuffer(0);                        // Co2 PPM
-//             weather.ch2o = node.getResponseBuffer(1);                       // ug
-//             weather.tvoc = node.getResponseBuffer(2);                       // ug
-//             weather.pm25 = node.getResponseBuffer(3);                       // PM2.5ug
-//             weather.pm100 = node.getResponseBuffer(4);                      // PM10 ug
-//             weather.temperature = (float)node.getResponseBuffer(5) / 10.0f; // C
-//             weather.humidity = (float)node.getResponseBuffer(6) / 10.0f;    //%RH
-
-//             weather.visable |= WX_CO2;
-//             weather.visable |= WX_CH2O;
-//             weather.visable |= WX_TVOC;
-//             weather.visable |= WX_PM25;
-//             weather.visable |= WX_PM100;
-//             weather.visable |= WX_TEMP;
-//             weather.visable |= WX_HUMIDITY;
-//             return true;
-//         }
-//     }
-//     else
-//     {
-//         if (sensor & WX_CO2)
-//         {
-//             weather.visable &= ~WX_CO2;
-//             result = node.readHoldingRegisters(0, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.co2 = node.getResponseBuffer(0); // Co2 PPM
-//                 weather.visable |= WX_CO2;
-//                 return true;
-//             }
-//         }
-//         else if (sensor & WX_CH2O)
-//         {
-//             weather.visable &= ~WX_CH2O;
-//             result = node.readHoldingRegisters(1, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.ch2o = node.getResponseBuffer(0); // ug
-//                 weather.visable |= WX_CH2O;
-//                 return true;
-//             }
-//         }
-//         else if (sensor & WX_TVOC)
-//         {
-//             weather.visable &= ~WX_TVOC;
-//             result = node.readHoldingRegisters(2, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.tvoc = node.getResponseBuffer(0); // ug
-//                 weather.visable |= WX_TVOC;
-//                 return true;
-//             }
-//         }
-//         else if (sensor & WX_PM25)
-//         {
-//             weather.visable &= ~WX_PM25;
-//             result = node.readHoldingRegisters(3, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.pm25 = node.getResponseBuffer(0); // PM2.5ug
-//                 weather.visable |= WX_PM25;
-//                 return true;
-//             }
-//         }
-//         else if (sensor & WX_PM100)
-//         {
-//             weather.visable &= ~WX_PM100;
-//             result = node.readHoldingRegisters(4, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.pm100 = node.getResponseBuffer(0); // PM10 ug
-//                 weather.visable |= WX_PM100;
-//                 return true;
-//             }
-//         }
-//         else if (sensor & WX_TEMP)
-//         {
-//             weather.visable &= ~WX_TEMP;
-//             result = node.readHoldingRegisters(5, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.temperature = (float)node.getResponseBuffer(0) / 10.0f; // C
-//                 weather.visable |= WX_TEMP;
-//                 return true;
-//             }
-//         }
-//         else if (sensor & WX_HUMIDITY)
-//         {
-//             weather.visable &= ~WX_HUMIDITY;
-//             result = node.readHoldingRegisters(6, 1);
-//             if (result == node.ku8MBSuccess)
-//             {
-//                 weather.humidity = (float)node.getResponseBuffer(0) / 10.0f; //%RH
-//                 weather.visable |= WX_HUMIDITY;
-//                 return true;
-//             }
-//         }
-//     }
-//     return false;
-// }
 
 void getSensor(uint32_t type, float *val, int i)
 {
