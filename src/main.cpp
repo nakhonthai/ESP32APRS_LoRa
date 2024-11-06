@@ -3519,9 +3519,9 @@ void setup()
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
         if(config.disp_flip)
-            display.setRotation(3);
+            display.setRotation(2);
         else
-            display.setRotation(1);
+            display.setRotation(0);
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(WHITE);
