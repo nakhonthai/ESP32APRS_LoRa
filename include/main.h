@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.3"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'a'
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
@@ -98,6 +98,12 @@
 #define TXCH_RF 1
 #define TXCH_DIGI 2
 #define TXCH_3PTY 3
+
+#if defined(HELTEC_HTIT_TRACKER)
+#define ST7735_LED_K_Pin 21
+#elif defined(APRS_LORA_DONGLE)
+#define ST7735_LED_K_Pin 16
+#endif
 
 // APRS data type identifiers
 #define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_NO_MSG         "!"
@@ -335,7 +341,7 @@ const char MODEM_TYPE[2][10] = {"AFSK_300", "AFSK_1200"};
 const char PWR_MODE[3][10] = {"MODE A", "MODE B","MODE C"};
 const char ACTIVATE[8][10] = {"OFF", "TRACKER", "IGATE", "DIGI", "WX", "TELEMETRY", "QUERY", "STATUS"};
 //const char SENSOR_PORT[12][15] = {"UART0_CSV", "UART1_CSV", "ADC", "I2C_0","I2C_1","CNT_0","CNT_1","MODBUS","M701_Modbus","M702_Modbus","BME280_I2C0","BME280_I2C1"};
-const char WX_SENSOR[22][19]={"Wind Course","Wind Speed","Wind Gust","Temperature","Rain 1hr","Rain 24hr","Rain Midnight","Humidity","Barometric","Luminosity","Snow","Soil Temperature","Soil Humidity","Water Temperature","Water TDS","Water Level","PM 2.5","PM 10","Co2","CH2O","TVOC","UV"};
+const char WX_SENSOR[23][19]={"Wind Course","Wind Speed","Wind Gust","Temperature","Rain 1hr","Rain 24hr","Rain Midnight","Humidity","Barometric","Luminosity","Snow","Soil Temperature","Soil Humidity","Water Temperature","Water TDS","Water Level","PM 2.5","PM 10","Co2","CH2O","TVOC","UV","SOUND"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
 void saveEEPROM();

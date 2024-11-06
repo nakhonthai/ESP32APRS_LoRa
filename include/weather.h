@@ -15,8 +15,8 @@
 #include "sensor.h"
 //#include <ModbusMaster.h>
 
-//Format: c...s...g...t...r...p...P...h..b.....L...S...m...M...w...W....v...o...O...x....F....T....u..
-#define WX_SENSOR_NUM 22
+//Format: c...s...g...t...r...p...P...h..b.....L...S...m...M...w...W....v...d...D...x....F....T....u..n...
+//#define WX_SENSOR_NUM 23
 
 #define WX_NONE 0
 #define WX_WIND_DIR (1 << 0)       // c Wind Direction (in degrees)
@@ -35,12 +35,13 @@
 #define WX_WATER_TEMP (1 << 13)    // w Water (Fahenheit)
 #define WX_WATER_TDS (1 << 14)     // W Water TDS(Total Dissolved Solids) 0-1000ppm
 #define WX_WATER_LEVEL (1 << 15)   // v Water Level (in hundredths of an inch)
-#define WX_PM25 (1 << 16)          // o Ordure PM 2.5 0~1000μg/m³
-#define WX_PM100 (1 << 17)         // O Ordure PM 10 ,0~1000μg/m³
+#define WX_PM25 (1 << 16)          // d Dust PM 2.5 0~1000μg/m³
+#define WX_PM100 (1 << 17)         // D Dust PM 10 ,0~1000μg/m³
 #define WX_CO2 (1 << 18)           // X,x Co2 (PPM) x=0-9999,X=10-99990(x10)
 #define WX_CH2O (1<<19)             //F,f Formaldehyde(CH2O) F=0-9999,f,1000-2000 μg/m³
 #define WX_TVOC (1<<20)             // T
 #define WX_UV (1<<21)               //UV Index
+#define WX_SOUND (1<<22)            //n noise of sound Level dB
 
 typedef struct Weather_Struct
 {
@@ -68,6 +69,7 @@ typedef struct Weather_Struct
     uint16_t ch2o;           // F,f Formaldehyde(CH2O) F=0-9999,f,1000-2000 μg/m³
     uint16_t tvoc;         // (0~2000μg/m³)
     uint8_t uv;         // UV index 1-11
+    float sound;        // Sound Level dB
     float vbat;             // Battery Voltage (V)
     float vsolar;           // Solar cell Voltage (V)
     float ibat;             // Battery Current (A)

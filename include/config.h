@@ -14,6 +14,8 @@
 #include <Arduino.h>
 #include "sensor.h"
 
+#define WX_SENSOR_NUM 23
+
 #define ACTIVATE_OFF 0				// Packet is disable all packet
 #define ACTIVATE_TRACKER (1 << 0)		// packet is an object
 #define ACTIVATE_IGATE (1 << 1)		// packet is an item
@@ -30,7 +32,6 @@
 // #include <SPIFFS.h>
 // #include "soc/rtc_wdt.h"
 // #include <AX25.h>
-// #include "weather.h"
 
 // #include "HardwareSerial.h"
 // #include "EEPROM.h"
@@ -352,6 +353,9 @@ typedef struct Config_Struct
 	uint16_t pwr_stanby_delay; //sec
 	uint8_t pwr_sleep_activate;
 	int8_t pwr_gpio=-1;
+	bool pwr_active = 1;
+	bool disp_flip;
+	uint8_t disp_brightness;
 
 	uint16_t log=0;
 
@@ -381,9 +385,9 @@ typedef struct Config_Struct
 	char igate_tlm_UNIT[5][8];
 	float igate_tlm_EQNS[5][3];
 
-	bool wx_sensor_enable[22];
-	bool wx_sensor_avg[22];
-	uint8_t wx_sensor_ch[22];
+	bool wx_sensor_enable[WX_SENSOR_NUM];
+	bool wx_sensor_avg[WX_SENSOR_NUM];
+	uint8_t wx_sensor_ch[WX_SENSOR_NUM];
 
 } Configuration;
 

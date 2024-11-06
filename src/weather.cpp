@@ -267,6 +267,9 @@ int getRawWx(char *strData)
         case WX_UV:
             getSensor(senType, (uint16_t*)&weather.uv, i);
             break;
+        case WX_SOUND:
+            getSensor(senType, (uint16_t*)&weather.sound, i);
+            break;
         }
         senType <<= 1;
     }
@@ -484,7 +487,7 @@ int getRawWx(char *strData)
 
         if (weather.visable & WX_PM25)
         {
-            sprintf(strtmp, "o%03u", (int)weather.pm25);
+            sprintf(strtmp, "d%03u", (int)weather.pm25);
             strcat(strData, strtmp);
         }
     }
@@ -493,7 +496,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_PM100)
         {
-            sprintf(strtmp, "O%03u", (int)weather.pm100);
+            sprintf(strtmp, "D%03u", (int)weather.pm100);
             strcat(strData, strtmp);
         }
     }
@@ -537,6 +540,15 @@ int getRawWx(char *strData)
         }
     }
 
+    if (config.wx_flage & WX_SOUND)
+    {
+        if (weather.visable & WX_SOUND)
+        {
+            sprintf(strtmp, "n%03u", (unsigned int)weather.sound);
+            strcat(strData, strtmp);
+        }
+    }
+
     // sprintf(strtmp, " BAT:%0.2fV/%dmA", weather.vbat, (int)(weather.ibat * 1000));
     // strcat(strData, strtmp);
     //  sprintf(strtmp,"/%0.1fmA",weather.ibat*1000);
@@ -547,5 +559,5 @@ int getRawWx(char *strData)
 
     i = strlen(strData);
     return i;
-    // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...o...O...x....
+    // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...d...D...x....n...
 }

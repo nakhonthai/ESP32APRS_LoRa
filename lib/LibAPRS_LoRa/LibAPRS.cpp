@@ -264,9 +264,18 @@ void APRS_init(Configuration *cfg)
     }
 
     log_d("[%d] Begin... ", config.rf_type);
-    if ((cfg->rf_type == RF_SX1231) || (cfg->rf_type == RF_SX1233))
+    if ((cfg->rf_type == RF_SX1231) || (cfg->rf_type == RF_SX1233) || (config.rf_mode == 2))
     {
-        state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_baudrate, config.rf_bw, config.rf_bw, config.rf_power, config.rf_preamable, 0, 1.6);
+        // state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_baudrate, config.rf_bw, config.rf_bw, config.rf_power, config.rf_preamable, 0, 1.6);
+        state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_bw,9.6f*0.25f, config.rf_bw, config.rf_power, config.rf_preamable, false, 1.6);
+        if (state == RADIOLIB_ERR_NONE)
+        {
+            log_d("FSK begin success!");
+        }
+        else
+        {
+            log_d("failed, code %d", state);
+        }
     }
     else
     {
@@ -281,8 +290,25 @@ void APRS_init(Configuration *cfg)
         log_d("[LoRa] Init failed, code %d", state);
     }
 
-    // radioHal->setsetPacketReceivedAction(setFlagRx);
+    if (config.rf_mode == 2)
+    {
+        uint8_t syncWord[] = {0x13,0xf2,0xb7,0xd3,0x27,0xda,0xef,0x42};
+        state = radioHal->setSyncWord(syncWord,0);
+        log_d("Set syncWord FSK success!");
+        if (state != RADIOLIB_ERR_NONE)
+        {
+            log_d("Unable to set configuration, code %i", state);
+        }
+        state = radioHal->setDataShaping(RADIOLIB_SHAPING_0_5);
+        state = radioHal->setEncoding(RADIOLIB_ENCODING_NRZ);
+        radioHal->setCRC(0);
+        //radioHal->fixedPacketLengthMode(0);        
+        
+    }
+
     radioHal->setDio0Action(setFlag);
+    // radioHal->setsetPacketReceivedAction(setFlagRx);
+    //radioHal->fixedPacketLengthMode(47);
 
     state = radioHal->startReceive();
 
@@ -299,17 +325,279 @@ void APRS_init(Configuration *cfg)
     ax25_init(&AX25, aprs_msg_callback);
 }
 
+const int BITS_PER_BYTE = 8;
+
+// Function to encode data using NRZI encoding
+size_t nrziEncode(uint8_t *inputData, size_t inputLength, uint8_t *outputData)
+{
+    bool currentSignalLevel = true; // Starting with a low level (false)
+    size_t outputIndex = 0;          // Index for the output data
+    uint8_t currentByte = 0;         // Holds the current byte of encoded data
+    int bitCount = 0;                // Count bits in the current output byte
+
+    for (size_t i = 0; i < inputLength; i++)
+    {
+        uint8_t byte = inputData[i];
+
+        for (int bit = 0; bit < BITS_PER_BYTE; bit++)
+        {
+            bool bitValue = (byte & (1 << (BITS_PER_BYTE - 1 - bit))) != 0;
+
+            if (bitValue)
+            {
+                // Invert signal for '1'
+                currentSignalLevel = !currentSignalLevel;
+            }
+
+            // Set the bit in the current byte of outputData
+            if (currentSignalLevel)
+            {
+                currentByte |= (1 << (BITS_PER_BYTE - 1 - bitCount));
+            }
+
+            bitCount++;
+
+            // When currentByte is full, store it in outputData and reset
+            if (bitCount == BITS_PER_BYTE)
+            {
+                outputData[outputIndex++] = currentByte;
+                currentByte = 0;
+                bitCount = 0;
+            }
+        }
+    }
+
+    // Handle any remaining bits in the last byte
+    if (bitCount > 0)
+    {
+        outputData[outputIndex] = currentByte;
+    }
+    return outputIndex;
+}
+
+// const uint32_t POLY = 0x010801; // Polynomial for 17-bit LFSR: x^17 + x^12 + 1
+// uint32_t lfsr = 0x1FFFF;        // Initial seed for the LFSR
+
+// // Function to get the next bit from the LFSR
+// bool getLfsrBit()
+// {
+//     bool feedbackBit = (lfsr & 1);
+//     lfsr >>= 1;
+//     if (feedbackBit)
+//     {
+//         lfsr ^= POLY;
+//     }
+//     //log_d("LFSR = %0X%0X%0X",(uint8_t)(lfsr>>16),(uint8_t)(lfsr>>8),(uint8_t)lfsr);
+//     return feedbackBit;
+// }
+
+// // Function to scramble data using 17-bit LFSR
+// void 
+
+// lfsrScramble(const uint8_t *inputData, size_t inputLength, uint8_t *outputData)
+// {
+//     for (size_t i = 0; i < inputLength; i++)
+//     {
+//         uint8_t byte = inputData[i];
+//         uint8_t scrambledByte = 0;
+
+//         for (int bit = 0; bit < 8; bit++)
+//         {
+//             bool lfsrBit = getLfsrBit();
+//             bool inputBit = (byte & (1 << (7 - bit))) != 0;
+//             bool scrambledBit = inputBit ^ lfsrBit;
+//             if (scrambledBit)
+//             {
+//                 scrambledByte |= (1 << (7 - bit));
+//             }
+//         }
+
+//         outputData[i] = scrambledByte;
+//     }
+// }
+
+//const uint32_t POLYNOMIAL_MASK = (1 << 17) | (1 << 12); // 1 + X^12 + X^17
+const uint32_t POLYNOMIAL_MASK = 0x10801;
+//const uint32_t POLYNOMIAL_MASK = 0x80108; // Polynomial for 17-bit LFSR: x^17 + x^12 + 1
+uint32_t lfsr = 0x1FFFF; // Initial LFSR state (all 1s)
+
+// Function to scramble a byte array using LFSR
+void lfsrScramble(byte* inputArray, byte* outputArray, int length) {
+  for (int i = 0; i < length; i++) {
+    byte scrambledByte = 0;
+    
+    // Process each bit in the current byte
+    for (int bit = 0; bit < 8; bit++) {
+      // Extract the current bit of the input byte
+      byte inputBit = (inputArray[i] >> (7 - bit)) & 0x01;
+
+      // XOR the input bit with the current LFSR output bit
+      byte lfsrBit = lfsr & 0x01; // The output bit of the LFSR is the least significant bit
+      byte scrambledBit = inputBit ^ lfsrBit;
+
+      // Add the scrambled bit to the scrambled byte
+      scrambledByte |= (scrambledBit << (7 - bit));
+
+      // Update LFSR: shift left and XOR with the polynomial taps
+      lfsr >>= 1; // Shift right by one bit
+      if (lfsrBit) {
+        lfsr ^= POLYNOMIAL_MASK; // Apply the polynomial
+      }
+        //lfsr&=0x1FFFF;
+    }
+
+    // Store the scrambled byte in the output array
+    outputArray[i] = scrambledByte;
+  }
+}
+
+// Function to scramble a byte array using LFSR based on K9NG system (LSB-first)
+void lfsrScrambleLSB(byte* inputArray, byte* outputArray, int length) {
+  for (int i = 0; i < length; i++) {
+    byte scrambledByte = 0;
+
+    // Scramble each bit in the current byte, LSB first
+    for (int bit = 0; bit < 8; bit++) {
+      // Extract the current LSB-first bit of the input byte
+      byte inputBit = (inputArray[i] >> bit) & 0x01;
+
+      // XOR input bit with LFSR output bit (least significant bit of LFSR)
+      byte lfsrBit = lfsr & 0x01; // Output bit of the LFSR (LSB)
+      byte scrambledBit = inputBit ^ lfsrBit;
+
+      // Shift the scrambled bit into the scrambled byte, LSB first
+      scrambledByte |= (scrambledBit << bit);
+
+      // Update LFSR: shift right by one bit and XOR with polynomial if needed
+      lfsr >>= 1;
+      if (lfsrBit) {
+        lfsr ^= POLYNOMIAL_MASK; // Apply polynomial mask if LFSR bit is 1
+      }
+      //lfsr&=0x1FFFF;
+    }
+
+    // Store the scrambled byte in the output array
+    outputArray[i] = scrambledByte;
+  }
+}
+
+/* Undo data scrambling for 9600 baud. */
+
+static inline int descramble (uint32_t in, uint32_t *state)
+{
+	int out;
+
+	out = (in ^ (*state >> 16) ^ (*state >> 11)) & 1;
+	*state = (*state << 1) | (in & 1);
+    //*state &= 0x1FFFF;
+    //out = ((*state >> 16) ^ (*state >> 11)) & 1;
+	//*state = (*state << 1) | (in & 1);
+    //*state = ((((in ^ *state) & 1) << 16) | (*state ^ ((*state & 1) << 11)) ) >> 1;
+	return (out);
+}
+
+void lfsr_scramble(byte* inputArray, byte* outputArray, int length) {
+  for (int i = 0; i < length; i++) {
+    byte scrambledByte = 0;
+    
+    // Process each bit in the current byte
+    for (int bit = 0; bit < 8; bit++) {
+      // Extract the current bit of the input byte
+      //int inputBit = (inputArray[i] >> (7 - bit)) & 0x1;
+      byte inputBit = (inputArray[i] >> bit) & 0x01;
+
+      byte scrambledBit = (byte)descramble(inputBit,&lfsr);
+
+      // Add the scrambled bit to the scrambled byte
+      //scrambledByte |= (scrambledBit << (7 - bit));
+      scrambledByte |= (scrambledBit << bit);
+    }
+
+    // Store the scrambled byte in the output array
+    outputArray[i] = scrambledByte;
+  }
+}
+
+void nrzi_encode(uint8_t *input_bytes, uint8_t *output_bytes, size_t length)
+{
+    bool previous_bit = false; // Initial state
+
+    for (size_t i = 0; i < length; i++)
+    {
+        uint8_t input_byte = input_bytes[i];
+
+        for (int j = 7; j >= 0; j--)
+        {
+            bool current_bit = (input_byte >> j) & 1;
+
+            if (current_bit == previous_bit)
+            {
+                output_bytes[i] |= (1 << j);
+            }
+
+            previous_bit = current_bit;
+        }
+    }
+}
+
+uint32_t lfsr_register = 0x1FFFF; // Initialize with a non-zero seed
+void lfsr_enscramble(uint8_t *input_bytes, uint8_t *output_bytes, size_t length)
+{
+    
+    for (size_t i = 0; i < length; i++)
+    {
+        // XOR the input byte with the high 8 bits of the LFSR register
+        output_bytes[i] = input_bytes[i] ^ (lfsr_register >> 9);
+
+        // Shift the LFSR register to the right, updating the feedback bit
+        uint32_t feedback_bit = (lfsr_register >> 16) ^ ((lfsr_register >> 11)&1);
+        lfsr_register = (lfsr_register >> 1) | (feedback_bit << 16);
+    }
+}
+
+void invertLSB(uint8_t *input_bytes,uint8_t *output_bytes,size_t len)
+{
+    uint8_t bit=0;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        uint8_t input_byte = input_bytes[i];
+        uint8_t output_byte=0;
+        for (int j = 7; j >= 0; j--)
+        {
+            bool current_bit = (input_byte >> j) & 1;
+            if (current_bit)
+            {
+                output_byte |= (0x80 >> j);
+            }
+        }
+        output_bytes[i]=output_byte;
+    }
+
+}
+
+void printHex(uint8_t *data, size_t len)
+{
+    String str = "HEX: ";
+    for (int i = 0; i < len; i++)
+    {
+        str += String((unsigned char)data[i], HEX) + ", ";
+    }
+    log_d("%s", str.c_str());
+    str.clear();
+}
+
 bool APRS_poll(void)
 {
     bool ret = false;
     // check if the flag is set
     if (received)
-    {        
+    {
         // disable the interrupt service routine while
         // processing the data
         disableInterrupt();
 
-        LED_Status(0,200,0);
+        LED_Status(0, 200, 0);
 
         received = false;
         uint8_t *byteArr = (uint8_t *)calloc(350, sizeof(uint8_t));
@@ -329,6 +617,11 @@ bool APRS_poll(void)
                 // log_d("[LoRa] Received packet! %d Byte\n", numBytes);
                 if (numBytes > 0)
                 {
+                    if (config.rf_mode == 2)
+                    {
+                        rx_Fifo_flush();
+                        printHex(byteArr, numBytes);
+                    }
                     if (byteArr[0] == 0x7E)
                     {
                         rx_Fifo_flush();
@@ -377,14 +670,14 @@ bool APRS_poll(void)
         }
         startRx();
         ax25_poll(&AX25);
-        LED_Status(0,0,0);
+        LED_Status(0, 0, 0);
     }
     else
     {
         if (ax25_stateTx)
-        {            
+        {
             ax25_stateTx = false;
-            LED_Status(200,0,0);
+            LED_Status(200, 0, 0);
             // flagTx = true;
             uint8_t *byteArr = (uint8_t *)calloc(250, sizeof(uint8_t));
             if (byteArr)
@@ -394,24 +687,102 @@ bool APRS_poll(void)
                 memset(byteArr, 0, 250);
                 for (i = 0; i < 250; i++)
                 {
+                    if (i < 3)
+                    {
+                        byteArr[i] = 0x7E;
+                        continue;
+                    }
+
                     int c = tx_getchar();
                     if (c == -1)
+                    {
                         break;
+                    }
                     else
+                    {
                         byteArr[i] = (uint8_t)c;
+                    }
 
                     // Serial.printf("%0X ",byteArr[i]);
                 }
+                if (config.rf_mode == 2)
+                {
 
-                // transmissionState = radioHal->startTransmit(byteArr, i);
-                radioHal->transmit(byteArr, i);
+uint8_t rawdata[] ={0xe4,0x5b,0xf7,0x42,0xb,0xfb,0x6c,0xf3,0x25,0x33,0xf3,0x8f,0xd1,0x8b,0x2c,0x14,0xcf,0xdc,0x4,0x1,0xc,0x33,0x12,0xf8,0x47,0xe5,0x66,0x9c,0x94,0x9b,0xd0,0x14,0x55,0x42,0x4c,0x42};
+//uint8_t rawdata[] ={0xb,0xfb,0x6c,0xf3,0x25,0x33,0xf3,0x8f,0xd1,0x8b,0x2c,0x14,0xcf,0xdc,0x4,0x1,0xc,0x33,0x12,0xf8,0x47,0xe5,0x66,0x9c,0x94,0x9b,0xd0,0x14,0x55,0x42,0x4c,0x42};
+//uint8_t rawdata[] = {0xa0,0xa0,0xa0,0xa0,0xa0,0x60,0x60,0x90,0xa6,0x6a,0xa8,0xa2,0x82,0xf1,0x5,0xe0,0xc1,0xec,0xb0,0x38,0xd8,0x40,0x38,0xb6,0x5e,0xc0,0x3e,0x81,0x34,0xb0,0xba,0xf8};
+uint8_t rawnrzi[] ={0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0xca,0xca,0xca,0xca,0xca,0x8a,0x8a,0xda,0xc8,0x8c,0x32,0xcb,0xd4,0x5,0x56,0xf5,0x15,0xf1,0x3a,0xbd,0xe2,0x6a,0xbd,0x38,0x9f,0xea,0x40,0x2a,0xb9,0x3a,0xc3,0x2};
+// uint8_t outputData[sizeof(rawdata)];
+//  invertLSB(rawdata,outputData,sizeof(rawdata));
+//  byteArr[4]=0xa0;
+//  byteArr[5]=0xa0;
+//  byteArr[6]=0xa0;
+//  byteArr[7]=0xa0;
+// for(int a=0;a<i;a++) byteArr[a]=0x7e;
+i=sizeof(rawnrzi);
+uint8_t outputDataLSB[i];
+                    //invertLSB(rawnrzi,outputDataLSB,i);
+                    size_t inputLength = i;
+                     //Estimate maximum output length
+                    // size_t outputNRZILength = i; //(i * BITS_PER_BYTE + BITS_PER_BYTE - 1) / BITS_PER_BYTE;
+                    // uint8_t outputNRZIData[outputNRZILength];
+                    // outputNRZILength = nrziEncode(outputDataLSB, i, outputNRZIData);
+                    // //nrzi_encode(byteArr,outputNRZIData,i);
+                    // log_d("DataLength=%d, NRZI_Lenght=%d", i, outputNRZILength);
+                    // printHex(outputDataLSB, i);
+                    // printHex(outputNRZIData, outputNRZILength);
+
+                    // // uint8_t inputData[] = {0x5A, 0xC3}; // Example data
+
+                    uint8_t outputData[inputLength];
+lfsr = lfsr_register = 0x1FFFF;
+                    //lfsr_enscramble(rawnrzi, outputData,i);
+                    // for(int i=0;i<0xFFFFFF;i++){
+                    //     lfsr = i;
+                    //     lfsr_register = i;
+                    //lfsr = lfsr_register = 0x1FFFF;
+                    //lfsrScrambleLSB(rawnrzi,outputDataLSB,i);
+                    //lfsrScramble(outputDataLSB, outputData,i);
+                    lfsr_scramble(rawnrzi,outputDataLSB,i);
+                    
+                    //  //lfsr_scramble(rawnrzi, outputData, inputLength);
+                    //  //for(int x=0;x<outputNRZILength-4;x++){
+                    //  if(outputData[2]==0x36 && outputData[1]==0xdf && outputData[0]==0xd0){
+                    //     log_d("LFST=%0X%0X%0X",lfsr>>16,lfsr>>8,lfsr);
+                    //     break;
+                    //  }
+                    //  //}
+                    // }
+                    //lfsr_scramble(outputNRZIData, outputData, inputLength);
+//invertLSB(outputData,outputDataLSB,i);
+                    //printHex(outputData, inputLength);
+                    printHex(outputDataLSB, inputLength);
+                    invertLSB(outputDataLSB,outputData,i);
+                    radioHal->setDataShaping(RADIOLIB_SHAPING_0_5);
+                    radioHal->setEncoding(RADIOLIB_ENCODING_NRZ);
+                    radioHal->fixedPacketLengthMode(inputLength);
+                    radioHal->transmit(outputData, inputLength);
+
+                    //radioHal->transmit(rawdata, i);
+                    // uint8_t outputDataRaw[sizeof(rawdata)];
+                    // invertLSB(rawdata,outputDataRaw,sizeof(rawdata));
+                    // radioHal->transmit(outputDataRaw,sizeof(rawdata));
+                    // lfsr = 0x1FFFF;
+                    //                 lfsrScramble(outputData, inputLength, outputNRZIData);
+                    //printHex(outputDataLSB,inputLength);
+                    //radioHal->transmit(outputNRZIData,outputNRZILength);
+                }
+                else
+                {
+                    radioHal->transmit(byteArr, i);
+                }
                 // radioHal->setDio0Action(setFlag); // TODO: Check, is this needed?? include it inside startRX ??
                 startRx();
                 // flagTx = false;
                 free(byteArr);
                 ret = true;
             }
-            LED_Status(0,0,0);
+            LED_Status(0, 0, 0);
         }
         else
         {

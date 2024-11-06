@@ -71,8 +71,9 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 - Youtube:	[https://www.youtube.com/@HS5TQA](https://www.youtube.com/@HS5TQA)
 - TikTok:   [https://www.tiktok.com/@hs5tqa](https://www.tiktok.com/@hs5tqa)
 - Facebook:	[https://www.facebook.com/atten](https://www.facebook.com/atten)
-- LineID: nakhonline
-- WeChat: HS5TQA
+- Telegram: [https://t.me/APRSTH](https://t.me/APRSTH)
+- TelegramID: @HS5TQA
+- WeChatID: HS5TQA
 
 ## Donate
 

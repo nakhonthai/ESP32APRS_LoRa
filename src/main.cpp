@@ -39,7 +39,6 @@
 #include <Fonts/Seven_Segment24pt7b.h>
 
 #include "wireguard_vpn.h"
-#include <WiFiUdp.h>
 
 #include <WiFiClientSecure.h>
 
@@ -85,7 +84,11 @@ XPowersAXP2101 PMU;
 
 #define PIXELS_PIN 45
 
+#ifdef HELTEC_V3_GPS
+#define LED_TX 35
+#else
 #define LED_TX -1
+#endif
 #define LED_RX -1
 
 #ifdef APRS_LORA_DONGLE
@@ -134,6 +137,8 @@ bool i2c_busy = false;
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #ifdef TTGO_LORA32_V1
 #define OLED_RESET 16 // Reset pin # (or -1 if sharing Arduino reset pin)
+#elif defined(HELTEC_V3_GPS)
+#define OLED_RESET 21
 #else
 #define OLED_RESET -1
 #endif
@@ -166,12 +171,11 @@ Adafruit_miniTFTWing ss;
 #define ST7735_VTFT_CTRL_Pin 3
 #define ST7735_WIDTH 160
 #define ST7735_HEIGHT 80
+#ifdef NV3022B3
+#define ST7735_MODEL INITR_MINI160x80
+#else
 // mini 160x80, rotate left (INITR_MINI160x80_PLUGIN)
 #define ST7735_MODEL INITR_MINI160x80_PLUGIN
-#if defined(HELTEC_HTIT_TRACKER)
-#define ST7735_LED_K_Pin 21
-#elif defined(APRS_LORA_DONGLE)
-#define ST7735_LED_K_Pin 16
 #endif
 
 SPIClass TFT_SPI(HSPI);
@@ -193,6 +197,7 @@ SPIClass TFT_SPI(HSPI);
 
 // Adafruit_ST7735 display = Adafruit_ST7735(ST7735_CS_Pin,  ST7735_DC_Pin,ST7735_MOSI_Pin,ST7735_SCLK_Pin, ST7735_REST_Pin);
 Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
+
 #endif
 
 #define FORMAT_LITTLEFS_IF_FAILED true
@@ -920,6 +925,34 @@ void setupPower()
     log_d("Setting Charge Target Voltage : %d", tableVoltage[val]);
 }
 #endif
+
+void PowerOn(){
+    #ifdef ST7735_LED_K_Pin
+	ledcWrite(0, (uint32_t)config.disp_brightness);
+	#endif
+    //Power ON
+    if(config.pwr_active){
+        pinMode(config.pwr_gpio, OUTPUT);
+        digitalWrite(config.pwr_gpio, HIGH);
+    }else{
+        pinMode(config.pwr_gpio, OPEN_DRAIN);
+        digitalWrite(config.pwr_gpio, LOW);
+    }
+}
+
+void PowerOff(){
+    #ifdef ST7735_LED_K_Pin
+	ledcWrite(0, 0);
+	#endif
+    //Power OFF
+    if(config.pwr_active){
+        pinMode(config.pwr_gpio, OUTPUT);
+        digitalWrite(config.pwr_gpio, LOW);
+    }else{
+        pinMode(config.pwr_gpio, INPUT_PULLUP);
+        digitalWrite(config.pwr_gpio, HIGH);
+    }
+}
 
 char EVENT_TX_POSITION = 0;
 unsigned char SB_SPEED = 0, SB_SPEED_OLD = 0;
@@ -1987,6 +2020,8 @@ void defaultConfig()
     config.startup = 0;
 
     // Display
+    config.disp_brightness = 250;
+    config.disp_flip = false;
     config.dispDelay = 3; // Popup display 3 sec
     config.dispRF = true;
     config.dispINET = false;
@@ -2186,6 +2221,7 @@ void defaultConfig()
     config.pwr_stanby_delay = 300;   // sec
     config.pwr_sleep_activate = ACTIVATE_TRACKER | ACTIVATE_WIFI;
     config.pwr_gpio = -1;
+    config.pwr_active = 1;
 
     for (int i = 0; i < 5; i++)
     {
@@ -2244,6 +2280,7 @@ void defaultConfig()
 #endif
 
 #ifdef TTGO_LORA32_V1
+    config.rf_en = true;
     config.rf_type = RF_SX1276;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
@@ -2263,6 +2300,8 @@ void defaultConfig()
     config.i2c_enable = true;
     config.i2c_sda_pin = 4;
     config.i2c_sck_pin = 15;
+    config.pwr_gpio = 21;
+    config.pwr_active = 0;
 #elif defined(HT_CT62)
     config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
@@ -2279,9 +2318,11 @@ void defaultConfig()
     config.rf_reset_active = 0;
     config.rf_nss_active = 0;
 #elif defined(ESP32_DIY_LoRa_GPS) || defined(TTGO_T_LORA32_V2_1_GPS)
+    config.rf_en = true;
+    config.rf_type = RF_SX1278;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = -1;
+    config.rf_dio1_gpio = 26;
     config.rf_reset_gpio = 23;
     config.rf_busy_gpio = -1;
     config.rf_nss_gpio = 18;
@@ -2292,9 +2333,13 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_nss_active = 0;
     config.rf_reset_active = 0;
-    config.gnss_enable = true;
-    config.gnss_tx_gpio = 12;
-    config.gnss_rx_gpio = 34;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 4;
+    config.i2c_sck_pin = 15;
+    config.pwr_gpio = 21;
+    config.pwr_active = 0;
 #elif defined(TTGO_T_Beam_V1_2)
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
@@ -2351,7 +2396,9 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
-#elif defined(HELTEC_V3_GPS)
+#elif defined(HELTEC_V3_GPS)    
+    config.rf_en = true;
+    config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 14;
@@ -2366,13 +2413,20 @@ void defaultConfig()
     config.rf_nss_active = 0;
     config.rf_reset_active = 0;
     config.gnss_enable = true;
-    config.gnss_tx_gpio = 20;
-    config.gnss_rx_gpio = 19;
+    config.gnss_channel = 2;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 19;
+    config.uart1_tx_gpio = 20;
+    config.uart1_rts_gpio = -1;
     config.i2c_enable = true;
     config.i2c_sda_pin = 17;
     config.i2c_sck_pin = 18;
-    config.i2c_rst_pin = 21;
+    config.pwr_gpio = 36;
+    config.pwr_active = 0;
 #elif defined(TTGO_T_Beam_V1_0_SX1268) || defined(TTGO_T_Beam_V1_2_SX1262)
+    config.rf_en = true;
+    config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 33;
@@ -2420,6 +2474,7 @@ void defaultConfig()
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 47;
     config.pwr_gpio = 41;
+    config.pwr_active = 1;
     sprintf(config.wifi_ap_ssid, "LoRa_HT");
     sprintf(config.wifi_ap_pass, "aprsthnetwork");
 #elif defined(HELTEC_HTIT_TRACKER)
@@ -2449,6 +2504,7 @@ void defaultConfig()
     config.i2c_sda_pin = -1;
     config.i2c_sck_pin = -1;
     config.pwr_gpio = 3;
+    config.pwr_active = 1;
 #elif defined(APRS_LORA_DONGLE)
     config.rf_en = true;
     config.rf_type = RF_SX1276;
@@ -2488,6 +2544,7 @@ void defaultConfig()
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 47;
     config.pwr_gpio = 17;
+    config.pwr_active = 1;
 #endif
 
     config.i2c_freq = 400000;
@@ -2520,6 +2577,7 @@ void defaultConfig()
     config.wifi_mode |= WIFI_AP_FIX;
     config.log |= 1;
     config.pwr_gpio = 2;
+    config.pwr_active = 1;
     sprintf(config.trk_symbol, "\\N");
     config.trk_gps = true;
     config.trk_loc2rf = true;
@@ -3272,11 +3330,13 @@ RTC_DATA_ATTR uint8_t curTab;
 
 void preTransmission()
 {
+    pinMode(config.modbus_de_gpio,OUTPUT);
     digitalWrite(config.modbus_de_gpio, 1);
 }
 
 void postTransmission()
 {
+    pinMode(config.modbus_de_gpio,OUTPUT);
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
@@ -3336,6 +3396,9 @@ void setup()
 #ifdef HELTEC_HTIT_TRACKER
     pinMode(2, INPUT_PULLUP); // ADC_Ctl
     digitalWrite(2, HIGH);
+#elif defined(HELTEC_V3_GPS)
+    pinMode(37, INPUT_PULLUP); // ADC_Ctl
+    digitalWrite(37, HIGH);
 #endif
 
     // Set up serial port
@@ -3387,8 +3450,7 @@ void setup()
 #endif
 
     Sleep_Activate = config.pwr_sleep_activate;
-    pinMode(config.pwr_gpio, OUTPUT);
-    digitalWrite(config.pwr_gpio, HIGH);
+    PowerOn();
 
     if (config.i2c1_enable)
     {
@@ -3456,6 +3518,10 @@ void setup()
     // Initialising the UI will init the display too.
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
+        if(config.disp_flip)
+            display.setRotation(3);
+        else
+            display.setRotation(1);
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(WHITE);
@@ -3528,11 +3594,25 @@ void setup()
 #ifdef ST7735_160x80
     TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
     TFT_SPI.setFrequency(40000000);
-    pinMode(ST7735_LED_K_Pin, OUTPUT);
-    digitalWrite(ST7735_LED_K_Pin, HIGH);
+    //pinMode(ST7735_LED_K_Pin, OUTPUT);
+    ledcSetup(0,5000,8);
+    ledcAttachPin(ST7735_LED_K_Pin,0);
+    ledcWrite(0, config.disp_brightness);
     display.initR(ST7735_MODEL); // initialize a ST7735S chip, mini display
-    display.setRotation(1);
+    if(config.disp_flip)
+        display.setRotation(3);
+    else
+        display.setRotation(1);
+    #ifdef NV3022B3
+    uint8_t madctl = 0;
+    madctl = ST77XX_MADCTL_MY| ST77XX_MADCTL_MX | ST77XX_MADCTL_MV | ST77XX_MADCTL_RGB;
+    display.sendCommand(ST77XX_MADCTL, &madctl, 1);
+    display.invertDisplay(true);
+    #else
     display.invertDisplay(false);
+    #endif
+    display.setAddrWindow(0,0,160,80);   
+    display.enableDisplay(true);
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
         display.fillScreen(ST77XX_BLACK);
@@ -3753,7 +3833,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        8192,            /* Stack size in words */
+        4096,            /* Stack size in words */
         NULL,            /* Task input parameter */
         2,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -3764,7 +3844,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        12000,              /* Stack size in words */
+        10000,              /* Stack size in words */
         NULL,               /* Task input parameter */
         0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -4624,6 +4704,11 @@ void loop()
         analogSetAttenuation(ADC_11db);
         digitalWrite(2, HIGH);
         VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+#elif defined(HELTEC_V3_GPS)   
+        analogReadResolution(12);
+        analogSetAttenuation(ADC_11db);
+        digitalWrite(37, HIGH);
+        VBat = (double)analogReadMilliVolts(1) / 201.15357F;     
 #elif defined(APRS_LORA_HT)
         VBat = (double)analogReadMilliVolts(3) / 595.24F;
 #elif defined(BUOY)
@@ -4661,7 +4746,7 @@ void loop()
 
         if (VBat < 3.3F)
         {
-            digitalWrite(config.pwr_gpio, LOW);
+            PowerOff();
             if (VBat < 3.0F)
             {
                 esp_sleep_enable_timer_wakeup(600 * uS_TO_S_FACTOR);
@@ -4793,6 +4878,9 @@ void loop()
                     save_act = true;
                 showDisp = true;
                 timeSec = timeHalfSec = millis();
+                #ifdef ST7735_LED_K_Pin
+				ledcWrite(0, (uint32_t)config.disp_brightness);
+				#endif
                 // if (oledSleepTimeout > 0)
                 //{
                 curTab++;
@@ -4881,7 +4969,7 @@ void loop()
                             display.clearDisplay();
                             display.display();
 #elif defined(ST7735_160x80)
-                            // digitalWrite(ST7735_LED_K_Pin, LOW);
+                            ledcWrite(0, 5);
 #endif
                             i2c_busy = false;
                         }
@@ -4962,7 +5050,9 @@ void loop()
                         log_d("System to save mode A %d Sec", config.pwr_sleep_interval);
                         StandByTick = millis() + (config.pwr_sleep_interval * 1000);
                         vTaskSuspend(taskSensorHandle);
-                        digitalWrite(config.pwr_gpio, LOW);
+                        //Power OFF
+                        PowerOff();
+
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
                         PMU.disableDC5();
                         PMU.disableALDO1(); // QMC6310,BME280,OLED
@@ -4989,7 +5079,7 @@ void loop()
 #else
                         setCpuFrequencyMhz(160);
 #endif
-                        digitalWrite(config.pwr_gpio, HIGH);
+                        PowerOn();
                         sensorInit(false);
                         delay(100);
                         vTaskResume(taskSensorHandle);
@@ -5024,10 +5114,11 @@ void loop()
                         // sleep_timer = millis() + (config.pwr_sleep_interval * 1000);
                         StandByTick = millis() + (config.pwr_sleep_interval * 1000);
                         vTaskDelete(taskSensorHandle);
-                        digitalWrite(config.pwr_gpio, LOW);
+                        PowerOff();
                         adc_power_off();
                         vTaskDelete(taskNetworkHandle);
                         WiFi.disconnect(true); // Disconnect from the network
+                        WiFi.persistent(false);
                         WiFi.mode(WIFI_OFF);   // Switch WiFi off
 
                         // vTaskSuspend(taskNetworkHandle);
@@ -5090,7 +5181,7 @@ void loop()
                         adc_power_on();
                         // WiFi.disconnect(false);  // Reconnect the network
                         // WiFi.mode(WIFI_STA);    // Switch WiFi off
-                        digitalWrite(config.pwr_gpio, HIGH);
+                        PowerOn();
                         sensorInit(false);
                         delay(100);
                         vTaskResume(taskSensorHandle);
@@ -5150,7 +5241,7 @@ void loop()
                     log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
                     // radioSleep();
                     // esp_deep_sleep_enable_gpio_wakeup(BIT(DEFAULT_WAKEUP_PIN), DEFAULT_WAKEUP_LEVEL));
-                    digitalWrite(config.pwr_gpio, LOW);
+                    PowerOff();                   
                     // delay(100);
                     // esp_sleep_enable_ext0_wakeup(GPIO_NUM_14,LOW);
                     radioSleep();
@@ -7805,8 +7896,32 @@ void taskNetwork(void *pvParameters)
                 {
                     log_d("GW Fail!\n");
                     WiFi.disconnect();
-                    wifiMulti.run(5000);
+                    WiFi.persistent(false);
+                    WiFi.mode(WIFI_OFF);   // Switch WiFi off
+                    
                     wifiTTL = 0;
+                    delay(3000);
+                    if (config.wifi_mode == WIFI_STA_FIX)
+                    { /**< WiFi station mode */
+                        WiFi.mode(WIFI_MODE_STA);
+                        WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                    }
+                    else if (config.wifi_mode == WIFI_AP_FIX)
+                    { /**< WiFi soft-AP mode */
+                        WiFi.mode(WIFI_MODE_AP);
+                        WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                    }
+                    else if (config.wifi_mode == WIFI_AP_STA_FIX)
+                    { /**< WiFi station + soft-AP mode */
+                        WiFi.mode(WIFI_MODE_APSTA);
+                        WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                    }
+                    else
+                    {
+                        WiFi.mode(WIFI_MODE_NULL);
+                    }
+                    WiFi.reconnect();
+                    wifiMulti.run(5000);                    
                 }
                 if (config.vpn)
                 {
@@ -7988,7 +8103,7 @@ void dispTxWindow(txDisp txs)
 #elif defined(ST7735_160x80)
     display.fillScreen(ST77XX_BLACK);
     display.setTextColor(ST77XX_BLUE);
-    digitalWrite(ST7735_LED_K_Pin, HIGH);
+    ledcWrite(0, config.disp_brightness);
     disp_delay = config.dispDelay * 1000;
     timeHalfSec = millis() + disp_delay;
 
@@ -8822,7 +8937,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
             display.display();
 #elif defined(ST7735_160x80)
             display.fillScreen(ST77XX_BLACK);
-            digitalWrite(ST7735_LED_K_Pin, HIGH);
+            ledcWrite(0, config.disp_brightness);
             if (dispPush)
             {
                 disp_delay = 600 * 1000;
@@ -9450,8 +9565,8 @@ void statisticsDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(20, 7);
     display.setTextSize(1);
@@ -9608,8 +9723,8 @@ void pkgLastDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(30, 7);
     display.setTextSize(1);
@@ -9773,8 +9888,8 @@ void pkgCountDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
     display.setTextSize(1);
@@ -9928,8 +10043,8 @@ void systemDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
     display.setTextSize(1);
@@ -10062,8 +10177,8 @@ void wifiDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
     display.setTextSize(1);
@@ -10199,8 +10314,8 @@ void radioDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(25, 7);
     display.setTextSize(1);
@@ -10298,8 +10413,8 @@ void sensorDisp()
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    display.drawRect(0, 16, 160, 64, WHITE);
-    display.fillRect(1, 17, 158, 62, BLACK);
+    //display.drawRect(0, 16, 160, 64, WHITE);
+    display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
     display.setTextSize(1);
@@ -10471,8 +10586,8 @@ void gpsDisp()
     if (gps_mode == 0)
     {
         display.fillRect(0, 0, 160, 15, WHITE);
-        display.drawRect(0, 16, 160, 64, WHITE);
-        display.fillRect(1, 17, 158, 62, BLACK);
+        //display.drawRect(0, 16, 160, 64, WHITE);
+        display.fillRect(0, 15, 160, 64, BLACK);
 
         display.setCursor(35, 7);
         display.setTextSize(1);

@@ -19,6 +19,8 @@
 #include <SHTSensor.h>
 #include <ModbusMaster.h>
 #include <TinyGPS++.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 extern Configuration config;
 extern WiFiClient aprsClient;
@@ -37,6 +39,8 @@ Adafruit_BMP280 *bmp280=NULL; // I2C
 Adafruit_Si7021 *Si7021=NULL;
 Adafruit_CCS811 *ccs=NULL;
 SHTSensor *sht=NULL; // Supported sensors:SHTC1, SHTC3, SHTW1, SHTW2, SHT3x-DIS (I2C), SHT2x, SHT85, SHT3x-ARP, SHT4x
+OneWire *oneWire=NULL;
+DallasTemperature *ds1820;
 
 SensorData sen[SENSOR_NUMBER];
 
@@ -218,6 +222,14 @@ bool getBAT(uint8_t port)
             VBat = (double)analogReadMilliVolts(1) / 204.08F;  //390k/100k Voltage divider
             sensorUpdate(i, VBat + 0.285F); //Add offset 0.285V
             digitalWrite(2, LOW);
+#elif defined(HELTEC_V3_GPS)
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            digitalWrite(37, HIGH);
+            delay(10);
+            VBat = (double)analogReadMilliVolts(1) / 204.08F;  //390k/100k Voltage divider
+            sensorUpdate(i, VBat + 0.285F); //Add offset 0.285V
+            digitalWrite(37, LOW);
 #elif defined(APRS_LORA_HT)
             VBat = (double)analogReadMilliVolts(3) / 595.24F;
             sensorUpdate(i, VBat);
@@ -250,6 +262,23 @@ bool getLOGIC(uint8_t port)
             if(digitalRead((uint8_t)config.sensor[i].address)) val=1;
             sensorUpdate(i, (double)val);
             cnt0 = 0;
+            break;
+        }
+    }
+    return true;
+}
+
+bool getDS1820(uint8_t port)
+{
+    ds1820->requestTemperatures();
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+    {
+        if(!config.sensor[i].enable) continue;
+        if (config.sensor[i].port == port)
+        {
+            float val=0;
+            val=ds1820->getTempCByIndex(config.sensor[i].address);
+            sensorUpdate(i, (double)val);
             break;
         }
     }
@@ -758,7 +787,7 @@ bool getModbus16Bit(ModbusMaster &node, int i)
 {
     uint8_t result;
     uint16_t addr = config.sensor[i].address % 1000;
-
+log_d("Modbus Reg=%d",addr);
     result = node.readHoldingRegisters(addr, 1);
     if (result == node.ku8MBSuccess)
     {
@@ -1050,7 +1079,10 @@ bool getSensor(int cfgIdx)
         break;
     case PORT_LOGIC:
         getLOGIC(port);
-        break;        
+        break; 
+    case PORT_DS1820:
+        getDS1820(port);
+        break;       
     default:
         log_d("Sensor Not config");
         break;
@@ -1313,7 +1345,17 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C1 port");
             }
             break;
+        case PORT_DS1820:
+            if(oneWire!=NULL)
+            {
+                ds1820 = new DallasTemperature(oneWire);
+                ds1820->begin();                
+            }else{
+                log_d("Not enable 1-Wire port");
+            }
+            break;
         }
+                    
     }
 }
 
@@ -1326,6 +1368,10 @@ void taskSensor(void *pvParameters)
     pinMode(2, INPUT_PULLUP);
     pinMode(1, ANALOG);
     digitalWrite(2, HIGH);
+#elif defined(HELTEC_V3_GPS)
+    pinMode(37, INPUT_PULLUP);
+    pinMode(1, ANALOG);
+    digitalWrite(37, HIGH);
 #elif defined(BUOY)
     pinMode(0, ANALOG);
 #endif
@@ -1348,6 +1394,11 @@ void taskSensor(void *pvParameters)
     if (config.i2c1_enable)
     {
         Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
+    }
+
+    if(config.onewire_enable)
+    {
+        oneWire = new OneWire(config.onewire_gpio);
     }
 
     sensorInit(true);
