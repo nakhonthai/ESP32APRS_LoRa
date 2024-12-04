@@ -1335,7 +1335,7 @@ int ParseAPRS::parse_aprs_uncompressed(struct pbuf_t *pb, const char *body, cons
 			   &lat_deg, &lat_min, &lat_min_frag, &lat_hemi, &sym_table,
 			   &lng_deg, &lng_min, &lng_min_frag, &lng_hemi, &sym_code) != 10)
 	{
-		log_d("\tsscanf failed");
+		log_d("\tsscanf failed posbuf=%s",posbuf);
 		return 0;
 	}
 
@@ -1412,7 +1412,7 @@ int ParseAPRS::parse_aprs_object(struct pbuf_t *pb, const char *body, const char
 
 	pb->packettype |= T_OBJECT;
 
-	log_d("parse_aprs_object");
+	log_d("parse_aprs_object info=%s",body);
 
 	/* check that the object name ends with either * or _ */
 	if (*(body + 9) != '*' && *(body + 9) != '_')

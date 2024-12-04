@@ -27,6 +27,12 @@ public:
   virtual int16_t setFrequency(float freq) = 0;
   virtual int16_t setEncoding(uint8_t encoding) = 0;
   virtual void setRfSwitchPins(uint8_t rxEnPin, uint8_t txEnPin) = 0;
+  virtual bool fifoAdd(uint8_t* data, int totalLen, int* remLen) = 0;
+  virtual bool fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen);
+  virtual void setFifoEmptyAction(void (*func)(void)) = 0;
+  virtual void setFifoFullAction(void (*func)(void)) = 0;
+  virtual int16_t setCurrentLimit(float currentLimit) = 0;
+  virtual int16_t setOutputPower(int8_t power) = 0;
 };
 
 
@@ -58,9 +64,23 @@ public:
   int16_t startReceive(uint8_t len = 0, uint8_t mode = RADIOLIB_SX127X_RXCONTINUOUS);
 
   int16_t transmit(uint8_t* data, size_t len, uint8_t addr = 0)
-  {
+  {    
     return radio->transmit(data, len, addr);
   }
+
+  bool fifoAdd(uint8_t* data, int totalLen, int* remLen);
+  bool fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen);
+  
+  int16_t setCurrentLimit(float currentLimit);
+
+  int16_t setOutputPower(int8_t power);
+
+  void setFifoEmptyAction(void (*func)(void));
+
+  void setFifoFullAction(void (*func)(void));
+  // {
+  //   radio->setFifoEmptyAction(func);
+  // }
 
   int16_t sleep()
   {

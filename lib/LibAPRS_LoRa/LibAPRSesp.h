@@ -14,7 +14,7 @@
 #include "RadioHal.hpp"
 #include "../../include/config.h"
 
-void APRS_init(Configuration *cfg);
+bool APRS_init(Configuration *cfg);
 bool APRS_poll(void);
 
 void APRS_setCallsign(char *call, int ssid);
@@ -41,7 +41,7 @@ void APRS_sendMsg(void *_buffer, size_t length);
 void APRS_msgRetry();
 
 void APRS_printSettings();
-void APRS_sendTNC2Pkt(String raw);
+void APRS_sendTNC2Pkt(uint8_t *raw,size_t length);
 
 void APRS_setFreq(float freq);
 
@@ -52,5 +52,7 @@ int APRS_getTNC2Pkt(uint8_t *raw,String info);
 
 int freeMemory();
 void radioSleep();
+
+void taskADDFifo(void *pvParameters);
 
 #endif

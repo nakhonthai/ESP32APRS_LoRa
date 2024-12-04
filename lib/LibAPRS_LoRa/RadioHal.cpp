@@ -453,6 +453,12 @@ int16_t RadioHal<SX1279>::startReceive(uint8_t len, uint8_t mode)
 template<>
 int16_t RadioHal<SX1278>::startReceive(uint8_t len, uint8_t mode)
 {
+    //radio->setRSSIThreshold(-90.0);
+    //radio->setOOK(false);
+    // radio->disableAddressFiltering();
+    //radio->disableBitSync();
+    // radio->fixedPacketLengthMode(64);
+    //radio->setGain(6);
     return radio->startReceive(len, mode);
 }
 
@@ -829,8 +835,7 @@ template<>
 int16_t RadioHal<SX1278>::setEncoding(uint8_t encoding) 
 {
     if (encoding == 10)
-        encoding = 0;
-
+        encoding = 0; 
     return radio->setEncoding(encoding);
 }
 
@@ -913,4 +918,406 @@ int16_t RadioHal<SX1282>::setEncoding(uint8_t encoding)
         encoding = 1;
 
     return radio->setEncoding(encoding);
+}
+
+template<>
+bool RadioHal<SX1272>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return radio->fifoAdd(data,totalLen,remLen);
+}
+
+template<>
+bool RadioHal<SX1273>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return radio->fifoAdd(data,totalLen,remLen);
+}
+
+template<>
+bool RadioHal<SX1276>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return radio->fifoAdd(data,totalLen,remLen);
+}
+
+template<>
+bool RadioHal<SX1278>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return radio->fifoAdd(data,totalLen,remLen);
+}
+
+template<>
+bool RadioHal<SX1279>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return radio->fifoAdd(data,totalLen,remLen);
+}
+
+template<>
+bool RadioHal<SX1268>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1262>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1261>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1280>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1281>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1282>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+{
+    return false;
+}
+
+template<>
+void RadioHal<SX1272>::setFifoEmptyAction(void (*func)(void))
+{
+    radio->setFifoEmptyAction(func);
+}
+
+template<>
+void RadioHal<SX1273>::setFifoEmptyAction(void (*func)(void))
+{
+    radio->setFifoEmptyAction(func);
+}
+
+template<>
+void RadioHal<SX1276>::setFifoEmptyAction(void (*func)(void))
+{
+    radio->setFifoEmptyAction(func);
+}
+
+template<>
+void RadioHal<SX1278>::setFifoEmptyAction(void (*func)(void))
+{
+    radio->setFifoEmptyAction(func);
+}
+
+template<>
+void RadioHal<SX1279>::setFifoEmptyAction(void (*func)(void))
+{
+    radio->setFifoEmptyAction(func);
+}
+
+template<>
+void RadioHal<SX1261>::setFifoEmptyAction(void (*func)(void))
+{
+
+}
+
+template<>
+void RadioHal<SX1262>::setFifoEmptyAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1268>::setFifoEmptyAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1280>::setFifoEmptyAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1281>::setFifoEmptyAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1282>::setFifoEmptyAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1272>::setFifoFullAction(void (*func)(void))
+{
+    radio->setFifoFullAction(func);
+}
+
+template<>
+void RadioHal<SX1273>::setFifoFullAction(void (*func)(void))
+{
+    radio->setFifoFullAction(func);
+}
+
+template<>
+void RadioHal<SX1276>::setFifoFullAction(void (*func)(void))
+{
+    radio->setFifoFullAction(func);
+}
+
+template<>
+void RadioHal<SX1278>::setFifoFullAction(void (*func)(void))
+{
+    radio->clearFifoFullAction();
+    radio->setFifoFullAction(func);
+}
+
+template<>
+void RadioHal<SX1279>::setFifoFullAction(void (*func)(void))
+{
+    radio->setFifoFullAction(func);
+}
+
+template<>
+void RadioHal<SX1261>::setFifoFullAction(void (*func)(void))
+{
+
+}
+
+template<>
+void RadioHal<SX1262>::setFifoFullAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1268>::setFifoFullAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1280>::setFifoFullAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1281>::setFifoFullAction(void (*func)(void))
+{
+    
+}
+
+template<>
+void RadioHal<SX1282>::setFifoFullAction(void (*func)(void))
+{
+    
+}
+
+template<>
+bool RadioHal<SX1272>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return radio->fifoGet(data,totalLen,rcvLen);
+}
+
+template<>
+bool RadioHal<SX1273>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return radio->fifoGet(data,totalLen,rcvLen);
+}
+
+template<>
+bool RadioHal<SX1276>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return radio->fifoGet(data,totalLen,rcvLen);
+}
+
+template<>
+bool RadioHal<SX1278>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return radio->fifoGet(data,totalLen,rcvLen);
+}
+
+template<>
+bool RadioHal<SX1279>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return radio->fifoGet(data,totalLen,rcvLen);
+}
+
+template<>
+bool RadioHal<SX1268>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1262>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1261>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1280>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1281>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return false;
+}
+
+template<>
+bool RadioHal<SX1282>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+{
+    return false;
+}
+
+template<>
+int16_t RadioHal<SX1272>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1273>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1276>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1278>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1279>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1268>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1262>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1261>::setCurrentLimit(float currentLimit)
+{
+    return radio->setCurrentLimit(currentLimit);
+}
+
+template<>
+int16_t RadioHal<SX1280>::setCurrentLimit(float currentLimit)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1281>::setCurrentLimit(float currentLimit)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1282>::setCurrentLimit(float currentLimit)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1272>::setOutputPower(int8_t power)
+{
+    if(power>17) power=20;
+    return radio->setOutputPower(power);
+}
+
+template<>
+int16_t RadioHal<SX1273>::setOutputPower(int8_t power)
+{
+    if(power>17) power=20;
+    return radio->setOutputPower(power);
+}
+
+template<>
+int16_t RadioHal<SX1276>::setOutputPower(int8_t power)
+{
+    if(power>17) power=20;
+    return radio->setOutputPower(power);
+}
+
+template<>
+int16_t RadioHal<SX1278>::setOutputPower(int8_t power)
+{
+    if(power>17) power=20;
+    return radio->setOutputPower(power);
+}
+
+template<>
+int16_t RadioHal<SX1279>::setOutputPower(int8_t power)
+{
+    if(power>17) power=20;
+    return radio->setOutputPower(power);
+}
+
+template<>
+int16_t RadioHal<SX1268>::setOutputPower(int8_t power)
+{
+    return false;
+}
+
+template<>
+int16_t RadioHal<SX1262>::setOutputPower(int8_t power)
+{
+    return false;
+}
+
+template<>
+int16_t RadioHal<SX1261>::setOutputPower(int8_t power)
+{
+    return false;
+}
+
+template<>
+int16_t RadioHal<SX1280>::setOutputPower(int8_t power)
+{
+    return false;
+}
+
+template<>
+int16_t RadioHal<SX1281>::setOutputPower(int8_t power)
+{
+    return false;
+}
+
+template<>
+int16_t RadioHal<SX1282>::setOutputPower(int8_t power)
+{
+    return false;
 }

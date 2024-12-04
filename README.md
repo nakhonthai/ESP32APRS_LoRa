@@ -4,8 +4,11 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
  
 
 ## Feature
-* Supported APRS on AX.25 Protocol
-* Supported hardware: TTGO_LoRa32,TTGO T-Beam V1.2,LILYGO T-Beam Supreme,Heltec HTIT-Tracker,HT-CT62,D.I.Y Mod GPIO
+* Support (G)FSK Modem for D.I.Y
+* Support GFSK9600(G3RUH) Modem for APRS(Test by Direwolf,VX8-DR,FTM-350,FTM-400DR TX Delay 100mS)
+* Support AIS (Automatic Identification System) RX Only, IGate by APRS-CB recommend.
+* Support APRS on AX.25 Protocol
+* Support hardware: TTGO_LoRa32,TTGO T-Beam V1.2,LILYGO T-Beam Supreme,Heltec HTIT-Tracker,HT-CT62,TTGO T-Beam V1.2, TTGO LoRa32 (T3) V1.6, Heltec LoRa V3 and D.I.Y Mod GPIO
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
@@ -13,7 +16,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 * Support TNC External mod select UART0-2 and Yaesu packet
 * Support APRS IGATE/DIGI/WX with fix position for move position from GNSS
 * Using ESP-Arduino development on Visual studio code + Platform IO
-* Support LoRa Chip SX1231,SX1233,SX1261,SX1262,SX1268,SX12732,SX1273,SX1276,SX1278,SX1279,SX1280,SX1281,SX1282
+* Support LoRa Chip SX1261,SX1262,SX1268,SX1273,SX1273,SX1276,SX1278,SX1279,SX1280,SX1281,SX1282
 * Support Frequncy by LoRa Chip 137Mhz-1020Mhz
 * Support monitor display information and statistices
 * Support Wi-Fi multi station or WiFi Access point

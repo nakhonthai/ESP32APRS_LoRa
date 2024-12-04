@@ -54,6 +54,13 @@
 #define RF_SX127x	23
 #define RF_SX128x	24
 
+#define RF_MODE_OFF		0
+#define RF_MODE_LoRa 	1
+#define RF_MODE_G3RUH 	2
+#define RF_MODE_AIS 	3
+#define RF_MODE_GFSK	4
+#define RF_MODE_DPRS	5
+
 #define MODE_A	0
 #define MODE_B	1
 #define MODE_C	2
@@ -92,14 +99,18 @@ typedef struct Config_Struct
 	uint8_t rf_mode;
 	float rf_freq;
 	int16_t rf_freq_offset; //+-30,000Hz
-	float rf_bw;
+	float rf_bw; //Band Width for LoRa/GFSK
+	float rf_br; //Baud Rate for GFSK
 	uint8_t rf_sf;
 	uint8_t rf_cr;
 	uint8_t rf_sync;
 	int8_t rf_power;
 	uint8_t rf_preamable;
 	uint8_t rf_lna;
-	bool rf_dio2Sw;
+	bool rf_ax25;
+	uint8_t rf_shaping;
+	uint8_t rf_encoding;
+	
 
 	// IGATE
 	bool igate_en;
@@ -289,12 +300,12 @@ typedef struct Config_Struct
 	char gnss_tcp_host[20];
 	char gnss_at_command[30];
 
-	unsigned long rf_baudrate;
 	int8_t rf_tx_gpio = -1; //LORA ANTENNA TX ENABLE
 	int8_t rf_rx_gpio = -1;
 	int8_t rf_dio1_gpio = 3;
 	int8_t rf_reset_gpio = 5;
-	int8_t rf_busy_gpio = 4;
+	int8_t rf_dio0_gpio = 4;
+	int8_t rf_dio2_gpio = -1;
 	int8_t rf_nss_gpio = 8;
 	int8_t rf_sclk_gpio = 10;
 	int8_t rf_miso_gpio = 6;

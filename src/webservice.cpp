@@ -130,7 +130,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "<div class=\"header\">\n";
 	// webString += "<div style=\"font-size: 8px; text-align: right; padding-right: 8px;\">ESP32IGate Firmware V" + String(VERSION) + "</div>\n";
 	// webString += "<div style=\"font-size: 8px; text-align: right; padding-right: 8px;\"><a href=\"/logout\">[LOG OUT]</a></div>\n";
-	webString += "<h1>ESP32APRS_LoRa [ALL IN ONE]</h1>\n";
+	webString += "<h1>ESP32APRS_LoRa</h1>\n";
 	webString += "<div style=\"font-size: 8px; text-align: right; padding-right: 8px;\"><a href=\"/logout\">[LOG OUT]</a></div>\n";
 	webString += "<div class=\"row\">\n";
 	webString += "<ul class=\"nav nav-tabs\" style=\"margin: 5px;\">\n";
@@ -206,7 +206,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 	webString = "<script type=\"text/javascript\">\n";
 	webString += "function reloadSysInfo() {\n";
 	webString += "$(\"#sysInfo\").load(\"/sysinfo\", function () { setTimeout(reloadSysInfo, 60000) });\n";
@@ -241,12 +241,25 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "<td>Modem Mode</td>\n";
 	webString += "<td style=\"background: #ffffff;\">" + String(RF_MODE[config.rf_mode]) + "</td>\n";
 	webString += "</tr>\n";
+	webString += "<tr>\n";
 	webString += "<td>Band Width</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.rf_bw, 2) + " Khz</td>\n";
+	webString += "<td style=\"background: #ffffff;\">" + String(config.rf_bw, 1) + " Khz</td>\n";
 	webString += "</tr>\n";
-	webString += "<td>SF/CR</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.rf_sf) + "/" + String(config.rf_cr) + "</td>\n";
-	webString += "</tr>\n";
+	if (config.rf_mode == RF_MODE_LoRa)
+	{
+		webString += "<tr>\n";
+		webString += "<td>SF/CR</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.rf_sf) + "/" + String(config.rf_cr) + "</td>\n";
+		webString += "</tr>\n";
+	}
+	else
+	{
+		webString += "<tr>\n";
+		webString += "<td>Baud Rate</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.rf_br, 1) + " Kbps</td>\n";
+		webString += "</tr>\n";
+	}
+
 	webString += "<tr>\n";
 	webString += "<td>TX Power</td>\n";
 	if (config.rf_power >= 0)
@@ -545,7 +558,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<th><span>SPIFFS(KByte)</span></th>\n";
 	html += "<th><span>VBat(V)</span></th>\n";
 	html += "<th><span>Temp(C)</span></th>\n";
-#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) ||defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
+#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
 	html += "<th><span>SPIFFS(KByte)</span></th>\n";
 	html += "<th><span>VBat(V)</span></th>\n";
 #else
@@ -567,7 +580,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
 	html += "<td><b>" + String(VBat, 2) + "</b></td>\n";
 	html += "<td><b>" + String(TempNTC, 2) + "</b></td>\n";
-#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) ||defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
+#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
 	unsigned long cardTotal = LITTLEFS.totalBytes();
 	unsigned long cardUsed = LITTLEFS.usedBytes();
 	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
@@ -608,12 +621,25 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 	else
 		html += String(config.timeZone, 1) + ")</b></span></th>\n";
 	html += "<th style=\"min-width:16px\">ICON</th>\n";
-	html += "<th style=\"min-width:10ch\">Callsign</th>\n";
-	html += "<th>VIA LAST PATH</th>\n";
-	html += "<th style=\"min-width:5ch\">DX</th>\n";
-	html += "<th style=\"min-width:5ch\">RX</th>\n";
-	html += "<th style=\"min-width:5ch\">RSSI</th>\n";
-	html += "<th style=\"min-width:5ch\">FreqErr</th>\n";
+	if (config.rf_mode == RF_MODE_AIS)
+	{
+		html += "<th style=\"min-width:10ch\">MMSI</th>\n";
+		html += "<th style=\"min-width:5ch\">Latitude</th>\n";
+		html += "<th style=\"min-width:5ch\">Longitude</th>\n";
+		// html += "<th style=\"min-width:5ch\">Speed</th>\n";
+		html += "<th style=\"min-width:5ch\">DX</th>\n";
+		html += "<th style=\"min-width:5ch\">PKT</th>\n";
+		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
+	}
+	else
+	{
+		html += "<th style=\"min-width:10ch\">Callsign</th>\n";
+		html += "<th>VIA LAST PATH</th>\n";
+		html += "<th style=\"min-width:5ch\">DX</th>\n";
+		html += "<th style=\"min-width:5ch\">RX</th>\n";
+		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
+		html += "<th style=\"min-width:5ch\">FreqErr</th>\n";
+	}
 	html += "</tr>\n";
 
 	for (int i = 0; i < PKGLISTSIZE; i++)
@@ -701,33 +727,44 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 					{
 						html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>";
 					}
-					html += "<td>" + src_call;
-					if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
+					if (config.rf_mode == RF_MODE_AIS)
 					{
-						char itemname[10];
-						memset(&itemname, 0, sizeof(itemname));
-						memcpy(&itemname, aprs.srcname, aprs.srcname_len);
-						html += "(" + String(itemname) + ")";
-					}
-					html += +"</td>";
-					if (path == "")
-					{
-						html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
+						html += "<td>" + String(pkg.object) + "</td>";
+						html += "<td style=\"text-align: right;\">" + String(aprs.lat, 5) + "</td>";
+						html += "<td style=\"text-align: right;\">" + String(aprs.lng, 5) + "</td>";
+						// html += "<td style=\"text-align: center;\">" + String(aprs.speed,1) + "</td>";
 					}
 					else
 					{
-						String LPath = path.substring(path.lastIndexOf(',') + 1);
-						// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
-						if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
+						html += "<td>" + src_call;
+						if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
 						{
-							html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
+							char itemname[10];
+							memset(&itemname, 0, sizeof(itemname));
+							memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+							html += "(" + String(itemname) + ")";
+						}
+
+						html += +"</td>";
+						if (path == "")
+						{
+							html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
 						}
 						else
 						{
-							if (LPath.indexOf("*") > 0)
-								html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+							String LPath = path.substring(path.lastIndexOf(',') + 1);
+							// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
+							if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
+							{
+								html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
+							}
 							else
-								html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+							{
+								if (LPath.indexOf("*") > 0)
+									html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+								else
+									html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+							}
 						}
 					}
 					// html += "<td>" + path + "</td>";
@@ -774,26 +811,45 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 						}
 						html += String((int)rssi) + "dBm</td>\n";
 					}
-					if (pkg.freqErr == 0)
+					if (config.rf_mode != RF_MODE_AIS)
 					{
-						html += "<td>-</td></tr>\n";
-					}
-					else
-					{
-						html += "<td>" + String((int)pkg.freqErr) + "Hz</td></tr>\n";
+						if (pkg.freqErr == 0)
+						{
+							html += "<td>-</td></tr>\n";
+						}
+						else
+						{
+							html += "<td>" + String((int)pkg.freqErr) + "Hz</td></tr>\n";
+						}
 					}
 				}
 			}
 		}
 	}
 	html += "</table>\n";
-	char *info = (char *)calloc(html.length(), sizeof(char));
-	if (info)
+	if ((ESP.getFreeHeap() / 1000) > 120)
 	{
-		html.toCharArray(info, html.length(), 0);
-		html.clear();
-		lastheard_events.send(info, "lastHeard", millis(), 3000);
-		free(info);
+		request->send(200, "text/html", html); // send to someones browser when asked
+	}
+	else
+	{
+		size_t len = html.length();
+		char *info = (char *)calloc(len, sizeof(char));
+		if (info)
+		{
+
+			html.toCharArray(info, len, 0);
+			html.clear();
+			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
+
+			response->addHeader("Sensor", "content");
+			request->send(response);
+			free(info);
+		}
+		else
+		{
+			log_d("Can't define calloc info size %d", len);
+		}
 	}
 	// request->send(200, "text/html", html); // send to someones browser when asked
 	// delay(100);
@@ -827,12 +883,25 @@ void event_lastHeard()
 	else
 		html += String(config.timeZone, 1) + ")</b></span></th>\n";
 	html += "<th style=\"min-width:16px\">ICON</th>\n";
-	html += "<th style=\"min-width:10ch\">Callsign</th>\n";
-	html += "<th>VIA LAST PATH</th>\n";
-	html += "<th style=\"min-width:5ch\">DX</th>\n";
-	html += "<th style=\"min-width:5ch\">RX</th>\n";
-	html += "<th style=\"min-width:5ch\">RSSI</th>\n";
-	html += "<th style=\"min-width:5ch\">FreqErr</th>\n";
+	if (config.rf_mode == RF_MODE_AIS)
+	{
+		html += "<th style=\"min-width:10ch\">MMSI</th>\n";
+		html += "<th style=\"min-width:5ch\">Latitude</th>\n";
+		html += "<th style=\"min-width:5ch\">Longitude</th>\n";
+		// html += "<th style=\"min-width:5ch\">Speed</th>\n";
+		html += "<th style=\"min-width:5ch\">DX</th>\n";
+		html += "<th style=\"min-width:5ch\">PKT</th>\n";
+		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
+	}
+	else
+	{
+		html += "<th style=\"min-width:10ch\">Callsign</th>\n";
+		html += "<th>VIA LAST PATH</th>\n";
+		html += "<th style=\"min-width:5ch\">DX</th>\n";
+		html += "<th style=\"min-width:5ch\">RX</th>\n";
+		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
+		html += "<th style=\"min-width:5ch\">FreqErr</th>\n";
+	}
 	html += "</tr>\n";
 
 	for (int i = 0; i < PKGLISTSIZE; i++)
@@ -921,35 +990,46 @@ void event_lastHeard()
 					{
 						html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>";
 					}
-					html += "<td>" + src_call;
-					if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
+					if (config.rf_mode == RF_MODE_AIS)
 					{
-						char itemname[10];
-						memset(&itemname, 0, sizeof(itemname));
-						memcpy(&itemname, aprs.srcname, aprs.srcname_len);
-						html += "(" + String(itemname) + ")";
-					}
-					html += +"</td>";
-					if (path == "")
-					{
-						html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
+						html += "<td><a href=\"https://www.myshiptracking.com/vessels/pimnara-mmsi-" + String(pkg.object) + "\" target=\"_blank\">" + String(pkg.object) + "</a></td>";
+						html += "<td style=\"text-align: right;\">" + String(aprs.lat, 5) + "</td>";
+						html += "<td style=\"text-align: right;\">" + String(aprs.lng, 5) + "</td>";
+						// html += "<td style=\"text-align: center;\">" + String(aprs.speed,1) + "</td>";
 					}
 					else
 					{
-						String LPath = path.substring(path.lastIndexOf(',') + 1);
-						// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
-						if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
+						html += "<td>" + src_call;
+						if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
 						{
-							html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
+							char itemname[10];
+							memset(&itemname, 0, sizeof(itemname));
+							memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+							html += "(" + String(itemname) + ")";
+						}
+
+						html += +"</td>";
+						if (path == "")
+						{
+							html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
 						}
 						else
 						{
-							if (LPath.indexOf("*") > 0)
-								html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+							String LPath = path.substring(path.lastIndexOf(',') + 1);
+							// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
+							if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
+							{
+								pkg.rssi = 0;
+								html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
+							}
 							else
-								html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+							{
+								if (LPath.indexOf("*") > 0)
+									html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+								else
+									html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+							}
 						}
-						LPath.clear();
 					}
 					// html += "<td>" + path + "</td>";
 					if (aprs.flags & F_HASPOS)
@@ -995,13 +1075,16 @@ void event_lastHeard()
 						}
 						html += String((int)rssi) + "dBm</td>\n";
 					}
-					if (pkg.freqErr == 0)
+					if (config.rf_mode != RF_MODE_AIS)
 					{
-						html += "<td>-</td></tr>\n";
-					}
-					else
-					{
-						html += "<td>" + String((int)pkg.freqErr) + "Hz</td></tr>\n";
+						if (pkg.freqErr == 0)
+						{
+							html += "<td>-</td></tr>\n";
+						}
+						else
+						{
+							html += "<td>" + String((int)pkg.freqErr) + "Hz</td></tr>\n";
+						}
 					}
 				}
 				src_call.clear();
@@ -1012,12 +1095,13 @@ void event_lastHeard()
 	}
 	html += "</table>\n";
 	// log_d("HTML Length=%d Byte",html.length());
-	char *info = (char *)calloc(html.length(), sizeof(char));
+	size_t len = html.length();
+	char *info = (char *)calloc(len, sizeof(char));
 	if (info)
 	{
-		html.toCharArray(info, html.length(), 0);
+		html.toCharArray(info, len, 0);
 		html.clear();
-		lastheard_events.send(info, "lastHeard", millis(), 5000);
+		lastheard_events.send(info, "lastHeard", millis(), 10000);
 		free(info);
 	}
 	// lastheard_events.send(html.c_str(), "lastHeard", millis());
@@ -1029,7 +1113,7 @@ void handle_storage(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	String dirname = "/";
 	char strTime[100];
@@ -1263,10 +1347,11 @@ void handle_radio(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	// bool noiseEn=false;
 	bool radioEnable = false;
+	bool ax25Enable = false;
 	if (request->hasArg("commitRadio"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
@@ -1282,6 +1367,17 @@ void handle_radio(AsyncWebServerRequest *request)
 					if (String(request->arg(i)) == "OK")
 					{
 						radioEnable = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "ax25En")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						ax25Enable = true;
 					}
 				}
 			}
@@ -1337,6 +1433,15 @@ void handle_radio(AsyncWebServerRequest *request)
 				}
 			}
 
+			if (request->argName(i) == "rf_br")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.rf_br = request->arg(i).toFloat();
+				}
+			}
+
 			if (request->argName(i) == "freq")
 			{
 				if (request->arg(i) != "")
@@ -1379,15 +1484,45 @@ void handle_radio(AsyncWebServerRequest *request)
 						config.rf_preamable = request->arg(i).toInt();
 				}
 			}
+
+			if (request->argName(i) == "rf_shaping")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+					{
+						config.rf_shaping = request->arg(i).toInt();
+					}
+				}
+			}
+
+			if (request->argName(i) == "rf_encoding")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+					{
+						config.rf_encoding = request->arg(i).toInt();
+					}
+				}
+			}
 		}
 		// config.noise=noiseEn;
 		// config.agc=agcEn;
 		config.rf_en = radioEnable;
+		config.rf_ax25 = ax25Enable;
 		String html = "OK";
-		request->send(200, "text/html", html); // send to someones browser when asked
-		saveEEPROM();
-		delay(500);
-		APRS_init(&config);
+		if (APRS_init(&config))
+		{
+			html = "Setup completed successfully";
+			saveEEPROM();
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Setup failed.";
+			request->send(400, "text/html", html); // send to someones browser when asked
+		}
 	}
 	else
 	{
@@ -1411,14 +1546,72 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "}\n";
 		html += "});\n";
 		html += "});\n";
-		html += "function rfType(){\n";
 
-		html += "\n";
+		html += "function loraVHF(){\n";
+		html += "const rftype=Number(document.querySelector('#rf_type').value);";
+		html += "if (rftype>5 && rftype<11) {\n"; // SX127x
+		html += "document.getElementById(\"rf_bw\").value='7.8';\n";
+		html += "document.getElementById(\"rf_sync\").value=18;\n";
+		html += "document.getElementById(\"rf_sf\").value=7;\n";
+		html += "document.getElementById(\"rf_cr\").value=5;\n";
+		html += "document.getElementById(\"freq\").value=144.410;\n";
+		html += "var x = document.getElementById(\"ax25En\");\n";
+  		html += "x.checked = true;\n";
+		html += "} else {\n";
+		html += "alert(\"For chip type SX127x model.\");\n";
+		html += "}\n";
+		html += "}\n";
+
+		html += "function loraUHF(){\n";
+		html += "document.getElementById(\"rf_bw\").value='125.0';\n";
+		html += "document.getElementById(\"rf_sync\").value=18;\n";
+		html += "document.getElementById(\"rf_sf\").value=12;\n";
+		html += "document.getElementById(\"rf_cr\").value=5;\n";
+		html += "document.getElementById(\"freq\").value=433.775;\n";
+		html += "var x = document.getElementById(\"ax25En\");\n";
+  		html += "x.checked = true;\n";
+		html += "}\n";
+
+		html += "function rfMode(){\n";
+		html += "const rfmode=Number(document.querySelector('#rf_mode').value);";
+		html += "const rftype=Number(document.querySelector('#rf_type').value);";
+		//html += "console.log(rftype);";
+		html += "if (rfmode===1) {\n"; // LoRa
+		html += "document.getElementById(\"loraGrp\").disabled=false;\n";
+		html += "document.getElementById(\"gfskGrp\").disabled=true;\n";
+		html += "document.getElementById(\"rf_bw\").value='125.0';\n";
+		html += "document.getElementById(\"rf_sync\").value=18;\n";
+		html += "document.getElementById(\"rf_sf\").value=12;\n";
+		html += "document.getElementById(\"rf_cr\").value=5;\n";
+		html += "document.getElementById(\"freq\").value=433.775;\n";
+		html += "document.getElementById(\"mode_desc\").innerHTML=\"Default frequency [VHF:144.410Mhz,UHF:433.775MHz]\";\n";
+		html += "}else{";
+		html += "document.getElementById(\"loraGrp\").disabled=true;\n";
+		html += "document.getElementById(\"gfskGrp\").disabled=false;\n";
+		html += "if (rftype>5 && rftype<11) {\n"; // SX127x
+		html += "document.getElementById(\"rf_bw\").value=15.6;\n";
+		html += "document.getElementById(\"rf_br\").value=9.6;\n";
+		html += "document.getElementById(\"rf_shaping\").value=2;\n";
+		html += "document.getElementById(\"rf_encoding\").value=0;\n";
+		html += "} else {\n";
+		html += "document.getElementById(\"rf_bw\").value=14.6;\n";
+		html += "document.getElementById(\"rf_br\").value=9.7;\n";
+		html += "document.getElementById(\"rf_shaping\").value=2;\n";
+		html += "document.getElementById(\"rf_encoding\").value=0;\n";
+		html += "}\n";
+		html += "if (rfmode===3) {\n"; // AIS
+		html += "document.getElementById(\"freq\").value=161.975;\n";
+		html += "document.getElementById(\"mode_desc\").innerHTML=\"Use frequency [87B]161.975Mhz,[88B]162.025MHz RX Only.\";\n";
+		html += "}else{\n";
+		html += "document.getElementById(\"freq\").value=433.275;\n";
+		html += "if(rfmode===2) {document.getElementById(\"mode_desc\").innerHTML=\"Works with Yaesu radio VX8-DR/FTM350/FTM400 TX Delay 100mS.\";}\n";
+		html += "if(rfmode===4) {document.getElementById(\"mode_desc\").innerHTML=\"D.I.Y (G)FSK\";}\n";
+		html += "}\n}\n";
 		html += "}\n";
 		html += "</script>\n";
 		html += "<form id='formRadio' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>RF LoRa Module</b></span></th>\n";
+		html += "<th colspan=\"2\"><span><b>Radio Module</b></span></th>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Enable:</b></td>\n";
 		String radioEnFlag = "";
@@ -1429,7 +1622,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Chip Type:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"rf_type\" id=\"rf_type\" onchange=\"rfType()\">\n";
+		html += "<select name=\"rf_type\" id=\"rf_type\">\n";
 		for (int i = 0; i < 14; i++)
 		{
 			if (config.rf_type == i)
@@ -1439,67 +1632,162 @@ void handle_radio(AsyncWebServerRequest *request)
 		}
 		html += "</select>\n";
 		html += "</td>\n";
+		html += "</tr>\n";
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Mode:</b></td>\n";
+		html += "<td align=\"right\"><b>Modem Mode:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"rf_mode\" id=\"rf_mode\">\n";
-		for (int i = 0; i < 2; i++)
+		html += "<select name=\"rf_mode\" id=\"rf_mode\" onchange=\"rfMode()\">\n";
+		for (int i = 0; i < 5; i++)
 		{
 			if (config.rf_mode == i)
 				html += "<option value=\"" + String(i) + "\" selected>" + String(RF_MODE[i]) + "</option>\n";
 			else
 				html += "<option value=\"" + String(i) + "\" >" + String(RF_MODE[i]) + "</option>\n";
 		}
-		html += "</select>\n";
+		html += "</select> ";
+		if (config.rf_mode == RF_MODE_LoRa)
+		{
+			html += "<label id=\"mode_desc\"><i>Default frequency [VHF:144.410Mhz,UHF:433.775MHz]</i></label>\n";
+		}
+		else if (config.rf_mode == RF_MODE_G3RUH)
+		{
+			html += "<label id=\"mode_desc\"><i>Works with Yaesu radio VX8-DR/FTM350/FTM400 TX Delay 100mS.</i></label>\n";
+		}
+		else if (config.rf_mode == RF_MODE_GFSK)
+		{
+			html += "<label id=\"mode_desc\"><i>D.I.Y (G)FSK</i></label>\n";
+		}
+		else if (config.rf_mode == RF_MODE_AIS)
+		{
+			html += "<label id=\"mode_desc\"><i>Use frequency [87B]161.975Mhz,[88B]162.025MHz RX Only.</i></label>\n";
+		}
 		html += "</td>\n";
 		float freqMin = 137;
 		float freqMax = 1020;
-		switch (config.rf_type)
-		{
-		case RF_SX1261:
-		case RF_SX1262:
-		case RF_SX1268:
-			freqMin = 150.0F;
-			freqMax = 960.0F;
-			break;
-		case RF_SX1276:
-			// case RF_SX1277:
-			freqMin = 137.0F;
-			freqMax = 1020.0F;
-			break;
-		case RF_SX1278:
-			freqMin = 137.0F;
-			freqMax = 525.0F;
-			break;
-		case RF_SX1279:
-			freqMin = 137.0F;
-			freqMax = 960.0F;
-			break;
-		default:
-			freqMin = 137.0F;
-			freqMax = 1020.0F;
-			break;
-		}
+		// switch (config.rf_type)
+		// {
+		// case RF_SX1261:
+		// case RF_SX1262:
+		// case RF_SX1268:
+		// 	freqMin = 150.0F;
+		// 	freqMax = 960.0F;
+		// 	break;
+		// case RF_SX1276:
+		// 	// case RF_SX1277:
+		// 	freqMin = 137.0F;
+		// 	freqMax = 1020.0F;
+		// 	break;
+		// case RF_SX1278:
+		// 	freqMin = 137.0F;
+		// 	freqMax = 525.0F;
+		// 	break;
+		// case RF_SX1279:
+		// 	freqMin = 137.0F;
+		// 	freqMax = 960.0F;
+		// 	break;
+		// default:
+		// 	freqMin = 137.0F;
+		// 	freqMax = 1020.0F;
+		// 	break;
+		// }
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Frequency:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"freq\" name=\"freq\" min=\"" + String(freqMin, 3) + "\" max=\"" + String(freqMax, 3) + "\"\n";
-		html += "step=\"0.001\" value=\"" + String(config.rf_freq, 3) + "\" /> MHz</td>\n";
+		html += "step=\"0.001\" value=\"" + String(config.rf_freq, 3) + "\" /> MHz <i>[SX126x:150-960MHz],[SX1278:137-175Mhz,410-525Mhz]</i></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Offset Freq:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"freq_offset\" name=\"freq_offset\" min=\"-30000\" max=\"30000\"\n";
-		html += "step=\"1\" value=\"" + String(config.rf_freq_offset) + "\" /> Hz</td>\n";
+		html += "step=\"1\" value=\"" + String(config.rf_freq_offset) + "\" /> Hz   <i>[SX1276:137-175Mhz,410-525Mhz,862-1020Mhz]</i></td>\n";
 		html += "</tr>\n";
+		// html += "<tr>\n";
+		// html += "<td align=\"right\"><b>Band Width:</b></td>\n";
+		// html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_bw\" name=\"rf_bw\" min=\"0.0\" max=\"500.0\"\n";
+		// html += "step=\"0.01\" value=\"" + String(config.rf_bw, 2) + "\" />(LoRa 7.8,10.4,15.6,20.8,31.25,41.7,62.5,125.0,250.0,500.0 kHz)</td>\n";
+		// html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>RF Power:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"rf_power\" id=\"rf_power\">\n";
+		int pwrMax = 23;
+		if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+			pwrMax = 21;
+
+		for (int i = -9; i < pwrMax; i++)
+		{
+			if (config.rf_power == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(i) + "</option>\n";
+			else
+				html += "<option value=\"" + String(i) + "\" >" + String(i) + "</option>\n";
+		}
+		html += "</select>\n";
+		html += " dBm</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Preamble Length:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_pream\" name=\"rf_pream\" min=\"0\" max=\"255\"\n";
+		html += "step=\"1\" value=\"" + String(config.rf_preamable) + "\" /></td>\n";
+		html += "</tr>\n";
+
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Band Width:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_bw\" name=\"rf_bw\" min=\"0.0\" max=\"500.0\"\n";
-		html += "step=\"0.01\" value=\"" + String(config.rf_bw, 2) + "\" />(LoRa 7.8,10.4,15.6,20.8,31.25,41.7,62.5,125.0,250.0,500.0 kHz)</td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"rf_bw\" id=\"rf_bw\">\n";
+		if (config.rf_mode == RF_MODE_LoRa)
+		{
+			for (int i = 0; i < sizeof(LORA_BW) / sizeof(float); i++)
+			{
+				if ((config.rf_bw > (LORA_BW[i] - 0.5)) && (config.rf_bw < (LORA_BW[i] + 0.5)))
+					html += "<option value=\"" + String(LORA_BW[i], 1) + "\" selected>" + String(LORA_BW[i], 1) + "</option>\n";
+				else
+					html += "<option value=\"" + String(LORA_BW[i], 1) + "\" >" + String(LORA_BW[i], 1) + "</option>\n";
+			}
+		}
+		else
+		{
+			if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+			{
+				for (int i = 0; i < sizeof(BW1) / sizeof(float); i++)
+				{
+					if ((config.rf_bw > (BW1[i] - 0.5)) && (config.rf_bw < (BW1[i] + 0.5)))
+						html += "<option value=\"" + String(BW1[i], 1) + "\" selected>" + String(BW1[i], 1) + "</option>\n";
+					else
+						html += "<option value=\"" + String(BW1[i], 1) + "\" >" + String(BW1[i], 1) + "</option>\n";
+				}
+			}
+			else
+			{
+				for (int i = 0; i < sizeof(BW2) / sizeof(float); i++)
+				{
+					if ((config.rf_bw > (BW2[i] - 0.5)) && (config.rf_bw < (BW2[i] + 0.5)))
+						html += "<option value=\"" + String(BW2[i], 1) + "\" selected>" + String(BW2[i], 1) + "</option>\n";
+					else
+						html += "<option value=\"" + String(BW2[i], 1) + "\" >" + String(BW2[i], 1) + "</option>\n";
+				}
+			}
+		}
+		html += "</select> KHz. <i>(GFSK: RX Band width)</i>\n";
+		html += "</td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Sync Word:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_sync\" name=\"rf_sync\" min=\"1\" max=\"255\"\n";
-		html += "step=\"1\" value=\"" + String(config.rf_sync) + "\" /></td>\n";
+		html += "<td align=\"right\"><b>AX.25 Protocol:</b></td>\n";
+		radioEnFlag = "";
+		if (config.rf_ax25)
+			radioEnFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"ax25En\" id=\"ax25En\" value=\"OK\" " + radioEnFlag + "><span class=\"slider round\"></span></label></td>\n";
 		html += "</tr>\n";
+
+		// LoRa Group
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>LoRa Modem:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		if (config.rf_mode == RF_MODE_LoRa)
+			html += "<fieldset id=\"loraGrp\">\n";
+		else
+			html += "<fieldset id=\"loraGrp\" disabled>\n";
+		html += "<legend>LoRa Modem Configuration</legend>\n";
+		html += "<table style=\"text-align: left;\">\n";
+
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Spread Factor:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
@@ -1514,6 +1802,12 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "</select>\n";
 		html += "</td>\n";
 		html += "<tr>\n";
+		html += "<td align=\"right\" width=\"20%\"><b>Sync Word:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_sync\" name=\"rf_sync\" min=\"1\" max=\"255\"\n";
+		html += "step=\"1\" value=\"" + String(config.rf_sync) + "\" /></td>\n";
+		html += "</tr>\n";		
+		html += "</tr>\n";
+		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Coding Rate:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"rf_cr\" id=\"rf_cr\">\n";
@@ -1526,26 +1820,79 @@ void handle_radio(AsyncWebServerRequest *request)
 		}
 		html += "</select>\n";
 		html += "</td>\n";
+		html += "</tr>\n";
+
+		html += "</table>*QuickCFG <button type=\"button\" onClick=\"loraVHF()\" style=\"background-color:green;color:white\">VHF</button>[<i>Freq:144.410Mhz,SF=7,BW=7.8Khz</i>] <button type=\"button\" onClick=\"loraUHF()\" style=\"background-color:gray;color:white\">UHF</button>[<i>Freq:433.775Mhz,SF=12,BW=125Khz</i>]<br /></fieldset></tr>";
+
+		// GFSK Group
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>RF Power:</b></td>\n";
+		html += "<td align=\"right\"><b>GFSK Modem:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"rf_power\" id=\"rf_power\">\n";
-		int pwrMax=21;
-		if(config.rf_type == RF_SX1262) pwrMax=23;
-		for (int i = -9; i < pwrMax; i++)
+		if (config.rf_mode != RF_MODE_LoRa)
+			html += "<fieldset id=\"gfskGrp\">\n";
+		else
+			html += "<fieldset id=\"gfskGrp\" disabled>\n";
+		html += "<legend>GFSK Modem Configuration</legend>\n";
+		html += "<table style=\"text-align: left;\">\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\" width=\"20%\"><b>Baud Rate:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"rf_br\" id=\"rf_br\">\n";
+
+		if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
 		{
-			if (config.rf_power == i)
-				html += "<option value=\"" + String(i) + "\" selected>" + String(i) + "</option>\n";
+			for (int i = 0; i < sizeof(BR1) / sizeof(float); i++)
+			{
+				if ((config.rf_br > (BR1[i] - 0.5)) && (config.rf_br < (BR1[i] + 0.5)))
+					html += "<option value=\"" + String(BR1[i], 1) + "\" selected>" + String(BR1[i], 1) + "</option>\n";
+				else
+					html += "<option value=\"" + String(BR1[i], 1) + "\" >" + String(BR1[i], 1) + "</option>\n";
+			}
+		}
+		else
+		{
+			for (int i = 0; i < sizeof(BR2) / sizeof(float); i++)
+			{
+				if ((config.rf_br > (BR2[i] - 0.5)) && (config.rf_br < (BR2[i] + 0.5)))
+					html += "<option value=\"" + String(BR2[i], 1) + "\" selected>" + String(BR2[i], 1) + "</option>\n";
+				else
+					html += "<option value=\"" + String(BR2[i], 1) + "\" >" + String(BR2[i], 1) + "</option>\n";
+			}
+		}
+		html += "</select> Kbps.\n";
+		html += "</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Shaping:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"rf_shaping\" id=\"rf_shaping\">\n";
+		for (int i = 0; i < 5; i++)
+		{
+			if (config.rf_shaping == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(SHAPING[i]) + "</option>\n";
 			else
-				html += "<option value=\"" + String(i) + "\" >" + String(i) + "</option>\n";
+				html += "<option value=\"" + String(i) + "\" >" + String(SHAPING[i]) + "</option>\n";
 		}
 		html += "</select>\n";
-		html += " dBm</td>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Preamble Length:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_pream\" name=\"rf_pream\" min=\"0\" max=\"255\"\n";
-		html += "step=\"1\" value=\"" + String(config.rf_preamable) + "\" /></td>\n";
+		html += "</td>\n";
 		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Encoding:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"rf_encoding\" id=\"rf_encoding\">\n";
+		for (int i = 0; i < 3; i++)
+		{
+			if (config.rf_encoding == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(ENCODING[i]) + "</option>\n";
+			else
+				html += "<option value=\"" + String(i) + "\" >" + String(ENCODING[i]) + "</option>\n";
+		}
+		html += "</select>\n";
+		html += "</td>\n";
+		html += "</tr>\n";
+
+		html += "</table></fieldset></tr>";
 
 		html += "</table>\n";
 		html += "<div class=\"form-group\">\n";
@@ -1564,7 +1911,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	if (request->hasArg("commitVPN"))
 	{
@@ -1745,7 +2092,7 @@ void handle_mod(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	if (request->hasArg("commitGNSS"))
 	{
@@ -2115,11 +2462,11 @@ void handle_mod(AsyncWebServerRequest *request)
 					config.rf_reset_gpio = request->arg(i).toInt();
 				}
 			}
-			if (request->argName(i) == "rf_busy")
+			if (request->argName(i) == "rf_dio0")
 			{
 				if (request->arg(i) != "")
 				{
-					config.rf_busy_gpio = request->arg(i).toInt();
+					config.rf_dio0_gpio = request->arg(i).toInt();
 				}
 			}
 			if (request->argName(i) == "rf_nss")
@@ -2514,7 +2861,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		// html += "</td></tr></table>\n";
 
 		// html += "</form><br />\n";
-		//html += "</td></tr></table>\n";
+		// html += "</td></tr></table>\n";
 
 		// html += "</td><td width=\"32%\" style=\"border:unset;\">";
 
@@ -2602,8 +2949,8 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>BUSY GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_busy\" type=\"number\" value=\"" + String(config.rf_busy_gpio) + "\" /></td>\n";
+		html += "<td align=\"right\"><b>BUSY/DIO0 GPIO:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf_dio0\" type=\"number\" value=\"" + String(config.rf_dio0_gpio) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -2927,7 +3274,7 @@ void handle_system(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	if (request->hasArg("updateTimeZone"))
 	{
@@ -3302,7 +3649,6 @@ void handle_system(AsyncWebServerRequest *request)
 						config.log |= LOG_DIGI;
 				}
 			}
-
 		}
 		saveEEPROM();
 		String html = "OK";
@@ -3465,9 +3811,9 @@ void handle_system(AsyncWebServerRequest *request)
 					if (isValidNumber(request->arg(i)))
 					{
 						config.disp_brightness = request->arg(i).toInt();
-						#ifdef ST7735_LED_K_Pin
+#ifdef ST7735_LED_K_Pin
 						ledcWrite(0, (uint32_t)config.disp_brightness);
-						#endif
+#endif
 					}
 				}
 			}
@@ -3803,7 +4149,7 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "<input type=\"hidden\" name=\"commitPath\"/>\n";
 		html += "</td></tr></table>\n";
 		html += "</form><br /><br />";
-		//delay(1);
+		// delay(1);
 // log_d("%s",html.c_str());
 // log_d("Length: %d",html.length());
 #if defined OLED || defined ST7735_160x80
@@ -3968,9 +4314,33 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "</form><br />";
 #endif
 
-		//if ((ESP.getFreeHeap() / 1000) > 100)
-		//{			
+		if ((ESP.getFreeHeap() / 1000) > 120)
+		{
 			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			size_t len = html.length();
+			char *info = (char *)calloc(len, sizeof(char));
+			if (info)
+			{
+
+				html.toCharArray(info, len, 0);
+				html.clear();
+				AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
+
+				response->addHeader("Sensor", "content");
+				request->send(response);
+				free(info);
+			}
+			else
+			{
+				log_d("Can't define calloc info size %d", len);
+			}
+		}
+		// if ((ESP.getFreeHeap() / 1000) > 100)
+		//{
+		// request->send(200, "text/html", html); // send to someones browser when asked
 		// }
 		// else
 		// {
@@ -3978,7 +4348,7 @@ void handle_system(AsyncWebServerRequest *request)
 		// 	response->addHeader("System", "content");
 		// 	request->send(response);
 		// }
-		html.clear();
+		// html.clear();
 	}
 }
 
@@ -3988,7 +4358,7 @@ void handle_igate(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	bool aprsEn = false;
 	bool rf2inetEn = false;
@@ -4740,7 +5110,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			html += "</tr>\n";
 		}
 		html += "</table></td></tr>\n";
-		
+
 		html += "<tr><td colspan=\"2\" align=\"center\">\n";
 		html += "<div><button type='submit' id='submitIGATE'  name=\"commitIGATE\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitIGATE\"/>\n";
@@ -4870,24 +5240,47 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</tr></table></fieldset>\n";
 		html += "</td></tr>\n";
 
-		
 		html += "<tr><td colspan=\"2\" align=\"center\">\n";
 		html += "<div><button type='submit' id='submitIGATEfilter'  name=\"commitIGATEfilter\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitIGATEfilter\"/>\n";
 		html += "</td></tr></table><br />\n";
 		html += "</form><br />";
-		request->send(200, "text/html", html); // send to someones browser when asked
-		// if ((ESP.getFreeHeap() / 1000) > 100)
-		// {
-		// 	request->send(200, "text/html", html); // send to someones browser when asked
-		// }
-		// else
-		// {
-		// 	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
-		// 	response->addHeader("IGate", "content");
-		// 	request->send(response);
-		// }
-		html.clear();
+		if ((ESP.getFreeHeap() / 1000) > 120)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			size_t len = html.length();
+			char *info = (char *)calloc(len, sizeof(char));
+			if (info)
+			{
+
+				html.toCharArray(info, len, 0);
+				html.clear();
+				AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
+
+				response->addHeader("Sensor", "content");
+				request->send(response);
+				free(info);
+			}
+			else
+			{
+				log_d("Can't define calloc info size %d", len);
+			}
+		}
+		// request->send(200, "text/html", html); // send to someones browser when asked
+		//  if ((ESP.getFreeHeap() / 1000) > 100)
+		//  {
+		//  	request->send(200, "text/html", html); // send to someones browser when asked
+		//  }
+		//  else
+		//  {
+		//  	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+		//  	response->addHeader("IGate", "content");
+		//  	request->send(response);
+		//  }
+		// html.clear();
 	}
 }
 
@@ -4897,7 +5290,7 @@ void handle_digi(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	bool digiEn = false;
 	bool posGPS = false;
@@ -5529,11 +5922,35 @@ void handle_digi(AsyncWebServerRequest *request)
 		html += "<div><button type='submit' id='submitDIGI'  name=\"commitDIGI\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitDIGI\"/>\n";
 		html += "</form><br />";
-		request->send(200, "text/html", html); // send to someones browser when asked
-		// AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
-		// response->addHeader("Digi", "content");
-		// request->send(response);
-		html.clear();
+		if ((ESP.getFreeHeap() / 1000) > 120)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			size_t len = html.length();
+			char *info = (char *)calloc(len, sizeof(char));
+			if (info)
+			{
+
+				html.toCharArray(info, len, 0);
+				html.clear();
+				AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
+
+				response->addHeader("Sensor", "content");
+				request->send(response);
+				free(info);
+			}
+			else
+			{
+				log_d("Can't define calloc info size %d", len);
+			}
+		}
+		// request->send(200, "text/html", html); // send to someones browser when asked
+		//  AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+		//  response->addHeader("Digi", "content");
+		//  request->send(response);
+		// html.clear();
 	}
 }
 
@@ -5543,7 +5960,7 @@ void handle_wx(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	bool En = false;
 	bool posGPS = false;
@@ -5927,18 +6344,42 @@ void handle_wx(AsyncWebServerRequest *request)
 		html += "<div><button type='submit' id='submitWX'  name=\"commitWX\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWX\"/>\n";
 		html += "</form><br />";
-		request->send(200, "text/html", html); // send to someones browser when asked
-		// if ((ESP.getFreeHeap() / 1000) > 110)
-		// {
-		// 	request->send(200, "text/html", html); // send to someones browser when asked
-		// }
-		// else
-		// {
-		// 	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
-		// 	response->addHeader("Weather", "content");
-		// 	request->send(response);
-		// }
-		html.clear();
+		if ((ESP.getFreeHeap() / 1000) > 120)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			size_t len = html.length();
+			char *info = (char *)calloc(len, sizeof(char));
+			if (info)
+			{
+
+				html.toCharArray(info, len, 0);
+				html.clear();
+				AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
+
+				response->addHeader("Sensor", "content");
+				request->send(response);
+				free(info);
+			}
+			else
+			{
+				log_d("Can't define calloc info size %d", len);
+			}
+		}
+		// request->send(200, "text/html", html); // send to someones browser when asked
+		//  if ((ESP.getFreeHeap() / 1000) > 110)
+		//  {
+		//  	request->send(200, "text/html", html); // send to someones browser when asked
+		//  }
+		//  else
+		//  {
+		//  	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+		//  	response->addHeader("Weather", "content");
+		//  	request->send(response);
+		//  }
+		// html.clear();
 	}
 }
 
@@ -5948,7 +6389,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	bool En = false;
 	bool pos2RF = false;
@@ -6299,7 +6740,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 	String arg = "";
 
 	if (request->hasArg("commitSENSOR"))
@@ -6383,7 +6824,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 			}
 		}
 
-		saveEEPROM();		
+		saveEEPROM();
 		String html = "OK";
 		request->send(200, "text/html", html);
 		vTaskResume(taskSensorHandle);
@@ -6524,8 +6965,6 @@ void handle_sensor(AsyncWebServerRequest *request)
 		html += "}\n}\n";
 		html += "</script>\n";
 
-		
-
 		/************************ Sensor Monitor **************************/
 		// html += "<form id='formSENSOR' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		html += "<table>\n";
@@ -6624,69 +7063,76 @@ void handle_sensor(AsyncWebServerRequest *request)
 		html += "typeArry = new Array(";
 		for (uint8_t idx = 0; idx < SENSOR_NAME_NUM; idx++)
 		{
-			html +="'"+String(SENSOR_NAME[idx])+"'";
-			if(idx<SENSOR_NAME_NUM-1) html+=",";
+			html += "'" + String(SENSOR_NAME[idx]) + "'";
+			if (idx < SENSOR_NAME_NUM - 1)
+				html += ",";
 		}
 		html += ");\n";
 		html += "if (typeof portArry === 'undefined'){let portArry = [];};\n";
 		html += "portArry = new Array(";
 		for (uint8_t idx = 0; idx < SENSOR_PORT_NUM; idx++)
 		{
-			html +="'"+String(SENSOR_PORT[idx])+"'";
-			if(idx<SENSOR_PORT_NUM-1) html+=",";
+			html += "'" + String(SENSOR_PORT[idx]) + "'";
+			if (idx < SENSOR_PORT_NUM - 1)
+				html += ",";
 		}
 		html += ");\n";
-		//html += "delete typeSel;delete listType;delete portSel;delete listPort;\n";
+		// html += "delete typeSel;delete listType;delete portSel;delete listPort;\n";
 		html += "if (typeof typeSel === 'undefined'){var typeSel = [];};\n";
 		html += "if (typeof listType === 'undefined'){var listType = [];};\n";
 		html += "if (typeof portSel === 'undefined'){var portSel = [];};\n";
 		html += "if (typeof listPort === 'undefined'){var listPort = [];};\n";
-		for(int i=0;i<10;i++){
-			html += "listType["+String(i)+"] = document.querySelector('#sensorCH"+String(i)+"');typeSel["+String(i)+"]="+String(config.sensor[i].type)+";\n";
-			html += "listPort["+String(i)+"] = document.querySelector('#sensorP"+String(i)+"');portSel["+String(i)+"]="+String(config.sensor[i].port)+";\n";
+		for (int i = 0; i < 10; i++)
+		{
+			html += "listType[" + String(i) + "] = document.querySelector('#sensorCH" + String(i) + "');typeSel[" + String(i) + "]=" + String(config.sensor[i].type) + ";\n";
+			html += "listPort[" + String(i) + "] = document.querySelector('#sensorP" + String(i) + "');portSel[" + String(i) + "]=" + String(config.sensor[i].port) + ";\n";
 		}
-		
+
 		html += "for (let n = 0; n < 10; n++){\n";
 		html += "for (let i = 0; i < typeArry.length; i++) {\n";
-  		html += "const optionType = new Option(typeArry[i], i);\n";
+		html += "const optionType = new Option(typeArry[i], i);\n";
 		html += "listType[n].add(optionType, undefined);\n";
-		html +="};\n";
+		html += "};\n";
 		html += "listType[n].options[typeSel[n]].selected = true;\n";
 		html += "for (let p = 0; p < portArry.length; p++) {\n";
-  		html += "const optionPort = new Option(portArry[p], p);\n";
+		html += "const optionPort = new Option(portArry[p], p);\n";
 		html += "listPort[n].add(optionPort, undefined);\n";
-		html +="};\n";
+		html += "};\n";
 		html += "listPort[n].options[portSel[n]].selected = true;\n";
-		html +="};\n";
+		html += "};\n";
 
 		html += "</script>\n";
+		log_d("FreeHeap=%i", ESP.getFreeHeap() / 1000);
+		if ((ESP.getFreeHeap() / 1000) > 120)
+		{
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			// 	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
+			// 	response->addHeader("Sensor", "/");
+			// 	request->send(response);
+			// 	delay(1000);
+			// }
+			// html.clear();
+			size_t len = html.length();
+			char *info = (char *)calloc(len, sizeof(char));
+			if (info)
+			{
 
-		//if ((ESP.getFreeHeap() / 1000) > 110)
-		//{
-		request->send(200, "text/html", html); // send to someones browser when asked
-		// }
-		// else
-		// {
-		// 	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)html.c_str(), html.length());
-		// 	response->addHeader("Sensor", "content");
-		// 	request->send(response);
-		// }
-		html.clear();
+				html.toCharArray(info, len, 0);
+				html.clear();
+				AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
 
-		// char *info = (char *)calloc(html.length(), sizeof(char));
-		//  if (info)
-		//  {
-		//  	html.toCharArray(info, html.length(), 0);
-		//  	AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, html.length());
-
-		// 	response->addHeader("Sensor", "content");
-		// 	request->send(response);
-		// 	free(info);
-		// }
-		// else
-		// {
-		// 	log_d("Can't define calloc info size %d", html.length());
-		// }
+				response->addHeader("Sensor", "content");
+				request->send(response);
+				free(info);
+			}
+			else
+			{
+				log_d("Can't define calloc info size %d", len);
+			}
+		}
 	}
 }
 
@@ -6696,7 +7142,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	bool trakerEn = false;
 	bool smartEn = false;
@@ -7360,8 +7806,8 @@ void handle_wireless(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	StandByTick = millis() + (config.pwr_stanby_delay*1000);
-	
+	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
+
 	if (request->hasArg("commitWiFiAP"))
 	{
 		bool wifiAP = false;
@@ -8220,7 +8666,7 @@ void webService()
 		{
 			if (!index)
 			{
-				Serial.printf("Update Start: %s\n", filename.c_str());
+				log_d("Update Start: %s\n", filename.c_str());
 				if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
 				{
 					Update.printError(Serial);
@@ -8229,9 +8675,13 @@ void webService()
 				{
 					disableLoopWDT();
 					disableCore0WDT();
-					vTaskSuspend(taskAPRSPollHandle);
-					vTaskSuspend(taskAPRSHandle);
-					vTaskSuspend(taskSensorHandle);
+					// disableCore1WDT();
+					//  vTaskSuspend(taskAPRSPollHandle);
+					//  vTaskSuspend(taskAPRSHandle);
+					//  vTaskSuspend(taskSensorHandle);
+					//  vTaskSuspend(taskSerialHandle);
+					//  vTaskSuspend(taskGPSHandle);
+					//  vTaskSuspend(taskSensorHandle);
 				}
 			}
 			if (!Update.hasError())
@@ -8245,7 +8695,7 @@ void webService()
 			{
 				if (Update.end(true))
 				{
-					Serial.printf("Update Success: %uByte\n", index + len);
+					log_d("Update Success: %uByte\n", index + len);
 					delay(1000);
 					esp_restart();
 				}
@@ -8259,7 +8709,7 @@ void webService()
 	lastheard_events.onConnect([](AsyncEventSourceClient *client)
 							   {
     if(client->lastId()){
-      Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+      log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second

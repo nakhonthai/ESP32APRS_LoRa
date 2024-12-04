@@ -270,6 +270,7 @@ bool getLOGIC(uint8_t port)
 
 bool getDS1820(uint8_t port)
 {
+    if(ds1820==NULL) return false;
     ds1820->requestTemperatures();
     for (int i = 0; i < SENSOR_NUMBER; i++)
     {
@@ -1081,7 +1082,9 @@ bool getSensor(int cfgIdx)
         getLOGIC(port);
         break; 
     case PORT_DS1820:
-        getDS1820(port);
+        if(config.onewire_enable){
+            getDS1820(port);
+        }
         break;       
     default:
         log_d("Sensor Not config");
@@ -1421,6 +1424,8 @@ void taskSensor(void *pvParameters)
                 {   
                     if(getSensor(i)){
                         sen[i].timeTick = millis() + ((unsigned long)config.sensor[i].samplerate * 1000);
+                    }else{
+                        sen[i].timeTick = millis() + (30 * 1000);
                     }
                     log_d("Request getSensor [%d] for %s timeTick=%d/%d", i, config.sensor[i].parm,tick,sen[i].timeTick);
                     //dispSensor(i);

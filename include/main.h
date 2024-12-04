@@ -11,8 +11,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.3"
-#define VERSION_BUILD 'a'
+#define VERSION "0.4"
+#define VERSION_BUILD ' '
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
@@ -53,12 +53,12 @@
 
 #ifdef BOARD_HAS_PSRAM
 #define TLMLISTSIZE 100
-#define PKGLISTSIZE 1000
+#define PKGLISTSIZE 20
 #define PKGTXSIZE 100
 #else
 #define TLMLISTSIZE 5
 #define PKGLISTSIZE 20
-#define PKGTXSIZE 5
+#define PKGTXSIZE 3
 #endif
 
 #define LOG_NONE 0
@@ -203,6 +203,7 @@ typedef struct
 {
 	time_t time;
 	char calsign[11];
+	char object[10];
 	char ssid[5];
 	bool channel;
 	unsigned int pkg;
@@ -212,7 +213,9 @@ typedef struct
 	float rssi;
 	float snr;
 	float freqErr;
-	char raw[256];
+	char *raw;
+	size_t length;
+	//char raw[256];
 } pkgListType;
 
 typedef struct statisticStruct
@@ -332,7 +335,7 @@ const float ctcss[] = {0, 67, 71.9, 74.4, 77, 79.7, 82.5, 85.4, 88.5, 91.5, 94.8
 const float wifiPwr[12][2] = {{-4, -1}, {8, 2}, {20, 5}, {28, 7}, {34, 8.5}, {44, 11}, {52, 13}, {60, 15}, {68, 17}, {74, 18.5}, {76, 19}, {78, 19.5}};
 const char RF_TYPE[14][7] = {"NONE", "SX1231", "SX1233", "SX1261", "SX1262", "SX1268", "SX1272", "SX1273", "SX1276", "SX1278", "SX1279", "SX1280", "SX1281", "SX1282"};
 const unsigned long baudrate[] = {2400, 4800, 9600, 19200, 2880, 38400, 57600, 76800, 115200, 230400, 460800, 576000, 921600};
-const char RF_MODE[3][10] = {"NONE", "LoRa", "GFSK_9600"};
+const char RF_MODE[5][11] = {"NONE", "LoRa", "GFSK_G3RUH","AIS","(G)FSK"};
 const char GNSS_PORT[5][6] = {"NONE", "UART0", "UART1", "UART2", "TCP"};
 const char TNC_PORT[4][6] = {"NONE", "UART0", "UART1", "UART2"};
 const char TNC_MODE[4][6] = {"NONE", "KISS", "TNC2", "YAESU"};
@@ -342,6 +345,13 @@ const char PWR_MODE[3][10] = {"MODE A", "MODE B","MODE C"};
 const char ACTIVATE[8][10] = {"OFF", "TRACKER", "IGATE", "DIGI", "WX", "TELEMETRY", "QUERY", "STATUS"};
 //const char SENSOR_PORT[12][15] = {"UART0_CSV", "UART1_CSV", "ADC", "I2C_0","I2C_1","CNT_0","CNT_1","MODBUS","M701_Modbus","M702_Modbus","BME280_I2C0","BME280_I2C1"};
 const char WX_SENSOR[23][19]={"Wind Course","Wind Speed","Wind Gust","Temperature","Rain 1hr","Rain 24hr","Rain Midnight","Humidity","Barometric","Luminosity","Snow","Soil Temperature","Soil Humidity","Water Temperature","Water TDS","Water Level","PM 2.5","PM 10","Co2","CH2O","TVOC","UV","SOUND"};
+const float BR1[]={1.2,2.4,4.8,9.6,12.5,19.2,25,38.4,50,57.6,76.8,100,115.2,150.0,153.6,200,250,300};
+const float BW1[]={2.6,3.1,3.9,5.2,6.3,7.8,10.4,12.5,15.6,20.8,25,31.3,41.7,50,62.5,83.3,100,125,166.7,200,250};
+const float BR2[]={4.8,5.8,7.3,9.7,11.7,14.6,19.5,23.4,29.3,39.0,46.9,58.6,78.2,93.8,117.3,156.2,187.2,234.3,312.0,373.6,467.0};
+const float BW2[]={4.8,5.8,7.3,9.7,11.7,14.6,19.5,23.4,29.3,39.0,46.9,58.6,78.2,93.8,117.3,156.2,187.2,232.3,312.0,373.6,467.0};
+const float LORA_BW[]={7.8,10.4,15.6,20.8,31.2,41.7,62.5,125,250,500};
+const char SHAPING[5][7]={"NONE","BT=0.3","BT=0.5","BT=0.7","BT=1.0"};
+const char ENCODING[3][11]={"NRZ","MANCHESTER","WHITENING"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
 void saveEEPROM();
@@ -362,6 +372,9 @@ void printTime();
 int popTNC2Raw(int &ret);
 int pushTNC2Raw(int raw);
 int pkgListUpdate(char *call, char *raw, uint16_t type);
+int pkgList_Find(char *call,char *object, uint16_t type);
+int pkgList_Find(char *call, uint16_t type);
+int pkgList_Find(char *call);
 pkgListType getPkgList(int idx);
 String myBeacon(String Path);
 int tlmList_Find(char *call);

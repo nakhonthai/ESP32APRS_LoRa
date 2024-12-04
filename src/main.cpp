@@ -2,9 +2,9 @@
  Name:		ESP32APRS LoRa
  Created:	1-Feb-2024
  Author:	HS5TQA/Atten
- Support IS: host:aprs.dprns.com port:14580
+ Support APRS-IS: host:aprs.dprns.com port:14580
+ Support APRS-CB: host:aprs.dprns.com port:24580
  Support IS monitor: http://aprs.dprns.com:14501
- Support in LINE Group APRS Only
 */
 
 #include <Arduino.h>
@@ -28,9 +28,6 @@
 
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
-
-// #include "driver/temp_sensor.h"
-
 #include <TinyGPS++.h>
 #include <pbuf.h>
 #include <parse_aprs.h>
@@ -89,7 +86,12 @@ XPowersAXP2101 PMU;
 #else
 #define LED_TX -1
 #endif
+
+#if defined(HELTEC_HTIT_TRACKER)
+#define LED_RX 18
+#else
 #define LED_RX -1
+#endif
 
 #ifdef APRS_LORA_DONGLE
 #include <Adafruit_NeoPixel.h>
@@ -128,14 +130,20 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 bool i2c_busy = false;
 #include <Wire.h>
 #ifdef OLED
-#include "Adafruit_SSD1306.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_I2CDevice.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#ifdef TTGO_LORA32_V1
+#ifdef SH1106
+#include <Adafruit_SH1106.h>
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SH1106 display(OLED_RESET);
+#else
+#include <Adafruit_SSD1306.h>
+#if defined(TTGO_LORA32_V1) || defined(TTGO_LORA32_V1_6) 
 #define OLED_RESET 16 // Reset pin # (or -1 if sharing Arduino reset pin)
 #elif defined(HELTEC_V3_GPS)
 #define OLED_RESET 21
@@ -144,6 +152,7 @@ bool i2c_busy = false;
 #endif
 #define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#endif
 
 #endif
 
@@ -268,7 +277,7 @@ long timeNetwork, timeAprs, timeGui;
 
 cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 #if defined OLED || defined ST7735_160x80
-cppQueue dispBuffer(300, 5, IMPLEMENTATION);
+cppQueue dispBuffer(300, 3, IMPLEMENTATION);
 cppQueue queTxDisp(sizeof(txDisp), 5, IMPLEMENTATION); // Instantiate queue
 
 void pushTxDisp(uint8_t ch, const char *name, char *info)
@@ -1848,6 +1857,11 @@ void defaultConfig()
     config.rf_preamable = 8;
     config.rf_lna = 1;
     config.rf_mode = 1;
+    config.rf_ax25 = true;
+    config.rf_br = 9.7;
+    config.rf_dio2_gpio = -1;
+    config.rf_shaping = RADIOLIB_SHAPING_0_5;
+    config.rf_encoding = RADIOLIB_ENCODING_NRZ;
 
     // IGATE
     config.igate_bcn = false;
@@ -1872,7 +1886,7 @@ void defaultConfig()
     config.igate_lon = 100.4930;
     config.igate_alt = 0;
     config.igate_interval = 600;
-    sprintf(config.igate_symbol, "/&");
+    sprintf(config.igate_symbol, "Lz");
     memset(config.igate_object, 0, sizeof(config.igate_object));
     memset(config.igate_phg, 0, sizeof(config.igate_phg));
     config.igate_path = 8;
@@ -1896,7 +1910,7 @@ void defaultConfig()
     config.digi_delay = 0;
     config.digiFilter = FILTER_OBJECT | FILTER_ITEM | FILTER_MESSAGE | FILTER_MICE | FILTER_POSITION | FILTER_WX;
 
-    sprintf(config.digi_symbol, "/#");
+    sprintf(config.digi_symbol, "L#");
     memset(config.digi_phg, 0, sizeof(config.digi_phg));
     sprintf(config.digi_comment, "DIGI MODE");
 
@@ -2284,9 +2298,9 @@ void defaultConfig()
     config.rf_type = RF_SX1276;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = 26;
+    config.rf_dio1_gpio = -1; //HPDIO1->33
     config.rf_reset_gpio = 14;
-    config.rf_busy_gpio = -1;
+    config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
     config.rf_sclk_gpio = 5;
     config.rf_miso_gpio = 19;
@@ -2300,15 +2314,38 @@ void defaultConfig()
     config.i2c_enable = true;
     config.i2c_sda_pin = 4;
     config.i2c_sck_pin = 15;
-    config.pwr_gpio = 21;
+    config.pwr_gpio = -1;
     config.pwr_active = 0;
+#elif defined(TTGO_LORA32_V1_6)
+    config.rf_en = true;
+    config.rf_type = RF_SX1276;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = -1; //HPDIO1->33
+    config.rf_reset_gpio = 23;
+    config.rf_dio0_gpio = 26;
+    config.rf_nss_gpio = 18;
+    config.rf_sclk_gpio = 5;
+    config.rf_miso_gpio = 19;
+    config.rf_mosi_gpio = 27;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 22;
+    config.pwr_gpio = -1;
+    config.pwr_active = 0;    
 #elif defined(HT_CT62)
     config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 3;
     config.rf_reset_gpio = 5;
-    config.rf_busy_gpio = 4;
+    config.rf_dio0_gpio = 4;
     config.rf_nss_gpio = 8;
     config.rf_sclk_gpio = 10;
     config.rf_miso_gpio = 6;
@@ -2317,14 +2354,14 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_reset_active = 0;
     config.rf_nss_active = 0;
-#elif defined(ESP32_DIY_LoRa_GPS) || defined(TTGO_T_LORA32_V2_1_GPS)
+#elif defined(ESP32_DIY_LoRa_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1278;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = 26;
-    config.rf_reset_gpio = 23;
-    config.rf_busy_gpio = -1;
+    config.rf_dio1_gpio = 33; //HPDIO1->33
+    config.rf_reset_gpio = 14;
+    config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
     config.rf_sclk_gpio = 5;
     config.rf_miso_gpio = 19;
@@ -2340,12 +2377,21 @@ void defaultConfig()
     config.i2c_sck_pin = 15;
     config.pwr_gpio = 21;
     config.pwr_active = 0;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 12;
+    config.uart1_tx_gpio = -1;
+    config.uart1_rts_gpio = -1;
 #elif defined(TTGO_T_Beam_V1_2)
+    config.rf_en = true;
+    config.rf_type = RF_SX1278;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = 33; // SX1278 DIO0=26
+    config.rf_dio1_gpio = -1; 
     config.rf_reset_gpio = 23;
-    config.rf_busy_gpio = -1;
+    config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
     config.rf_sclk_gpio = 5;
     config.rf_miso_gpio = 19;
@@ -2354,8 +2400,8 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_nss_active = 0;
     config.rf_reset_active = 0;
-    config.gnss_enable = true;
-    config.gnss_channel = 2;
+    //config.gnss_enable = true;
+    //config.gnss_channel = 2;
     config.uart1_enable = true;
     config.uart1_baudrate = 9600;
     config.uart1_rx_gpio = 34;
@@ -2368,11 +2414,13 @@ void defaultConfig()
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
 #elif defined(TTGO_T_Beam_S3_SUPREME_V3)
+    config.rf_en = true;
+    config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 1;
     config.rf_reset_gpio = 5;
-    config.rf_busy_gpio = 4;
+    config.rf_dio0_gpio = 4;
     config.rf_nss_gpio = 10;
     config.rf_sclk_gpio = 12;
     config.rf_miso_gpio = 13;
@@ -2403,7 +2451,7 @@ void defaultConfig()
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 14;
     config.rf_reset_gpio = 12;
-    config.rf_busy_gpio = 13;
+    config.rf_dio0_gpio = 13;
     config.rf_nss_gpio = 8;
     config.rf_sclk_gpio = 9;
     config.rf_miso_gpio = 11;
@@ -2412,8 +2460,8 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_nss_active = 0;
     config.rf_reset_active = 0;
-    config.gnss_enable = true;
-    config.gnss_channel = 2;
+    //config.gnss_enable = true;
+    //config.gnss_channel = 2;
     config.uart1_enable = true;
     config.uart1_baudrate = 9600;
     config.uart1_rx_gpio = 19;
@@ -2424,29 +2472,6 @@ void defaultConfig()
     config.i2c_sck_pin = 18;
     config.pwr_gpio = 36;
     config.pwr_active = 0;
-#elif defined(TTGO_T_Beam_V1_0_SX1268) || defined(TTGO_T_Beam_V1_2_SX1262)
-    config.rf_en = true;
-    config.rf_type = RF_SX1262;
-    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
-    config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = 33;
-    config.rf_reset_gpio = 23;
-    config.rf_busy_gpio = 32;
-    config.rf_nss_gpio = 18;
-    config.rf_sclk_gpio = 5;
-    config.rf_miso_gpio = 19;
-    config.rf_mosi_gpio = 27;
-    config.rf_tx_active = 1;
-    config.rf_rx_active = 1;
-    config.rf_nss_active = 0;
-    config.rf_reset_active = 0;
-    config.gnss_enable = true;
-    config.gnss_tx_gpio = 12;
-    config.gnss_rx_gpio = 15;
-    // config.i2c_enable = true;
-    // config.i2c_sda_pin = 17;
-    // config.i2c_sck_pin = 18;
-    // config.i2c_rst_pin = 21;
 #elif defined(APRS_LORA_HT)
     config.rf_en = true;
     config.rf_type = RF_SX1268;
@@ -2454,7 +2479,7 @@ void defaultConfig()
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 45;
     config.rf_reset_gpio = 11;
-    config.rf_busy_gpio = 14;
+    config.rf_dio0_gpio = 14;
     config.rf_nss_gpio = 17;
     config.rf_sclk_gpio = 18;
     config.rf_miso_gpio = 8;
@@ -2484,7 +2509,7 @@ void defaultConfig()
     config.rf_rx_gpio = -1;
     config.rf_dio1_gpio = 14;
     config.rf_reset_gpio = 12;
-    config.rf_busy_gpio = 13;
+    config.rf_dio0_gpio = 13;
     config.rf_nss_gpio = 8;
     config.rf_sclk_gpio = 9;
     config.rf_miso_gpio = 11;
@@ -2509,18 +2534,18 @@ void defaultConfig()
     config.rf_en = true;
     config.rf_type = RF_SX1276;
 #ifdef VHF
-    config.rf_freq = 144.415;
-    config.rf_freq_offset = 0;
-    config.rf_bw = 10.4F;
-    config.rf_sf = 8;
+    config.rf_freq = 144.410;
+    config.rf_freq_offset = 1300;
+    config.rf_bw = 7.8F;
+    config.rf_sf = 7;
     config.rf_cr = 5;
     config.rf_power = 20;
 #endif
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = 13;
+    config.rf_dio1_gpio = 14;
     config.rf_reset_gpio = 12;
-    config.rf_busy_gpio = -1;
+    config.rf_dio0_gpio = 13;
     config.rf_nss_gpio = 11;
     config.rf_sclk_gpio = 18;
     config.rf_miso_gpio = 8;
@@ -2714,8 +2739,28 @@ int pkgList_Find(char *call, uint16_t type)
     int i;
     for (i = 0; i < PKGLISTSIZE; i++)
     {
-        if ((strstr(pkgList[i].calsign, call) != NULL) && (pkgList[i].type == type))
-            return i;
+        if(pkgList[i].type == type){
+            if (strstr(pkgList[i].calsign, call) != NULL)
+            {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+int pkgList_Find(char *call,char *object, uint16_t type)
+{
+    int i;
+    for (i = 0; i < PKGLISTSIZE; i++)
+    {
+        if(pkgList[i].type == type){
+            if (strnstr(pkgList[i].calsign, call,strlen(call)) != NULL)
+            {
+                if(strnstr(pkgList[i].object, object,strlen(object)) != NULL)
+                return i;
+            }
+        }
     }
     return -1;
 }
@@ -2957,19 +3002,66 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     if (*raw == 0)
         return -1;
 
+    //int start_info = strchr(':',0);
+        
     char callsign[11];
+    char object[10];
     size_t sz = strlen(call);
     memset(callsign, 0, 11);
     if (sz > 10)
         sz = 10;
     // strncpy(callsign, call, sz);
     memcpy(callsign, call, sz);
+
 #ifdef BOARD_HAS_PSRAM
     while (psramBusy)
         delay(1);
     psramBusy = true;
 #endif
-    int i = pkgList_Find(callsign, type);
+    int i=-1;
+    
+    memset(object,0,sizeof(object));
+    if(type & FILTER_ITEM){
+        int x=0;
+        char *body=strchr(raw, ':');
+        if(body!=NULL){
+        body+=2;
+
+        for (int z = 0; z < 9 && body[z] != '!' && body[z] != '_'; z++)
+        {
+            if (body[z] < 0x20 || body[z] > 0x7e)
+            {
+                log_d("\titem name has unprintable characters");
+                break; /* non-printable */
+            }
+            object[x++]=body[z];
+        }
+        }
+        i = pkgList_Find(callsign,object, type);
+    }else if(type & FILTER_OBJECT){
+        int x=0;
+        char *body=strchr(raw, ':');
+        //log_d("body=%s",body);
+        if(body!=NULL){
+        body+=2;
+        for (int z = 0; z < 9; z++)
+        {
+            if (body[z] < 0x20 ||body[z] > 0x7e)
+            {
+                log_d("\tobject name has unprintable characters");
+                break; // non-printable
+            }
+            object[x++]=body[z];
+            //if (raw[i] != ' ')
+            //    namelen = i;
+        }
+        }
+        i = pkgList_Find(callsign, object, type);
+    }else{
+        i = pkgList_Find(callsign, type);
+    }
+
+    
     if (i > PKGLISTSIZE)
     {
         psramBusy = false;
@@ -2982,6 +3074,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             pkgList[i].time = time(NULL);
             pkgList[i].pkg++;
             pkgList[i].type = type;
+            //memcpy(pkgList[i].object,object,sizeof(object));
             if (channel == 0)
             {
                 pkgList[i].rssi = rssi;
@@ -2995,10 +3088,17 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
                 pkgList[i].freqErr = 0;
             }
             len = strlen(raw);
-            if (len > 256)
-                len = 256;
-            memcpy(pkgList[i].raw, raw, len);
-            log_d("Update: pkgList_idx=%d", i);
+            pkgList[i].length=len+1;
+            if(pkgList[i].raw!=NULL){
+                 pkgList[i].raw = (char*)realloc(pkgList[i].raw,pkgList[i].length);
+            }else{
+                pkgList[i].raw = (char*)calloc(pkgList[i].length,sizeof(char));
+            }
+            if(pkgList[i].raw){
+                memcpy(pkgList[i].raw, raw, len);
+                pkgList[i].raw[len]=0;
+                log_d("Update: pkgList_idx=%d callsign:%s object:%s", i,callsign,object);
+            }
         }
     }
     else
@@ -3014,6 +3114,12 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         pkgList[i].time = time(NULL);
         pkgList[i].pkg = 1;
         pkgList[i].type = type;
+        if(strlen(object)>3){
+            memcpy(pkgList[i].object,object,9);
+            pkgList[i].object[9]=0;
+        }else{
+            memset(pkgList[i].object,0,sizeof(pkgList[i].object));
+        }
         if (channel == 0)
         {
             pkgList[i].rssi = rssi;
@@ -3029,13 +3135,17 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         // strcpy(pkgList[i].calsign, callsign);
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
         len = strlen(raw);
-        if (len > 256)
-            len = 256;
-        memcpy(pkgList[i].raw, raw, len);
-        // strcpy(pkgList[i].raw, raw);
-        pkgList[i].calsign[10] = 0;
-        log_d("New: pkgList_idx=%d", i);
-        // SerialLOG.print("NEW: ");
+        pkgList[i].length=len+1;
+        if(pkgList[i].raw!=NULL){
+            pkgList[i].raw = (char*)realloc(pkgList[i].raw,pkgList[i].length);
+        }else{
+            pkgList[i].raw = (char*)calloc(pkgList[i].length,sizeof(char));
+        }
+        if(pkgList[i].raw){
+            memcpy(pkgList[i].raw, raw, len);
+            pkgList[i].raw[len]=0;
+            log_d("New: pkgList_idx=%d callsign:%s object:%s", i,callsign,object);
+        }
     }
     psramBusy = false;
     // event_lastHeard();
@@ -3126,7 +3236,7 @@ bool pkgTxPush(const char *info, size_t len, int dly, uint8_t Ch)
     {
         if (txQueue[i].Active == false)
         {
-            if(len>250) len=250;
+            if(len>sizeof(txQueue[i].Info)) len=sizeof(txQueue[i].Info);
             memset(txQueue[i].Info, 0, sizeof(txQueue[i].Info));
             memcpy(&txQueue[i].Info[0], info, len);
             txQueue[i].length = len;
@@ -3163,7 +3273,7 @@ bool pkgTxSend()
                 }else{
                     if (aprsClient.connected())
                     {
-                        status.txCount++;
+                        //status.txCount++;
                         //aprsClient.printf("%s\r\n", txQueue[i].Info); // Send packet to Inet
                         aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
                         aprsClient.write("\r\n");     // Send CR LF the end frame packet
@@ -3175,30 +3285,35 @@ bool pkgTxSend()
             }
             if (decTime > txQueue[i].Delay)
             {
-                if (txQueue[i].Channel & RF_CHANNEL)
+                if (config.rf_mode == RF_MODE_AIS) //AIS for RX Only
                 {
-                    char *info = (char *)calloc(350, sizeof(char));
-                    if (info)
+                    txQueue[i].Channel &= ~RF_CHANNEL;
+                }else{
+                    if (txQueue[i].Channel & RF_CHANNEL)
                     {
-                        memset(info, 0, 350);
-                        strcpy(info, txQueue[i].Info);
-                        psramBusy = false;
-                        // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
-                        status.txCount++;
-
-                        // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
-                        APRS_sendTNC2Pkt(String(info));
-                        igateTLM.TX++;
-                        log_d("TX->RF: %s", info);
-                        if (config.trk_en)
+                        char *info = (char *)calloc(txQueue[i].length+1, sizeof(char));
+                        if (info)
                         {
-                            timeSleep = millis() + 5000;
-                            // Sleep_Activate &= ~ACTIVATE_TRACKER;
-                        }
+                            memset(info, 0, txQueue[i].length);                        
+                            memcpy(info, txQueue[i].Info,txQueue[i].length);
+                            psramBusy = false;
+                            // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
+                            status.txCount++;
 
-                        // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
-                        free(info);
-                        txQueue[i].Channel &= ~RF_CHANNEL;
+                            // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
+                            APRS_sendTNC2Pkt((uint8_t *)info,txQueue[i].length);
+                            igateTLM.TX++;
+                            //log_d("TX->RF: %s", info);
+                            if (config.trk_en)
+                            {
+                                timeSleep = millis() + 5000;
+                                // Sleep_Activate &= ~ACTIVATE_TRACKER;
+                            }
+
+                            // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
+                            free(info);
+                            txQueue[i].Channel &= ~RF_CHANNEL;
+                        }
                     }
                 }
             }
@@ -3509,11 +3624,19 @@ void setup()
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     if (OLED_RESET > -1)
     {
+        #ifdef SH1106
+        display.begin(SH1106_SWITCHCAPVCC, 0x3C, true); // initialize with the I2C addr 0x3C (for the 128x64)
+        #else
         display.begin(SSD1306_SWITCHCAPVCC, 0x3C, true, false); // initialize with the I2C addr 0x3C (for the 128x64)
+        #endif
     }
     else
     {
+        #ifdef SH1106
+        display.begin(SH1106_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
+        #else
         display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false); // initialize with the I2C addr 0x3C (for the 128x64)
+        #endif
     }
     // Initialising the UI will init the display too.
     if (BootReason != ESP_RST_DEEPSLEEP)
@@ -3912,6 +4035,12 @@ void setup()
     }
 
     timeTask = millis() + 10000;
+
+    if(config.gnss_enable)
+        curTab=0;
+    else
+        curTab=6;
+        
 }
 
 String getTimeStamp()
@@ -4214,7 +4343,7 @@ String trk_gps_postion(String comment)
     }
     tnc2Raw += ":";
     tnc2Raw += String(rawTNC);
-    tnc2Raw += comment + " " + String(config.trk_comment);
+    tnc2Raw += comment + String(config.trk_comment);
     return tnc2Raw;
 }
 
@@ -4327,7 +4456,7 @@ String trk_fix_position(String comment)
     }
     tnc2Raw += ":";
     tnc2Raw += String(loc);
-    tnc2Raw += comment + " " + String(config.trk_comment);
+    tnc2Raw += comment + String(config.trk_comment);
     return tnc2Raw;
 }
 
@@ -4398,7 +4527,6 @@ String igate_position(double lat, double lon, double alt, String comment)
     tnc2Raw += ":";
     tnc2Raw += String(loc);
     tnc2Raw += String(config.igate_phg) + String(strAltitude);
-    // tnc2Raw += comment + " " + String(config.igate_comment);
     return tnc2Raw;
 }
 
@@ -4450,7 +4578,6 @@ String digi_position(double lat, double lon, double alt, String comment)
     tnc2Raw += ":";
     tnc2Raw += String(loc);
     tnc2Raw += String(config.digi_phg) + String(strAltitude);
-    // tnc2Raw += comment + " " + String(config.digi_comment);
     return tnc2Raw;
 }
 
@@ -4533,7 +4660,7 @@ String wx_report(double lat, double lon, double alt, String comment)
     memset(WxRaw, 0, 500);
     getRawWx(&WxRaw[0]);
     tnc2Raw += String(WxRaw);
-    tnc2Raw += comment + " " + String(config.wx_comment);
+    tnc2Raw += comment + String(config.wx_comment);
     return tnc2Raw;
 }
 
@@ -4911,6 +5038,7 @@ void loop()
                 i2c_busy = true;
                 char tnc2[300];
                 dispBuffer.pop(&tnc2);
+                //log_d("dispWindow info=%s",tnc2);
                 dispWindow(String(tnc2), 0, false);
                 i2c_busy = false;
                 timeHalfSec = millis() + (config.dispDelay * 1000);
@@ -5115,7 +5243,7 @@ void loop()
                         StandByTick = millis() + (config.pwr_sleep_interval * 1000);
                         vTaskDelete(taskSensorHandle);
                         PowerOff();
-                        adc_power_off();
+                        //adc_power_off();
                         vTaskDelete(taskNetworkHandle);
                         WiFi.disconnect(true); // Disconnect from the network
                         WiFi.persistent(false);
@@ -5178,7 +5306,7 @@ void loop()
                         // esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
                         // esp_task_wdt_add(NULL);               // add current thread to WDT watch
                         // esp_task_wdt_reset();
-                        adc_power_on();
+                        //adc_power_on();
                         // WiFi.disconnect(false);  // Reconnect the network
                         // WiFi.mode(WIFI_STA);    // Switch WiFi off
                         PowerOn();
@@ -6149,7 +6277,7 @@ void taskGPS(void *pvParameters)
                             setTime(timeGps);
                             time_t rtc = timeGps - (config.timeZone * SECS_PER_HOUR);
                             timeval tv = {rtc, 0};
-                            timezone tz = {(config.timeZone * SECS_PER_HOUR), 0};
+                            timezone tz = {(unsigned long)(config.timeZone * (float)SECS_PER_HOUR), 0};
                             settimeofday(&tv, &tz);
                             log_d("\nSET GPS Timestamp = %u Year=%d\n", timeGps, year());
                             // firstGpsTime = false;
@@ -6591,7 +6719,7 @@ void taskAPRS(void *pvParameters)
                     char tlm_result[100];
                     char tlm_data[200];
                     size_t tlm_sz;
-                    if (TLM_SEQ == 0)
+                    if ((TLM_SEQ%100) == 0)
                     {
                         char rawInfo[100];
                         char name[10];
@@ -6916,7 +7044,7 @@ void taskAPRS(void *pvParameters)
                     if (config.rx_display && config.dispRF && (type & config.dispFilter))
                     {
                         dispBuffer.push(tnc2.c_str());
-                        log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d] %s\n", idx, type, call);
+                        log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call,tnc2.c_str());
                     }
                 }
 #endif
@@ -6970,7 +7098,7 @@ void taskAPRS(void *pvParameters)
                             char tlm_result[100];
                             char tlm_data[200];
                             size_t tlm_sz;
-                            if (IGATE_TLM_SEQ == 0)
+                            if ((IGATE_TLM_SEQ%100) == 0)
                             {
                                 char rawInfo[100];
                                 char name[10];
@@ -7211,7 +7339,7 @@ void taskAPRS(void *pvParameters)
                             char tlm_result[100];
                             char tlm_data[200];
                             size_t tlm_sz;
-                            if (DIGI_TLM_SEQ == 0)
+                            if ((DIGI_TLM_SEQ%100) == 0)
                             {
                                 char rawInfo[100];
                                 char name[10];
@@ -7342,7 +7470,7 @@ void taskAPRS(void *pvParameters)
                             telemetry_base91(tlm_data, tlm_result, tlm_sz);
                             rawData += String(tlm_result);
                         }
-                        if (strlen(config.igate_comment) > 0)
+                        if (strlen(config.digi_comment) > 0)
                         {
                             rawData += String(config.digi_comment);
                         }
@@ -8203,9 +8331,10 @@ void dispWindow(String line, uint8_t mode, bool filter)
         memset(&aprs, 0, sizeof(pbuf_t));
         aprs.buf_len = 300;
         aprs.packet_len = line.length();
-        line.toCharArray(&aprs.data[0], aprs.packet_len);
+        memcpy(aprs.data,line.c_str(),line.length());
+        //line.toCharArray(&aprs.data[0], aprs.packet_len);
         int start_info = line.indexOf(":", 0);
-        int end_ssid = line.indexOf(",", 0);
+        int end_ssid = line.indexOf(",", start_val);
         int start_dst = line.indexOf(">", 2);
         int start_dstssid = line.indexOf("-", start_dst);
         if ((end_ssid < 0) || (end_ssid > start_info))
@@ -8343,6 +8472,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
         }
         else
         {
+            log_d("APRS PARSE FAIL!");
             return;
         }
 
@@ -8350,7 +8480,11 @@ void dispWindow(String line, uint8_t mode, bool filter)
         {
 
 #ifdef OLED
+            #ifdef SH1106
+            display.SH1106_command(0xE4);
+            #else
             display.ssd1306_command(0xE4);
+            #endif
             delay(10);
             display.clearDisplay();
 
@@ -9389,17 +9523,17 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 display.setCursor(60, x += 10);
                 display.print("LAT:");
                 str = String(aprs.lat, 5);
-                // l = str.length() * 6;
-                // display.setCursor(160 - l, x);
-                display.setCursor(61, x);
+                //l = str.length() * 6;
+                //display.setCursor(160 - l-2, x);
+                display.setCursor(85, x);
                 display.print(str);
 
                 display.setCursor(60, x += 9);
                 display.print("LON:");
                 str = String(aprs.lng, 5);
-                // l = str.length() * 6;
-                // display.setCursor(160 - l, x);
-                display.setCursor(61, x);
+                //l = str.length() * 6;
+                //display.setCursor(160 - l-2, x);
+                display.setCursor(85, x);
                 display.print(str);
 
                 double lat, lon;
