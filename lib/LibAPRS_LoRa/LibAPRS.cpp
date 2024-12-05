@@ -191,7 +191,7 @@ void startRx()
         // uint8_t syncWord[] = {0x4, 0x1, 0x43};
         uint8_t syncWord[] = {0xd9};
         radioHal->setSyncWord(syncWord, sizeof(syncWord));
-
+        rxTimeout = millis() + 60000;
         //if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
         //{
 
@@ -203,11 +203,10 @@ void startRx()
             //     radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
         //}
     }
-    // else
-    // {
-    //     rxTimeout = millis() + 600000;
-    // }
-    rxTimeout = millis() + 600000;
+    else
+    {
+        rxTimeout = millis() + 900000;
+    }
     // else if (config.rf_mode == RF_MODE_AIS)
     //{
     //  uint8_t syncWord[] = {0xcc, 0xcc, 0xcc};
@@ -371,32 +370,32 @@ bool APRS_init(Configuration *cfg)
     else if (cfg->rf_type == RF_SX1268)
     {
         log_d("Init chip SX1268");
-        radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
     else if (cfg->rf_type == RF_SX1261)
     {
         log_d("Init chip SX1262");
-        radioHal = new RadioHal<SX1261>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1261>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
     else if (cfg->rf_type == RF_SX1262)
     {
         log_d("Init chip SX1262");
-        radioHal = new RadioHal<SX1262>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1262>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
     else if (cfg->rf_type == RF_SX1280)
     {
         log_d("Init chip SX1280");
-        radioHal = new RadioHal<SX1280>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1280>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
     else if (cfg->rf_type == RF_SX1281)
     {
         log_d("Init chip SX1281");
-        radioHal = new RadioHal<SX1281>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1281>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
     else if (cfg->rf_type == RF_SX1282)
     {
         log_d("Init chip SX1282");
-        radioHal = new RadioHal<SX1282>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1282>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
     // else if (cfg->rf_type == RF_SX1231)
     // {
@@ -411,7 +410,7 @@ bool APRS_init(Configuration *cfg)
     else
     {
         log_d("Init chip Unknow default SX1268");
-        radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, -1, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
     }
 
     if (radioHal == NULL)
@@ -792,8 +791,8 @@ bool APRS_poll(void)
     }
     // check if the flag is set
     if (received)
-    {
-        rxTimeout = millis() + 600000;
+    {    
+        rxTimeout = millis() + 900000;   
         // disable the interrupt service routine while
         // processing the data
         disableInterrupt();
@@ -808,6 +807,7 @@ bool APRS_poll(void)
             int state = -1;
             if (config.rf_mode == RF_MODE_G3RUH)
             {
+                rxTimeout = millis() + 30000;
                 uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
                 state = RADIOLIB_ERR_NULL_POINTER;
                 if (outputBuff)
@@ -871,6 +871,7 @@ bool APRS_poll(void)
             }
             else if (config.rf_mode == RF_MODE_AIS)
             {
+                rxTimeout = millis() + 300000;
                 numBytes = radioHal->getPacketLength();
                 if (numBytes > 0)
                 {

@@ -2340,6 +2340,7 @@ void defaultConfig()
     config.pwr_gpio = -1;
     config.pwr_active = 0;    
 #elif defined(HT_CT62)
+    config.rf_en = true;
     config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
@@ -2354,6 +2355,8 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_reset_active = 0;
     config.rf_nss_active = 0;
+    config.pwr_gpio = -1;
+    config.pwr_active = 1;
 #elif defined(ESP32_DIY_LoRa_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1278;
@@ -3577,6 +3580,7 @@ void setup()
 #endif
 
 #ifdef OLED
+
     config.i2c_enable = true;
     // pinMode(OLED_RESET,OUTPUT);
     // digitalWrite(OLED_RESET,HIGH);
@@ -3613,13 +3617,13 @@ void setup()
     // //enable boost mode
     // ip5306.boost_mode(ENABLE);
     // #endif
-    int i2c_timeout = 0;
-    while (i2c_busy)
-    {
-        delay(10);
-        if (++i2c_timeout > 20)
-            break;
-    }
+    // int i2c_timeout = 0;
+    // while (i2c_busy)
+    // {
+    //     delay(10);
+    //     if (++i2c_timeout > 20)
+    //         break;
+    // }
     i2c_busy = true;
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     if (OLED_RESET > -1)
@@ -3715,6 +3719,12 @@ void setup()
     i2c_busy = false;
 #else
 #ifdef ST7735_160x80
+    if (config.i2c_enable)
+    {
+        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
+        i2c_busy=false;
+    }
+
     TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
     TFT_SPI.setFrequency(40000000);
     //pinMode(ST7735_LED_K_Pin, OUTPUT);
@@ -3806,10 +3816,7 @@ void setup()
     }
     LED_Status(0, 0, 0);
 #endif
-    if (config.i2c_enable)
-    {
-        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
-    }
+
     // if (config.pwr_mode != MODE_A)
     // {
     //     delay(1000);
