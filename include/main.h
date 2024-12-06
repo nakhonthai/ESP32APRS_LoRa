@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.4"
-#define VERSION_BUILD 'a'
+#define VERSION_BUILD 'b'
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
@@ -27,7 +27,8 @@
 #include "HardwareSerial.h"
 
 #include "config.h"
-#ifndef TTGO_T_Beam_S3_SUPREME_V3
+#if defined(TTGO_T_Beam_S3_SUPREME_V3)  || defined(HELTEC_V3_GPS) || defined(HELTEC_HTIT_TRACKER) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE)
+#else
 #include "soc/rtc_wdt.h"
 #endif
 

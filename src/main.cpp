@@ -2357,6 +2357,24 @@ void defaultConfig()
     config.rf_nss_active = 0;
     config.pwr_gpio = -1;
     config.pwr_active = 1;
+#elif defined(ESP32_C6_DEVKIT)
+    config.rf_en = true;
+    config.rf_type = RF_SX1262;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 3;
+    config.rf_reset_gpio = 5;
+    config.rf_dio0_gpio = 4;
+    config.rf_nss_gpio = 8;
+    config.rf_sclk_gpio = 10;
+    config.rf_miso_gpio = 6;
+    config.rf_mosi_gpio = 7;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.pwr_gpio = -1;
+    config.pwr_active = 1;
 #elif defined(ESP32_DIY_LoRa_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1278;
