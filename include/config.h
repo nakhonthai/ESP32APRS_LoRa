@@ -14,6 +14,9 @@
 #include <Arduino.h>
 #include "sensor.h"
 
+#define COMMENT_SIZE 32
+#define STATUS_SIZE 32
+
 #define WX_SENSOR_NUM 23
 
 #define ACTIVATE_OFF 0				// Packet is disable all packet
@@ -80,7 +83,7 @@ typedef struct Config_Struct
 	bool title;
 
 	// WiFi/BT/RF
-	char wifi_mode; // WIFI_AP,WIFI_STA,WIFI_AP_STA,WIFI_OFF
+	uint8_t wifi_mode; // WIFI_AP,WIFI_STA,WIFI_AP_STA,WIFI_OFF
 	int8_t wifi_power;
 	//--WiFi Client
 	wifiSTA wifi_sta[5];
@@ -89,7 +92,7 @@ typedef struct Config_Struct
 	// char wifi_pass[63];
 	//--WiFi AP
 	// bool wifi_ap;
-	char wifi_ap_ch;
+	uint8_t wifi_ap_ch;
 	char wifi_ap_ssid[32];
 	char wifi_ap_pass[63];
 
@@ -140,7 +143,7 @@ typedef struct Config_Struct
 	char igate_object[10];
 	char igate_phg[8];
 	uint8_t igate_path;
-	char igate_comment[50];
+	char igate_comment[COMMENT_SIZE];
 	//--Filter
 
 	// DIGI REPEATER
@@ -155,8 +158,8 @@ typedef struct Config_Struct
 	uint16_t digiFilter;
 	//--Position
 	bool digi_bcn;
-	bool digi_compress = false;
-	bool digi_altitude = false;
+	//bool digi_compress = false;
+	//bool digi_altitude = false;
 	bool digi_gps;
 	float digi_lat;
 	float digi_lon;
@@ -164,7 +167,7 @@ typedef struct Config_Struct
 	uint16_t digi_interval;
 	char digi_symbol[3] = "N&";
 	char digi_phg[8];
-	char digi_comment[50];
+	char digi_comment[COMMENT_SIZE];
 
 // TRACKER
 	bool trk_en;
@@ -197,7 +200,7 @@ typedef struct Config_Struct
 	char trk_symmove[3] = "/>";
 	char trk_symstop[3] = "\\>";
 	// char trk_btext[17] = "";
-	char trk_comment[50];
+	char trk_comment[COMMENT_SIZE];
 	char trk_item[10] = "";
 
 	// WX
@@ -213,11 +216,11 @@ typedef struct Config_Struct
 	float wx_lon;
 	float wx_alt;
 	uint16_t wx_interval;
-	int8_t wx_channel = 0;
-	uint8_t wx_type[32]; //Sensor number 32
+	//int8_t wx_channel = 0;
+	//uint8_t wx_type[32]; //Sensor number 32
 	uint32_t wx_flage;
 	char wx_object[10];
-	char wx_comment[50];
+	char wx_comment[COMMENT_SIZE];
 
 	// Telemetry 0
 	bool tlm0_en;
@@ -232,7 +235,7 @@ typedef struct Config_Struct
 	char tlm0_UNIT[13][8];
 	float tlm0_EQNS[5][3];
 	uint8_t tlm0_BITS_Active;	
-	char tlm0_comment[50];
+	char tlm0_comment[COMMENT_SIZE];
 	uint8_t tml0_data_channel[13];
 
 	// Telemetry 1
@@ -248,15 +251,15 @@ typedef struct Config_Struct
 	char tlm1_UNIT[13][8];
 	float tlm1_EQNS[5][3];
 	uint8_t tlm1_BITS_Active;	
-	char tlm1_comment[50];
+	char tlm1_comment[COMMENT_SIZE];
 	uint8_t tml1_data_channel[13];
 
 	// OLED DISPLAY
 	bool oled_enable;
 	int oled_timeout;
-	unsigned char dim;
-	unsigned char contrast;
-	unsigned char startup;
+	uint8_t dim;
+	uint8_t contrast;
+	uint8_t startup;
 
 	// Display
 	unsigned int dispDelay;
@@ -401,5 +404,8 @@ typedef struct Config_Struct
 	uint8_t wx_sensor_ch[WX_SENSOR_NUM];
 
 } Configuration;
+
+bool saveConfiguration(const char *filename, const Configuration &config);
+bool loadConfiguration(const char *filename, Configuration &config);
 
 #endif

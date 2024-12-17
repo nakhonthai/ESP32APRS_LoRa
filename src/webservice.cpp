@@ -269,20 +269,23 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "</tr>\n";
 	webString += "</table>\n";
 	webString += "\n";
-	webString += "<br />\n";
-	webString += "<table>\n";
-	webString += "<tr>\n";
-	webString += "<th colspan=\"2\">APRS-IS SERVER</th>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>HOST</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_host) + "</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>PORT</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_port) + "</td>\n";
-	webString += "</tr>\n";
-	webString += "</table>\n";
+	if (config.igate_en)
+	{
+		webString += "<br />\n";
+		webString += "<table>\n";
+		webString += "<tr>\n";
+		webString += "<th colspan=\"2\">APRS-IS SERVER</th>\n";
+		webString += "</tr>\n";
+		webString += "<tr>\n";
+		webString += "<td>HOST</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_host) + "</td>\n";
+		webString += "</tr>\n";
+		webString += "<tr>\n";
+		webString += "<td>PORT</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_port) + "</td>\n";
+		webString += "</tr>\n";
+		webString += "</table>\n";
+	}
 	webString += "<br />\n";
 	webString += "<table>\n";
 	webString += "<tr>\n";
@@ -1243,6 +1246,10 @@ void handle_download(AsyncWebServerRequest *request)
 		dataType = "application/pdf";
 	else if (path.endsWith(".zip"))
 		dataType = "application/zip";
+	else if (path.endsWith(".cfg"))
+		dataType = "text/html";
+	else if (path.endsWith(".json"))
+		dataType = "application/json";
 	else if (path.endsWith(".gz"))
 	{
 		if (path.startsWith("/gz/htm"))
@@ -1271,7 +1278,10 @@ void handle_download(AsyncWebServerRequest *request)
 	}
 	else
 	{
-		request->send_P(404, PSTR("text/plain"), PSTR("File Not found"));
+		if (dataType != "")
+			request->send_P(404, PSTR("text/plain"), PSTR("ContentType Not Support"));
+		else
+			request->send_P(404, PSTR("text/plain"), PSTR("File Not found"));
 	}
 }
 
@@ -1400,6 +1410,11 @@ void handle_radio(AsyncWebServerRequest *request)
 					if (isValidNumber(request->arg(i)))
 					{
 						config.rf_mode = request->arg(i).toInt();
+						if (config.rf_mode == RF_MODE_AIS)
+						{
+							sprintf(config.aprs_host, "aprs.dprns.com");
+							config.aprs_port = 24580;
+						}
 					}
 				}
 			}
@@ -1515,7 +1530,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		if (APRS_init(&config))
 		{
 			html = "Setup completed successfully";
-			saveEEPROM();
+			saveConfiguration("/default.cfg", config);
 			request->send(200, "text/html", html); // send to someones browser when asked
 		}
 		else
@@ -1550,13 +1565,13 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "function loraVHF(){\n";
 		html += "const rftype=Number(document.querySelector('#rf_type').value);";
 		html += "if (rftype>5 && rftype<11) {\n"; // SX127x
-		html += "document.getElementById(\"rf_bw\").value='7.8';\n";
+		html += "document.getElementById(\"rf_bw\").value='10.4';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
-		html += "document.getElementById(\"rf_sf\").value=7;\n";
+		html += "document.getElementById(\"rf_sf\").value=8;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
 		html += "document.getElementById(\"freq\").value=144.410;\n";
 		html += "var x = document.getElementById(\"ax25En\");\n";
-  		html += "x.checked = true;\n";
+		html += "x.checked = true;\n";
 		html += "} else {\n";
 		html += "alert(\"For chip type SX127x model.\");\n";
 		html += "}\n";
@@ -1569,13 +1584,23 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
 		html += "document.getElementById(\"freq\").value=433.775;\n";
 		html += "var x = document.getElementById(\"ax25En\");\n";
-  		html += "x.checked = true;\n";
+		html += "x.checked = false;\n";
+		html += "}\n";
+
+		html += "function loraUHFCB(){\n";
+		html += "document.getElementById(\"rf_bw\").value='20.8';\n";
+		html += "document.getElementById(\"rf_sync\").value=18;\n";
+		html += "document.getElementById(\"rf_sf\").value=9;\n";
+		html += "document.getElementById(\"rf_cr\").value=5;\n";
+		html += "document.getElementById(\"freq\").value=433.3;\n";
+		html += "var x = document.getElementById(\"ax25En\");\n";
+		html += "x.checked = true;\n";
 		html += "}\n";
 
 		html += "function rfMode(){\n";
 		html += "const rfmode=Number(document.querySelector('#rf_mode').value);";
 		html += "const rftype=Number(document.querySelector('#rf_type').value);";
-		//html += "console.log(rftype);";
+		// html += "console.log(rftype);";
 		html += "if (rfmode===1) {\n"; // LoRa
 		html += "document.getElementById(\"loraGrp\").disabled=false;\n";
 		html += "document.getElementById(\"gfskGrp\").disabled=true;\n";
@@ -1738,9 +1763,9 @@ void handle_radio(AsyncWebServerRequest *request)
 			for (int i = 0; i < sizeof(LORA_BW) / sizeof(float); i++)
 			{
 				if ((config.rf_bw > (LORA_BW[i] - 0.5)) && (config.rf_bw < (LORA_BW[i] + 0.5)))
-					html += "<option value=\"" + String(LORA_BW[i], 1) + "\" selected>" + String(LORA_BW[i], 1) + "</option>\n";
+					html += "<option value=\"" + String(LORA_BW[i], 2) + "\" selected>" + String(LORA_BW[i], 1) + "</option>\n";
 				else
-					html += "<option value=\"" + String(LORA_BW[i], 1) + "\" >" + String(LORA_BW[i], 1) + "</option>\n";
+					html += "<option value=\"" + String(LORA_BW[i], 2) + "\" >" + String(LORA_BW[i], 1) + "</option>\n";
 			}
 		}
 		else
@@ -1805,7 +1830,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "<td align=\"right\" width=\"20%\"><b>Sync Word:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_sync\" name=\"rf_sync\" min=\"1\" max=\"255\"\n";
 		html += "step=\"1\" value=\"" + String(config.rf_sync) + "\" /></td>\n";
-		html += "</tr>\n";		
+		html += "</tr>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Coding Rate:</b></td>\n";
@@ -1822,7 +1847,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "</td>\n";
 		html += "</tr>\n";
 
-		html += "</table>*QuickCFG <button type=\"button\" onClick=\"loraVHF()\" style=\"background-color:green;color:white\">VHF</button>[<i>Freq:144.410Mhz,SF=7,BW=7.8Khz</i>] <button type=\"button\" onClick=\"loraUHF()\" style=\"background-color:gray;color:white\">UHF</button>[<i>Freq:433.775Mhz,SF=12,BW=125Khz</i>]<br /></fieldset></tr>";
+		html += "</table>*QuickCFG <button type=\"button\" onClick=\"loraVHF()\" style=\"background-color:green;color:white\">VHF</button>[<i>Freq:144.410Mhz,SF=8,BW=10.4Khz</i>] <button type=\"button\" onClick=\"loraUHF()\" style=\"background-color:gray;color:white\">UHF</button>[<i>Freq:433.775Mhz,SF=12,BW=125Khz</i>] <button type=\"button\" onClick=\"loraUHFCB()\" style=\"background-color:red;color:white\">CB</button><br /></fieldset></tr>";
 
 		// GFSK Group
 		html += "<tr>\n";
@@ -2001,9 +2026,17 @@ void handle_vpn(AsyncWebServerRequest *request)
 		}
 
 		config.vpn = vpnEn;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -2152,9 +2185,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.gnss_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitUART0"))
 	{
@@ -2209,9 +2250,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.uart0_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitUART1"))
 	{
@@ -2266,9 +2315,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.uart1_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitMODBUS"))
 	{
@@ -2316,9 +2373,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.modbus_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitTNC"))
 	{
@@ -2358,9 +2423,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.ext_tnc_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitONEWIRE"))
 	{
@@ -2392,9 +2465,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.onewire_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitRF"))
 	{
@@ -2498,9 +2579,17 @@ void handle_mod(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitI2C0"))
 	{
@@ -2545,9 +2634,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.i2c_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitI2C1"))
 	{
@@ -2592,9 +2689,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.i2c1_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitCOUNTER0"))
 	{
@@ -2632,9 +2737,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.counter0_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitCOUNTER1"))
 	{
@@ -2672,9 +2785,17 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.counter0_enable = En;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -3291,9 +3412,17 @@ void handle_system(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("updateTimeNtp"))
 	{
@@ -3314,9 +3443,17 @@ void handle_system(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("updateTime"))
 	{
@@ -3376,9 +3513,17 @@ void handle_system(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("REBOOT"))
 	{
@@ -3391,6 +3536,14 @@ void handle_system(AsyncWebServerRequest *request)
 	{
 		defaultConfig();
 		esp_restart();
+	}
+	else if (request->hasArg("LoadCFG"))
+	{
+		if (loadConfiguration("/default.cfg", config))
+		{
+			String html = "OK";
+			request->send(200, "text/html", html);
+		}
 	}
 	else if (request->hasArg("commitWebAuth"))
 	{
@@ -3415,9 +3568,17 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitPath"))
 	{
@@ -3456,9 +3617,17 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitPWR"))
 	{
@@ -3589,9 +3758,17 @@ void handle_system(AsyncWebServerRequest *request)
 			}
 		}
 		config.pwr_en = PwrEn;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitLOG"))
 	{
@@ -3650,9 +3827,17 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitDISP"))
 	{
@@ -3868,9 +4053,17 @@ void handle_system(AsyncWebServerRequest *request)
 		// config.filterTracker = filterTracker;
 		// config.filterMove = filterMove;
 		// config.filterPosition = filterPosition;
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -3950,8 +4143,9 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "<tr>\n";
 		html += "<td style=\"text-align: right;\">SYSTEM CONTROL </td>\n";
 		html += "<td style=\"text-align: left;\"><table><tr><td width=\"100\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formReboot\" method=\"post\"> <button type='submit' id='REBOOT'  name=\"commit\" style=\"background-color:red;color:white\"> REBOOT </button>\n";
-		html += " <input type=\"hidden\" name=\"REBOOT\"/></form></td><td width=\"100\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formFactory\" method=\"post\"> <button type='submit' id='Factory'  name=\"commit\" style=\"background-color:red;color:white\"> Factory Reset </button>\n";
-		html += " <input type=\"hidden\" name=\"Factory\"/></form></td></tr></table></td>\n";
+		html += " <input type=\"hidden\" name=\"REBOOT\"/></form></td><td width=\"100\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formFactory\" method=\"post\"> <button type='submit' id='Factory'  name=\"commit\" style=\"background-color:orange;color:white\"> Factory Reset </button>\n";
+		html += " <input type=\"hidden\" name=\"Factory\"/></form></td><td width=\"100\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formLoad\" method=\"post\"> <button type='submit' id='LoadCFG'  name=\"commit\" style=\"background-color:green;color:white\"> Load Default </button>\n";
+		html += " <input type=\"hidden\" name=\"LoadCFG\"/></form></td></tr></table></td>\n";
 		// html += "<td style=\"text-align: left;\"><input type='submit' class=\"btn btn-danger\" id=\"REBOOT\" name=\"REBOOT\" value='REBOOT'></td>\n";
 		html += "</tr></table><br /><br />\n";
 
@@ -4627,10 +4821,18 @@ void handle_igate(AsyncWebServerRequest *request)
 		config.igate_loc2inet = pos2INET;
 		config.igate_timestamp = timeStamp;
 
-		saveEEPROM();
 		initInterval = true;
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitIGATEfilter"))
 	{
@@ -4798,9 +5000,17 @@ void handle_igate(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -5596,10 +5806,18 @@ void handle_digi(AsyncWebServerRequest *request)
 		config.digi_loc2inet = pos2INET;
 		config.digi_timestamp = timeStamp;
 
-		saveEEPROM();
 		initInterval = true;
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -6017,14 +6235,14 @@ void handle_wx(AsyncWebServerRequest *request)
 						config.wx_ssid = 3;
 				}
 			}
-			if (request->argName(i) == "channel")
-			{
-				if (request->arg(i) != "")
-				{
-					if (isValidNumber(request->arg(i)))
-						config.wx_channel = request->arg(i).toInt();
-				}
-			}
+			// if (request->argName(i) == "channel")
+			// {
+			// 	if (request->arg(i) != "")
+			// 	{
+			// 		if (isValidNumber(request->arg(i)))
+			// 			config.wx_channel = request->arg(i).toInt();
+			// 	}
+			// }
 			if (request->argName(i) == "PosInv")
 			{
 				if (request->arg(i) != "")
@@ -6147,10 +6365,18 @@ void handle_wx(AsyncWebServerRequest *request)
 		config.wx_2inet = pos2INET;
 		config.wx_timestamp = timeStamp;
 
-		saveEEPROM();
 		initInterval = true;
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -6542,10 +6768,18 @@ void handle_tlm(AsyncWebServerRequest *request)
 		config.tlm0_2rf = pos2RF;
 		config.tlm0_2inet = pos2INET;
 
-		saveEEPROM();
 		initInterval = true;
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else
 	{
@@ -6824,9 +7058,17 @@ void handle_sensor(AsyncWebServerRequest *request)
 			}
 		}
 
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 		vTaskResume(taskSensorHandle);
 	}
 	else
@@ -7490,10 +7732,18 @@ void handle_tracker(AsyncWebServerRequest *request)
 		config.trk_sat = optSat;
 		config.trk_timestamp = timeStamp;
 
-		saveEEPROM();
 		initInterval = true;
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 
 	String html = "<script type=\"text/javascript\">\n";
@@ -7674,7 +7924,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 		trackerOptCSTFlag = "checked";
 	html += "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\">";
 	html += "<input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" " + trackerOptCSTFlag + "/>Telemetry ";
-	// html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Temperature ";
+	html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Altutude ";
 	html += "<input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" " + trackerOptBatFlag + "/>RSSI Request ";
 	// html += "<input type=\"checkbox\" name=\"trackerOptSat\" value=\"OK\" " + trackerOptSatFlag + "/>Satellite";
 	html += "</td></tr>\n";
@@ -7847,9 +8097,17 @@ void handle_wireless(AsyncWebServerRequest *request)
 		{
 			config.wifi_mode &= ~WIFI_AP_FIX;
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 	}
 	else if (request->hasArg("commitWiFiClient"))
 	{
@@ -7918,9 +8176,17 @@ void handle_wireless(AsyncWebServerRequest *request)
 		{
 			config.wifi_mode &= ~WIFI_STA_FIX;
 		}
-		saveEEPROM();
-		String html = "OK";
-		request->send(200, "text/html", html);
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
 		WiFi.setTxPower((wifi_power_t)config.wifi_power);
 	}
 	else

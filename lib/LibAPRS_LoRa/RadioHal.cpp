@@ -1321,3 +1321,69 @@ int16_t RadioHal<SX1282>::setOutputPower(int8_t power)
 {
     return false;
 }
+
+template<>
+int16_t RadioHal<SX1272>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1273>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1276>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1278>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1279>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1268>::setRxBoostedGainMode(bool rxbgm)
+{
+    return radio->setRxBoostedGainMode(true);
+}
+
+template<>
+int16_t RadioHal<SX1262>::setRxBoostedGainMode(bool rxbgm)
+{
+    return radio->setRxBoostedGainMode(true);
+}
+
+template<>
+int16_t RadioHal<SX1261>::setRxBoostedGainMode(bool rxbgm)
+{
+    return radio->setRxBoostedGainMode(true);
+}
+
+template<>
+int16_t RadioHal<SX1280>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1281>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}
+
+template<>
+int16_t RadioHal<SX1282>::setRxBoostedGainMode(bool rxbgm)
+{
+    return 0;
+}

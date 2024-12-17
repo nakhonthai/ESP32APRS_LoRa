@@ -33,6 +33,7 @@ public:
   virtual void setFifoFullAction(void (*func)(void)) = 0;
   virtual int16_t setCurrentLimit(float currentLimit) = 0;
   virtual int16_t setOutputPower(int8_t power) = 0;
+  virtual int16_t setRxBoostedGainMode(bool rxbgm) = 0;
 };
 
 
@@ -78,6 +79,8 @@ public:
   void setFifoEmptyAction(void (*func)(void));
 
   void setFifoFullAction(void (*func)(void));
+
+  int16_t setRxBoostedGainMode(bool rxbgm);
   // {
   //   radio->setFifoEmptyAction(func);
   // }

@@ -543,16 +543,21 @@ bool APRS_init(Configuration *cfg)
 
     if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
     {
-        radioHal->setCurrentLimit(240);
+        radioHal->setCurrentLimit(140);
     }
     else
     {
-        radioHal->setCurrentLimit(140);
+        radioHal->setCurrentLimit(120);
     }
 
     radioHal->setOutputPower(config.rf_power);
 
     startRx();
+
+    if(config.igate_en || config.digi_en)
+    {
+        radioHal->setRxBoostedGainMode(true);
+    }
 
     ax25_init(&AX25, aprs_msg_callback);
     return ret;

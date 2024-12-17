@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.4"
-#define VERSION_BUILD 'b'
+#define VERSION_BUILD 'c'
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
@@ -27,10 +27,9 @@
 #include "HardwareSerial.h"
 
 #include "config.h"
-#if defined(TTGO_T_Beam_S3_SUPREME_V3)  || defined(HELTEC_V3_GPS) || defined(HELTEC_HTIT_TRACKER) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE)
-#else
-#include "soc/rtc_wdt.h"
-#endif
+// #ifndef CONFIG_IDF_TARGET_ESP32S3
+// #include "soc/rtc_wdt.h"
+// #endif
 
 #define WX
 //#define OLED
@@ -187,6 +186,30 @@
     */
     int16_t sendMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t* telem = NULL, size_t telemLen = 0, char* grid = NULL, char* status = NULL, int32_t alt = RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED);
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if defined(MBEDTLS_MD5_ALT)
+#include "md/esp_md.h"
+
+#define mbedtls_md5_init                        esp_md5_init
+#define mbedtls_md5_update_ret                      esp_md5_update
+#define mbedtls_md5_finish_ret                      esp_md5_finish
+#define mbedtls_md5_starts_ret                      esp_md5_starts
+
+#define mbedtls_md5_free                        esp_md5_free
+#define mbedtls_md5_clone                       esp_md5_clone
+#define mbedtls_internal_md5_process            esp_md5_process
+
+#endif /* MBEDTLS_MD5_ALT */
+
+#ifdef __cplusplus
+}
+#endif
+
+#define ets_printf	log_d 
 
 typedef struct igateTLM_struct
 {
@@ -350,12 +373,12 @@ const float BR1[]={1.2,2.4,4.8,9.6,12.5,19.2,25,38.4,50,57.6,76.8,100,115.2,150.
 const float BW1[]={2.6,3.1,3.9,5.2,6.3,7.8,10.4,12.5,15.6,20.8,25,31.3,41.7,50,62.5,83.3,100,125,166.7,200,250};
 const float BR2[]={4.8,5.8,7.3,9.7,11.7,14.6,19.5,23.4,29.3,39.0,46.9,58.6,78.2,93.8,117.3,156.2,187.2,234.3,312.0,373.6,467.0};
 const float BW2[]={4.8,5.8,7.3,9.7,11.7,14.6,19.5,23.4,29.3,39.0,46.9,58.6,78.2,93.8,117.3,156.2,187.2,232.3,312.0,373.6,467.0};
-const float LORA_BW[]={7.8,10.4,15.6,20.8,31.2,41.7,62.5,125,250,500};
+const float LORA_BW[]={7.8,10.4,15.6,20.8,31.25,41.7,62.5,125,250,500};
 const char SHAPING[5][7]={"NONE","BT=0.3","BT=0.5","BT=0.7","BT=1.0"};
 const char ENCODING[3][11]={"NRZ","MANCHESTER","WHITENING"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
-void saveEEPROM();
+//void saveEEPROM();
 void defaultConfig();
 String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);

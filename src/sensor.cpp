@@ -19,8 +19,12 @@
 #include <SHTSensor.h>
 #include <ModbusMaster.h>
 #include <TinyGPS++.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#include <soc/gpio_struct.h>
+//#include <OneWire.h>
+//#include <DallasTemperature.h>
+
+//#include "DS18B20.h" // Digital Thermometer, 12bit
+//#include "OneWireHub.h"
 
 extern Configuration config;
 extern WiFiClient aprsClient;
@@ -39,8 +43,15 @@ Adafruit_BMP280 *bmp280=NULL; // I2C
 Adafruit_Si7021 *Si7021=NULL;
 Adafruit_CCS811 *ccs=NULL;
 SHTSensor *sht=NULL; // Supported sensors:SHTC1, SHTC3, SHTW1, SHTW2, SHT3x-DIS (I2C), SHT2x, SHT85, SHT3x-ARP, SHT4x
-OneWire *oneWire=NULL;
-DallasTemperature *ds1820;
+//OneWire *oneWire=NULL;
+//DallasTemperature *ds1820;
+
+// OneWireHub *oneWire=NULL;
+// //auto hub = OneWireHub(pin_onewire);
+
+// auto ds18b20 = DS18B20(DS18B20::family_code, 0x00, 0x00, 0xB2, 0x18, 0xDA,
+//                        0x00); // DS18B20: 9-12bit, -55 -  +85 degC
+
 
 SensorData sen[SENSOR_NUMBER];
 
@@ -269,20 +280,23 @@ bool getLOGIC(uint8_t port)
 }
 
 bool getDS1820(uint8_t port)
-{
-    if(ds1820==NULL) return false;
-    ds1820->requestTemperatures();
-    for (int i = 0; i < SENSOR_NUMBER; i++)
-    {
-        if(!config.sensor[i].enable) continue;
-        if (config.sensor[i].port == port)
-        {
-            float val=0;
-            val=ds1820->getTempCByIndex(config.sensor[i].address);
-            sensorUpdate(i, (double)val);
-            break;
-        }
-    }
+{    
+    // oneWire->attach(ds18b20);
+    // //if(ds1820==NULL) return false;
+    // //ds1820->requestTemperatures();
+    // ds18b20.setTemperature(int8_t(85));
+    // for (int i = 0; i < SENSOR_NUMBER; i++)
+    // {
+    //     if(!config.sensor[i].enable) continue;
+    //     if (config.sensor[i].port == port)
+    //     {
+    //         float val=0;
+    //         //val=ds1820->getTempCByIndex(config.sensor[i].address);
+    //         val=ds18b20.getTemperature();
+    //         sensorUpdate(i, (double)val);
+    //         break;
+    //     }
+    // }
     return true;
 }
 
@@ -844,7 +858,7 @@ bool getSensor(int cfgIdx)
         {
             modbus.begin(config.sensor[cfgIdx].address, Serial1);
         }
-#ifndef CONFIG_IDF_TARGET_ESP32C3
+#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
         else if (config.modbus_channel == 3)
         {
             modbus.begin(config.sensor[cfgIdx].address, Serial2);
@@ -866,7 +880,7 @@ bool getSensor(int cfgIdx)
         {
             modbus.begin(config.sensor[cfgIdx].address, Serial1);
         }
-#ifndef CONFIG_IDF_TARGET_ESP32C3
+#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
         else if (config.modbus_channel == 3)
         {
             modbus.begin(config.sensor[cfgIdx].address, Serial2);
@@ -888,7 +902,7 @@ bool getSensor(int cfgIdx)
         {
             modbus.begin(config.sensor[cfgIdx].address, Serial1);
         }
-#ifndef CONFIG_IDF_TARGET_ESP32C3
+#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
         else if (config.modbus_channel == 3)
         {
             modbus.begin(config.sensor[cfgIdx].address, Serial2);
@@ -910,7 +924,7 @@ bool getSensor(int cfgIdx)
         {
             modbus.begin(config.sensor[cfgIdx].address/1000, Serial1);
         }
-#ifndef CONFIG_IDF_TARGET_ESP32C3
+#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
         else if (config.modbus_channel == 3)
         {
             modbus.begin(config.sensor[cfgIdx].address/1000, Serial2);
@@ -932,7 +946,7 @@ bool getSensor(int cfgIdx)
         {
             modbus.begin(config.sensor[cfgIdx].address/1000, Serial1);
         }
-#ifndef CONFIG_IDF_TARGET_ESP32C3
+#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
         else if (config.modbus_channel == 3)
         {
             modbus.begin(config.sensor[cfgIdx].address/1000, Serial2);
@@ -1349,13 +1363,13 @@ void sensorInit(bool resetAll)
             }
             break;
         case PORT_DS1820:
-            if(oneWire!=NULL)
-            {
-                ds1820 = new DallasTemperature(oneWire);
-                ds1820->begin();                
-            }else{
-                log_d("Not enable 1-Wire port");
-            }
+            // if(oneWire!=NULL)
+            // {
+            //     //ds1820 = new DallasTemperature(oneWire);
+            //     //ds1820->begin();                
+            // }else{
+            //     log_d("Not enable 1-Wire port");
+            // }
             break;
         }
                     
@@ -1401,7 +1415,7 @@ void taskSensor(void *pvParameters)
 
     if(config.onewire_enable)
     {
-        oneWire = new OneWire(config.onewire_gpio);
+        //oneWire = new OneWireHub(config.onewire_gpio);
     }
 
     sensorInit(true);

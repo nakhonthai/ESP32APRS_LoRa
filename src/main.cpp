@@ -44,7 +44,7 @@
 
 #include <ModbusMaster.h>
 
-#include <EEPROM.h>
+//#include <EEPROM.h>
 
 #include "IP5306_I2C.h"
 
@@ -73,29 +73,44 @@ XPowersAXP2101 PMU;
 XPowersAXP2101 PMU;
 #endif
 
-#define EEPROM_SIZE 4096
+//#define EEPROM_SIZE 4096
 
 #ifdef BLUETOOTH
 #include "BluetoothSerial.h"
 #endif
 
+#if APRS_LORA_DONGLE
 #define PIXELS_PIN 45
+#elif BV5DJ_BOARD
+#define PIXELS_PIN 12
+#endif
 
 #ifdef HELTEC_V3_GPS
 #define LED_TX 35
+#elif defined(TTGO_LORA32_V21)
+#define LED_TX 25
+#elif defined(HELTEC_HTIT_TRACKER)
+#define LED_TX 18
 #else
 #define LED_TX -1
 #endif
 
-#if defined(HELTEC_HTIT_TRACKER)
-#define LED_RX 18
-#else
 #define LED_RX -1
-#endif
 
 #ifdef APRS_LORA_DONGLE
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
+// portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
+void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+{
+    // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
+    strip.setPixelColor(0, strip.Color(r, g, b));
+    strip.show();
+    // portEXIT_CRITICAL_ISR(&ledMux);
+}
+#elif defined(BV5DJ_BOARD)
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(2, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
 
 // portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
@@ -129,6 +144,7 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 
 bool i2c_busy = false;
 #include <Wire.h>
+
 #ifdef OLED
 #include <Adafruit_GFX.h>
 #include <Adafruit_I2CDevice.h>
@@ -144,14 +160,20 @@ Adafruit_SH1106 display(OLED_RESET);
 #else
 #include <Adafruit_SSD1306.h>
 #if defined(TTGO_LORA32_V1) || defined(TTGO_LORA32_V1_6) 
-#define OLED_RESET 16 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #elif defined(HELTEC_V3_GPS)
 #define OLED_RESET 21
 #else
 #define OLED_RESET -1
 #endif
+#ifdef SSD1306_128x32
+#define SCREEN_ADDRESS 0x3C
+Adafruit_SSD1306 display(72, 40, &Wire, OLED_RESET);
+#else
 #define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#endif
+
 #endif
 
 #endif
@@ -220,7 +242,11 @@ TinyGPSPlus gps;
 // instantiate ModbusMaster object
 ModbusMaster modbus;
 
+#ifndef BV5DJ_BOARD
 #define VBAT_PIN 35
+#else
+#define VBAT_PIN 36
+#endif
 
 #define PPP_APN "internet"
 #define PPP_USER ""
@@ -230,6 +256,15 @@ ModbusMaster modbus;
 #define BOOT_PIN 0
 #else
 #define BOOT_PIN 9
+#endif
+#ifdef BV5DJ_BOARD
+#define BUTTON_LEFT 27
+#define BUTTON_RIGHT 32
+#define BUTTON_UP 34
+#define BUTTON_DOWN 35
+#define KEEP_ALIVE 25  //Trigger -pad in PCB
+#define SD_CS 13  //MicroSD card SlaveSelect
+#define GPS_PPS 26  //GPS PPS pin 
 #endif
 
 const char *str_status[] = {
@@ -1807,20 +1842,21 @@ void logWeather(double lat, double lon, double speed, double course)
     }
 }
 
-void saveEEPROM()
-{
-    uint8_t chkSum = 0;
-    byte *ptr;
-    ptr = (byte *)&config;
-    EEPROM.writeBytes(1, ptr, sizeof(Configuration));
-    chkSum = checkSum(ptr, sizeof(Configuration));
-    EEPROM.write(0, chkSum);
-    EEPROM.commit();
-#ifdef DEBUG
-    Serial.print("Save EEPROM ChkSUM=");
-    Serial.println(chkSum, HEX);
-#endif
-}
+// void saveEEPROM()
+// {
+//     uint8_t chkSum = 0;
+//     byte *ptr;
+//     ptr = (byte *)&config;
+//     EEPROM.writeBytes(1, ptr, sizeof(Configuration));
+//     chkSum = checkSum(ptr, sizeof(Configuration));
+//     EEPROM.write(0, chkSum);
+//     EEPROM.commit();
+// #ifdef DEBUG
+//     Serial.print("Save EEPROM ChkSUM=");
+//     Serial.println(chkSum, HEX);
+// #endif
+//     saveConfiguration("/default.cfg",config);
+// }
 
 void defaultConfig()
 {
@@ -1956,7 +1992,7 @@ void defaultConfig()
     config.wx_en = false;
     config.wx_2rf = true;
     config.wx_2inet = true;
-    config.wx_channel = 0;
+    //config.wx_channel = 0;
     config.wx_ssid = 13;
     sprintf(config.wx_mycall, "NOCALL");
     config.wx_path = 8;
@@ -2024,7 +2060,7 @@ void defaultConfig()
     config.wx_alt = 0;
     config.wx_interval = 600;
     config.wx_flage = 0;
-    memset(config.wx_type, 0, sizeof(config.wx_type));
+    //memset(config.wx_type, 0, sizeof(config.wx_type));
 
     // OLED DISPLAY
     config.oled_enable = true;
@@ -2338,7 +2374,31 @@ void defaultConfig()
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 22;
     config.pwr_gpio = -1;
-    config.pwr_active = 0;    
+    config.pwr_active = 0;  
+#elif defined(TTGO_LORA32_V21)
+    config.rf_en = true;
+    config.rf_type = RF_SX1278;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio0_gpio = 26;
+    config.rf_dio1_gpio = 33; // HPDIO1->33
+    config.rf_dio2_gpio = 32; // HPDIO2->32
+    config.rf_reset_gpio = 23;
+    config.rf_nss_gpio = 18;
+    config.rf_sclk_gpio = 5;
+    config.rf_miso_gpio = 19;
+    config.rf_mosi_gpio = 27;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 22;
+    config.pwr_gpio = -1;
+    config.pwr_active = 0;      
 #elif defined(HT_CT62)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -2465,6 +2525,36 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
+elif defined(BV5DJ_BOARD)
+    config.rf_en = true;
+    config.rf_type = RF_SX1268;
+    config.rf_tx_gpio = 4;  // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = 2;  // Same BUILTIN_LED
+    config.rf_dio1_gpio = 33;
+    config.rf_reset_gpio = 14;
+    config.rf_dio0_gpio = 39;
+    config.rf_nss_gpio = 5;
+    config.rf_sclk_gpio = 18;
+    config.rf_miso_gpio = 19;
+    config.rf_mosi_gpio = 23;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_nss_active = 0;
+    config.rf_reset_active = 0;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 115200;
+    config.uart1_rx_gpio = 16;
+    config.uart1_tx_gpio = 17;
+    config.uart1_rts_gpio = -1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 22;
+    config.pwr_gpio = -1;
+    config.pwr_active = 0;    
 #elif defined(HELTEC_V3_GPS)    
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -2706,7 +2796,7 @@ void defaultConfig()
     // else
     //     sprintf(config.wifi_ap_ssid,"%s-%d",config.trk_mycall,config.trk_ssid);
 
-    saveEEPROM();
+    //saveConfiguration("/default.cfg",config);
 }
 
 unsigned long NTP_Timeout;
@@ -3559,21 +3649,30 @@ void setup()
     log_d("Start ESP32APRS_LoRa V%s", VERSION);
     // log_d("Push BOOT after 3 sec for Factory Default config.");
 
-    if (!EEPROM.begin(EEPROM_SIZE))
-    {
-        log_d("failed to initialise EEPROM"); // delay(100000);
-    }
+    // if (!EEPROM.begin(EEPROM_SIZE))
+    // {
+    //     log_d("failed to initialise EEPROM"); // delay(100000);
+    // }
     // ตรวจสอบคอนฟิกซ์ผิดพลาด
-    ptr = (byte *)&config;
-    EEPROM.readBytes(1, ptr, sizeof(Configuration));
-    uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
-    log_d("EEPROM Check %0Xh=%0Xh(%dByte)\n", EEPROM.read(0), chkSum, sizeof(Configuration));
-    if (EEPROM.read(0) != chkSum || EEPROM.read(0) == 0)
+    // ptr = (byte *)&config;
+    // EEPROM.readBytes(1, ptr, sizeof(Configuration));
+    // uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
+    // log_d("EEPROM Check %0Xh=%0Xh(%dByte)\n", EEPROM.read(0), chkSum, sizeof(Configuration));
+    // if (EEPROM.read(0) != chkSum || EEPROM.read(0) == 0)
+    // {
+    //     log_d("CRC EEPROM Error!");
+    //     log_d("Factory Default");
+    //     defaultConfig();
+    // }
+
+    if (!LITTLEFS.exists("/default.cfg"))
     {
-        log_d("CRC EEPROM Error!");
         log_d("Factory Default");
         defaultConfig();
-    }
+        saveConfiguration("/default.cfg",config);
+    }else{
+        if(!loadConfiguration("/default.cfg",config)) defaultConfig();
+    } 
 
 #ifdef BUOY
     config.wifi_mode |= WIFI_AP_FIX;
@@ -3583,6 +3682,15 @@ void setup()
     timeLEDon = 10;
 #else
     pinMode(BOOT_PIN, INPUT_PULLUP);
+    #ifdef BV5DJ_BOARD
+        pinMode(BUTTON_LEFT, INPUT_PULLUP);
+        pinMode(BUTTON_RIGHT, INPUT_PULLUP);
+        pinMode(BUTTON_UP, INPUT_PULLUP);
+        pinMode(BUTTON_DOWN, INPUT_PULLUP);
+        pinMode(SD_CS, OUTPUT);
+        pinMode(GPS_PPS, INPUT_PULLUP);
+        pinMode(KEEP_ALIVE, INPUT_PULLUP);
+    #endif
 #endif
 
     Sleep_Activate = config.pwr_sleep_activate;
@@ -3590,12 +3698,14 @@ void setup()
 
     if (config.i2c1_enable)
     {
-        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
+        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);        
     }
 
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
     setupPower();
 #endif
+
+
 
 #ifdef OLED
 
@@ -3668,11 +3778,22 @@ void setup()
         else
             display.setRotation(0);
         display.clearDisplay();
-        display.setTextSize(1);
+        //display.setTextSize(1);
         display.setTextColor(WHITE);
 
         display.setTextSize(1);
         display.setFont(&FreeSansBold9pt7b);
+
+        #ifdef SSD1306_128x32
+        //display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
+        //display.drawRect(0, 0, 72, 40, WHITE);
+        display.drawCircle(20,20,10,WHITE);
+        display.display();
+
+        delay(3000);
+        // display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
+        // delay(3000);
+        #else
 
         display.setCursor(0, 15);
         display.print("APRS");
@@ -3708,6 +3829,7 @@ void setup()
         display.print("1 Sec");
         display.display();
         delay(1000);
+        #endif
 
         if (digitalRead(BOOT_PIN) == LOW)
         {
@@ -3745,7 +3867,9 @@ void setup()
 
     TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
     TFT_SPI.setFrequency(40000000);
+    //ledcAttachPin(ST7735_LED_K_Pin,0);
     //pinMode(ST7735_LED_K_Pin, OUTPUT);
+    //ledcAttach(ST7735_LED_K_Pin,5000,8);
     ledcSetup(0,5000,8);
     ledcAttachPin(ST7735_LED_K_Pin,0);
     ledcWrite(0, config.disp_brightness);
@@ -3946,8 +4070,14 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-    esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
-    esp_task_wdt_add(NULL);               // add current thread to WDT watch
+
+    // #if !defined(CONFIG_IDF_TARGET_ESP32C6)
+    // esp_task_wdt_init(WDT_TIMEOUT); // enable panic so ESP32 restarts
+    // #else
+    // esp_task_wdt_init(WDT_TIMEOUT); // enable panic so ESP32 restarts
+    // #endif
+    // esp_task_wdt_add(NULL);               // add current thread to WDT watch
+
     // esp_task_wdt_deinit
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
@@ -3957,7 +4087,7 @@ void setup()
     {
         if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
         {
-            if (strstr("AT", config.gnss_at_command) >= 0)
+            if (strstr("AT", config.gnss_at_command) != NULL)
             {
                 if (config.gnss_channel == 1)
                 {
@@ -4047,7 +4177,8 @@ void setup()
             0);             /* Core where the task should run */
     }
 
-    if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
+    //if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
+    if (config.ext_tnc_enable)
     {
         xTaskCreatePinnedToCore(
             taskSerial,        /* Function to implement the task */
@@ -4173,6 +4304,166 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
     aprs_position[8] = symbol; // Symbol
     str_comp = String(table) + String(aprs_position);
     return str_comp;
+}
+
+//String compress_position(double nowLat, double nowLng, int alt_feed, double course, uint16_t spdKnot, char table, char symbol, bool gps)
+
+String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t* telem, size_t telemLen, char* grid, char* status, int32_t alt, char table, char symbol) 
+{
+    String strRet="";
+  // sanity checks first
+  if(((telemLen == 0) && (telem != NULL)) || ((telemLen != 0) && (telem == NULL))) {
+    return strRet;
+  }
+
+  if((telemLen != 0) && (telemLen != 2) && (telemLen != 5)) {
+    return strRet;
+  }
+
+  if((telemLen > 0) && ((grid != NULL) || (status != NULL) || (alt != RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED))) {
+    // can't have both telemetry and status
+    return strRet;
+  }
+
+  // prepare buffers
+  char destCallsign[7];
+  #if !RADIOLIB_STATIC_ONLY
+    size_t infoLen = 10;
+    if(telemLen > 0) {
+      infoLen += 1 + telemLen;
+    } else {
+      if(grid != NULL) {
+        infoLen += strlen(grid) + 2;
+      }
+      if(status != NULL) {
+        infoLen += strlen(status);
+      }
+      if(alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED) {
+        infoLen += 4;
+      }
+    }
+    char* info = new char[infoLen];
+  #else
+    char info[RADIOLIB_STATIC_ARRAY_SIZE];
+  #endif
+  size_t infoPos = 0;
+
+  // the following is based on APRS Mic-E implementation by https://github.com/omegat
+  // as discussed in https://github.com/jgromes/RadioLib/issues/430
+
+  // latitude first, because that is in the destination field
+  float lat_abs = RADIOLIB_ABS(lat);
+  int lat_deg = (int)lat_abs;
+  int lat_min = (lat_abs - (float)lat_deg) * 60.0f;
+  int lat_hun = (((lat_abs - (float)lat_deg) * 60.0f) - lat_min) * 100.0f;
+  destCallsign[0] = lat_deg/10;
+  destCallsign[1] = lat_deg%10;
+  destCallsign[2] = lat_min/10;
+  destCallsign[3] = lat_min%10;
+  destCallsign[4] = lat_hun/10;
+  destCallsign[5] = lat_hun%10;
+
+  // next, add the extra bits
+  if(type & 0x04) { destCallsign[0] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
+  if(type & 0x02) { destCallsign[1] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
+  if(type & 0x01) { destCallsign[2] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
+  if(lat >= 0) { destCallsign[3] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
+  if(lon >= 100 || lon <= -100) { destCallsign[4] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
+  if(lon < 0) { destCallsign[5] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
+  destCallsign[6] = '\0';
+
+  // now convert to Mic-E characters to get the "callsign"
+  for(uint8_t i = 0; i < 6; i++) {
+    if(destCallsign[i] <= 9) {
+      destCallsign[i] += '0';
+    } else {
+      destCallsign[i] += ('A' - 10);
+    }
+  }
+
+  // setup the information field
+  info[infoPos++] = RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT;
+
+  // encode the longtitude
+  float lon_abs = RADIOLIB_ABS(lon);
+  int32_t lon_deg = (int32_t)lon_abs;
+  int32_t lon_min = (lon_abs - (float)lon_deg) * 60.0f;
+  int32_t lon_hun = (((lon_abs - (float)lon_deg) * 60.0f) - lon_min) * 100.0f;
+
+  if(lon_deg <= 9) {
+    info[infoPos++] = lon_deg + 118;
+  } else if(lon_deg <= 99) {
+    info[infoPos++] = lon_deg + 28;
+  } else if(lon_deg <= 109) {
+    info[infoPos++] = lon_deg + 8;
+  } else {
+    info[infoPos++] = lon_deg - 72;
+  }
+
+  if(lon_min <= 9){
+    info[infoPos++] = lon_min + 88;
+  } else {
+    info[infoPos++] = lon_min + 28;
+  }
+
+  info[infoPos++] = lon_hun + 28;
+
+  // now the speed and heading - this gets really weird
+  int32_t speed_hun_ten = speed/10;
+  int32_t speed_uni = speed%10;
+  int32_t head_hun = heading/100;
+  int32_t head_ten_uni = heading%100;
+
+  if(speed <= 199) {
+    info[infoPos++] = speed_hun_ten + 'l';
+  } else {
+    info[infoPos++] = speed_hun_ten + '0';
+  }
+
+  info[infoPos++] = speed_uni*10 + head_hun + 32;
+  info[infoPos++] = head_ten_uni + 28;
+  info[infoPos++] = symbol;
+  info[infoPos++] = table;
+
+  // onto the optional stuff - check telemetry first
+  if(telemLen > 0) {
+    if(telemLen == 2) {
+      info[infoPos++] = RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_2;
+    } else {
+      info[infoPos++] = RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_5;
+    }
+    for(uint8_t i = 0; i < telemLen; i++) {
+      sprintf(&(info[infoPos]), "%02X", telem[i]);
+      infoPos += 2;
+    }
+
+  } else {
+    if(grid != NULL) {
+      memcpy(&(info[infoPos]), grid, strlen(grid));
+      infoPos += strlen(grid);
+      info[infoPos++] = '/';
+      info[infoPos++] = 'G';
+    }
+    if(status != NULL) {
+      info[infoPos++] = ' ';
+      memcpy(&(info[infoPos]), status, strlen(status));
+      infoPos += strlen(status);
+    }
+    if(alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED) {
+      // altitude is offset by -10 km
+      int32_t alt_val = alt + 10000;
+
+      // ... and encoded in base 91 for some reason
+      info[infoPos++] = (alt_val / 8281) + 33;
+      info[infoPos++] = ((alt_val % 8281) / 91) + 33;
+      info[infoPos++] = ((alt_val % 8281) % 91) + 33;
+      info[infoPos++] = '}';
+    }
+  }
+  info[infoPos++] = '\0';
+
+  strRet=String(info);
+  return strRet;
 }
 
 String trk_gps_postion(String comment)
@@ -6145,7 +6436,7 @@ void taskGPS(void *pvParameters)
     {
         if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
         {
-            if (strstr("AT", config.gnss_at_command) >= 0)
+            if (strstr("AT", config.gnss_at_command) != NULL)
             {
                 if (config.gnss_channel == 1)
                 {
@@ -6302,7 +6593,7 @@ void taskGPS(void *pvParameters)
                             setTime(timeGps);
                             time_t rtc = timeGps - (config.timeZone * SECS_PER_HOUR);
                             timeval tv = {rtc, 0};
-                            timezone tz = {(unsigned long)(config.timeZone * (float)SECS_PER_HOUR), 0};
+                            timezone tz = {static_cast<int>(config.timeZone * SECS_PER_HOUR), 0};
                             settimeofday(&tv, &tz);
                             log_d("\nSET GPS Timestamp = %u Year=%d\n", timeGps, year());
                             // firstGpsTime = false;
@@ -6351,22 +6642,22 @@ void taskSerial(void *pvParameters)
     }
     if (config.wx_en)
     {
-        if (config.wx_channel == 1)
-        {
-#if ARDUINO_USB_CDC_ON_BOOT
-            Serial0.setTimeout(10);
-#else
-            Serial.setTimeout(10);
-#endif
-        }
-        else if (config.wx_channel == 2)
-        {
-            Serial1.setTimeout(10);
-        }
-        else if (config.wx_channel == 3)
-        {
-            // Serial2.setTimeout(10);
-        }
+//         if (config.wx_channel == 1)
+//         {
+// #if ARDUINO_USB_CDC_ON_BOOT
+//             Serial0.setTimeout(10);
+// #else
+//             Serial.setTimeout(10);
+// #endif
+//         }
+//         else if (config.wx_channel == 2)
+//         {
+//             Serial1.setTimeout(10);
+//         }
+//         else if (config.wx_channel == 3)
+//         {
+//             // Serial2.setTimeout(10);
+//         }
     }
     for (;;)
     {
@@ -6376,38 +6667,38 @@ void taskSerial(void *pvParameters)
 
         if (config.wx_en)
         {
-            if (config.wx_channel > 0 && config.wx_channel < 4)
-            {
-                String wx = "";
-                if (config.wx_channel == 1)
-                {
-#if ARDUINO_USB_CDC_ON_BOOT
-                    wx = Serial.readString();
-#else
-                    wx = Serial.readString();
-#endif
-                }
-                else if (config.wx_channel == 2)
-                {
-                    wx = Serial1.readString();
-                }
-                else if (config.wx_channel == 3)
-                {
-                    // wx = Serial2.readString();
-                }
-                // if (wx!="")
-                //{
-                // while (SerialWX->available())
-                //{
-                // String wx = SerialWX->readString();
-                if (wx != "" && wx.indexOf("DATA:") >= 0)
-                {
-                    log_d("WX Raw >> %d", wx.c_str());
-                    getCSV2Wx(wx);
-                }
-                //}
-                //}
-            }
+//             if (config.wx_channel > 0 && config.wx_channel < 4)
+//             {
+//                 String wx = "";
+//                 if (config.wx_channel == 1)
+//                 {
+// #if ARDUINO_USB_CDC_ON_BOOT
+//                     wx = Serial.readString();
+// #else
+//                     wx = Serial.readString();
+// #endif
+//                 }
+//                 else if (config.wx_channel == 2)
+//                 {
+//                     wx = Serial1.readString();
+//                 }
+//                 else if (config.wx_channel == 3)
+//                 {
+//                     // wx = Serial2.readString();
+//                 }
+//                 // if (wx!="")
+//                 //{
+//                 // while (SerialWX->available())
+//                 //{
+//                 // String wx = SerialWX->readString();
+//                 if (wx != "" && wx.indexOf("DATA:") >= 0)
+//                 {
+//                     log_d("WX Raw >> %d", wx.c_str());
+//                     getCSV2Wx(wx);
+//                 }
+//                 //}
+//                 //}
+//             }
             // else if(config.wx_channel == 4){
             //     bool result=getM702Modbus(modbus);
             // }
