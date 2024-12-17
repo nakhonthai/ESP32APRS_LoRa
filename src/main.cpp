@@ -80,7 +80,11 @@ XPowersAXP2101 PMU;
 #endif
 
 #if APRS_LORA_DONGLE
+#if APRS_LORA_DONGLE
 #define PIXELS_PIN 45
+#elif BV5DJ_BOARD
+#define PIXELS_PIN 12
+#endif
 #elif BV5DJ_BOARD
 #define PIXELS_PIN 12
 #endif
@@ -91,15 +95,34 @@ XPowersAXP2101 PMU;
 #define LED_TX 25
 #elif defined(HELTEC_HTIT_TRACKER)
 #define LED_TX 18
+#elif defined(TTGO_LORA32_V21)
+#define LED_TX 25
+#elif defined(HELTEC_HTIT_TRACKER)
+#define LED_TX 18
 #else
 #define LED_TX -1
 #endif
 
+#if defined(HELTEC_HTIT_TRACKER)
+#define LED_RX 18
+#else
 #define LED_RX -1
 
-#ifdef APRS_LORA_DONGLE
+#if APRS_LORA_DONGLE
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
+// portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
+void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+{
+    // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
+    strip.setPixelColor(0, strip.Color(r, g, b));
+    strip.show();
+    // portEXIT_CRITICAL_ISR(&ledMux);
+}
+#elif defined(BV5DJ_BOARD)
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(2, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
+
 // portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -2357,7 +2380,8 @@ void defaultConfig()
     config.rf_type = RF_SX1276;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = -1; //HPDIO1->33
+    config.rf_dio1_gpio = 33; // HPDIO1->33
+    config.rf_dio2_gpio = 32; // HPDIO2->32
     config.rf_reset_gpio = 23;
     config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
@@ -2398,7 +2422,7 @@ void defaultConfig()
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 22;
     config.pwr_gpio = -1;
-    config.pwr_active = 0;      
+    config.pwr_active = 0;    
 #elif defined(HT_CT62)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -2525,36 +2549,6 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
-elif defined(BV5DJ_BOARD)
-    config.rf_en = true;
-    config.rf_type = RF_SX1268;
-    config.rf_tx_gpio = 4;  // LORA ANTENNA TX ENABLE
-    config.rf_rx_gpio = 2;  // Same BUILTIN_LED
-    config.rf_dio1_gpio = 33;
-    config.rf_reset_gpio = 14;
-    config.rf_dio0_gpio = 39;
-    config.rf_nss_gpio = 5;
-    config.rf_sclk_gpio = 18;
-    config.rf_miso_gpio = 19;
-    config.rf_mosi_gpio = 23;
-    config.rf_tx_active = 1;
-    config.rf_rx_active = 1;
-    config.rf_nss_active = 0;
-    config.rf_reset_active = 0;
-    config.gnss_enable = true;
-    config.gnss_channel = 2;
-    config.uart0_rx_gpio = 3;
-    config.uart0_tx_gpio = 1;
-    config.uart1_enable = true;
-    config.uart1_baudrate = 115200;
-    config.uart1_rx_gpio = 16;
-    config.uart1_tx_gpio = 17;
-    config.uart1_rts_gpio = -1;
-    config.i2c_enable = true;
-    config.i2c_sda_pin = 21;
-    config.i2c_sck_pin = 22;
-    config.pwr_gpio = -1;
-    config.pwr_active = 0;    
 #elif defined(HELTEC_V3_GPS)    
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3708,7 +3702,6 @@ void setup()
 
 
 #ifdef OLED
-
     config.i2c_enable = true;
     // pinMode(OLED_RESET,OUTPUT);
     // digitalWrite(OLED_RESET,HIGH);
@@ -3745,6 +3738,7 @@ void setup()
     // //enable boost mode
     // ip5306.boost_mode(ENABLE);
     // #endif
+
     // int i2c_timeout = 0;
     // while (i2c_busy)
     // {
@@ -3859,12 +3853,11 @@ void setup()
     i2c_busy = false;
 #else
 #ifdef ST7735_160x80
-    if (config.i2c_enable)
+if (config.i2c_enable)
     {
         Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
         i2c_busy=false;
     }
-
     TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
     TFT_SPI.setFrequency(40000000);
     //ledcAttachPin(ST7735_LED_K_Pin,0);
@@ -5296,6 +5289,11 @@ void loop()
                 else
                     gps_mode = true;
             }
+            if (curTab == 4)    // System display
+            {
+                PowerOff();
+                esp_deep_sleep_start();
+            }
         }
         else
         {
@@ -5865,26 +5863,28 @@ void sendTelemetry_0(char *raw, bool header)
         SendMode |= INET_CHANNEL;
     pkgTxPush(str, strlen(str), 0, SendMode);
 
-    // if (config.tlm0_2rf)
-    // { // TLM SEND TO RF
-    //     SendMode |= RF_CHANNEL;
-    //     // char *rawP = (char *)malloc(rawData.length());
-    //     //  rawData.toCharArray(rawP, rawData.length());
-    //     // memcpy(rawP, rawData.c_str(), rawData.length());
-    //     pkgTxPush(str, strlen(str), 0,RF_CHANNEL);
-    //     // pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
-    //     // free(rawP);
-    // }
-    // if (config.tlm0_2inet)
-    // { // TLM SEND TO APRS-IS
+#if 1
+    if (config.tlm0_2rf)
+    { // TLM SEND TO RF
+        SendMode |= RF_CHANNEL;
+        // char *rawP = (char *)malloc(rawData.length());
+        //  rawData.toCharArray(rawP, rawData.length());
+        // memcpy(rawP, rawData.c_str(), rawData.length());
+        pkgTxPush(str, strlen(str), 0,RF_CHANNEL);
+        // pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
+        // free(rawP);
+    }
+    if (config.tlm0_2inet)
+    { // TLM SEND TO APRS-IS
 
-    //     if (aprsClient.connected())
-    //     {
-    //         status.txCount++;
-    //         aprsClient.printf("%s\r\n", str); // Send packet to Inet
-    //         // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
-    //     }
-    // }
+        if (aprsClient.connected())
+        {
+            status.txCount++;
+            aprsClient.printf("%s\r\n", str); // Send packet to Inet
+            // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
+        }
+    }
+#endif
 }
 
 void sendTelemetry_trk(char *raw)

@@ -27,9 +27,10 @@
 #include "HardwareSerial.h"
 
 #include "config.h"
-// #ifndef CONFIG_IDF_TARGET_ESP32S3
-// #include "soc/rtc_wdt.h"
-// #endif
+#if defined(TTGO_T_Beam_S3_SUPREME_V3)  || defined(HELTEC_V3_GPS) || defined(HELTEC_HTIT_TRACKER) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE)
+#else
+#include "soc/rtc_wdt.h"
+#endif
 
 #define WX
 //#define OLED
