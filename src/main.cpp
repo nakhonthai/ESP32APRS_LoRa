@@ -3865,13 +3865,13 @@ void setup()
         display.fillRect(50, 4, 20, 10, WHITE);
         display.display();
         delay(1000);
-        display.clearDisplay();
-        display.setCursor(3, 19);
-        display.printf("V%s%c", VERSION, VERSION_BUILD);
-        display.setCursor(5, 38);
-        display.print("@2024");
-        display.display();
-        delay(1000);
+        // display.clearDisplay();
+        // display.setCursor(3, 19);
+        // display.printf("V%s%c", VERSION, VERSION_BUILD);
+        // display.setCursor(5, 38);
+        // display.print("@2024");
+        // display.display();
+        // delay(1000);
 // display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
 // delay(3000);
 #else

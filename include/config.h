@@ -14,8 +14,8 @@
 #include <Arduino.h>
 #include "sensor.h"
 
-#define COMMENT_SIZE 32
-#define STATUS_SIZE 32
+#define COMMENT_SIZE 25
+#define STATUS_SIZE 50
 
 #define WX_SENSOR_NUM 23
 
@@ -145,7 +145,7 @@ typedef struct Config_Struct
 	uint8_t igate_path;
 	char igate_comment[COMMENT_SIZE];
 	uint16_t igate_sts_interval;
-	char igate_status[COMMENT_SIZE];
+	char igate_status[STATUS_SIZE];
 	//--Filter
 
 	// DIGI REPEATER
@@ -171,7 +171,7 @@ typedef struct Config_Struct
 	char digi_phg[8];
 	char digi_comment[COMMENT_SIZE];
 	uint16_t digi_sts_interval;
-	char digi_status[COMMENT_SIZE];
+	char digi_status[STATUS_SIZE];
 
 // TRACKER
 	bool trk_en;
@@ -207,7 +207,7 @@ typedef struct Config_Struct
 	char trk_comment[COMMENT_SIZE];
 	char trk_item[10] = "";
 	uint16_t trk_sts_interval;
-	char trk_status[COMMENT_SIZE];
+	char trk_status[STATUS_SIZE];
 
 	// WX
 	bool wx_en;
