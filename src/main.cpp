@@ -1958,7 +1958,9 @@ void defaultConfig()
     memset(config.igate_object, 0, sizeof(config.igate_object));
     memset(config.igate_phg, 0, sizeof(config.igate_phg));
     config.igate_path = 8;
-    sprintf(config.igate_comment, "IGate MODE");
+    sprintf(config.igate_comment, "");
+    sprintf(config.igate_status, "IGATE MODE");
+    config.igate_sts_interval = 1800;
 
     // DIGI REPEATER
     config.digi_en = false;
@@ -1980,7 +1982,9 @@ void defaultConfig()
 
     sprintf(config.digi_symbol, "L#");
     memset(config.digi_phg, 0, sizeof(config.digi_phg));
-    sprintf(config.digi_comment, "DIGI MODE");
+    sprintf(config.digi_comment, "");
+    sprintf(config.digi_status, "DIGI MODE");
+    config.digi_sts_interval = 1800;
 
     // Tracker
     config.trk_en = false;
@@ -2019,6 +2023,8 @@ void defaultConfig()
     sprintf(config.trk_mycall, "NOCALL");
     sprintf(config.trk_comment, "");
     memset(config.trk_item, 0, sizeof(config.trk_item));
+    sprintf(config.trk_status, "TRACKER MODE");
+    config.trk_sts_interval = 1800;
 
     // WX
     config.wx_en = false;
@@ -2472,7 +2478,7 @@ void defaultConfig()
     config.i2c_sda_pin = 5;
     config.i2c_sck_pin = 6;
     config.pwr_gpio = 8;
-    config.pwr_active = 0;    
+    config.pwr_active = 0;
 #elif defined(ESP32_C6_DEVKIT)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3454,28 +3460,31 @@ bool pkgTxSend()
                 {
                     if (txQueue[i].Channel & RF_CHANNEL)
                     {
-                        char *info = (char *)calloc(txQueue[i].length + 1, sizeof(char));
-                        if (info)
+                        if(config.rf_en)
                         {
-                            memset(info, 0, txQueue[i].length);
-                            memcpy(info, txQueue[i].Info, txQueue[i].length);
-                            psramBusy = false;
-                            // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
-                            status.txCount++;
-
-                            // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
-                            APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);
-                            igateTLM.TX++;
-                            // log_d("TX->RF: %s", info);
-                            if (config.trk_en)
+                            char *info = (char *)calloc(txQueue[i].length + 1, sizeof(char));
+                            if (info)
                             {
-                                timeSleep = millis() + 5000;
-                                // Sleep_Activate &= ~ACTIVATE_TRACKER;
-                            }
+                                memset(info, 0, txQueue[i].length);
+                                memcpy(info, txQueue[i].Info, txQueue[i].length);
+                                psramBusy = false;
+                                // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
+                                status.txCount++;
 
-                            // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
-                            free(info);
-                            txQueue[i].Channel &= ~RF_CHANNEL;
+                                // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
+                                APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);
+                                igateTLM.TX++;
+                                // log_d("TX->RF: %s", info);
+                                if (config.trk_en)
+                                {
+                                    timeSleep = millis() + 5000;
+                                    // Sleep_Activate &= ~ACTIVATE_TRACKER;
+                                }
+
+                                // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
+                                free(info);
+                                txQueue[i].Channel &= ~RF_CHANNEL;
+                            }
                         }
                     }
                 }
@@ -5023,6 +5032,99 @@ String digi_position(double lat, double lon, double alt, String comment)
     tnc2Raw += String(loc);
     tnc2Raw += String(config.digi_phg) + String(strAltitude);
     return tnc2Raw;
+}
+
+void tracker_status(char *text)
+{
+    char name[50];
+
+    if (config.trk_ssid > 0)
+        sprintf(name, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
+    else
+        sprintf(name, "%s>APE32L", config.trk_mycall);
+
+    String tnc2Raw = String(name);
+    if (config.trk_path < 5)
+    {
+        if (config.trk_path > 0)
+            tnc2Raw += "-" + String(config.trk_path);
+    }
+    else
+    {
+        tnc2Raw += ",";
+        tnc2Raw += getPath(config.trk_path);
+    }
+    tnc2Raw += ":>";
+    tnc2Raw += String(text);
+
+    uint8_t SendMode = 0;
+    if (config.trk_loc2rf)
+        SendMode |= RF_CHANNEL;
+    if (config.trk_loc2inet)
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, SendMode);
+}
+
+void igate_status(char *text)
+{
+    char name[50];
+
+    if (config.aprs_ssid > 0)
+        sprintf(name, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
+    else
+        sprintf(name, "%s>APE32L", config.aprs_mycall);
+
+    String tnc2Raw = String(name);
+    if (config.igate_path < 5)
+    {
+        if (config.igate_path > 0)
+            tnc2Raw += "-" + String(config.igate_path);
+    }
+    else
+    {
+        tnc2Raw += ",";
+        tnc2Raw += getPath(config.igate_path);
+    }
+    tnc2Raw += ":>";
+    tnc2Raw += String(text);
+
+    uint8_t SendMode = 0;
+    if (config.igate_loc2rf)
+        SendMode |= RF_CHANNEL;
+    if (config.igate_loc2inet)
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, SendMode);
+}
+
+void digi_status(char *text)
+{
+    char name[50];
+
+    if (config.digi_ssid > 0)
+        sprintf(name, "%s-%d>APE32L", config.digi_mycall, config.digi_ssid);
+    else
+        sprintf(name, "%s>APE32L", config.digi_mycall);
+
+    String tnc2Raw = String(name);
+    if (config.digi_path < 5)
+    {
+        if (config.digi_path > 0)
+            tnc2Raw += "-" + String(config.digi_path);
+    }
+    else
+    {
+        tnc2Raw += ",";
+        tnc2Raw += getPath(config.digi_path);
+    }
+    tnc2Raw += ":>";
+    tnc2Raw += String(text);
+
+    uint8_t SendMode = 0;
+    if (config.digi_loc2rf)
+        SendMode |= RF_CHANNEL;
+    if (config.digi_loc2inet)
+        SendMode |= INET_CHANNEL;
+    pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, SendMode);
 }
 
 String wx_report(double lat, double lon, double alt, String comment)
@@ -7006,6 +7108,10 @@ void taskAPRS(void *pvParameters)
     unsigned long tickInterval = 0;
     unsigned long DiGiInterval = 0;
 
+    unsigned long igateSTSInterval = 0;
+    unsigned long digiSTSInterval = 0;
+    unsigned long trkSTSInterval = 0;
+
     log_d("Task APRS has been start");
     PacketBuffer.clean();
 
@@ -7032,6 +7138,7 @@ void taskAPRS(void *pvParameters)
         if (initInterval)
         {
             tickInterval = WxInterval = DiGiInterval = iGatetickInterval = millis() + 10000;
+            igateSTSInterval = digiSTSInterval = trkSTSInterval = millis() + 15000;
             systemTLM.ParmTimeout = millis() + 20000;
             systemTLM.TeleTimeout = millis() + 30000;
             initInterval = false;
@@ -7082,7 +7189,14 @@ void taskAPRS(void *pvParameters)
 
         if (config.trk_en)
         { // TRACKER MODE
-
+            if (config.trk_sts_interval > 10)
+            {
+                if (millis() > trkSTSInterval)
+                {
+                    trkSTSInterval = millis() + (config.trk_sts_interval * 1000);
+                    tracker_status(config.trk_status);
+                }
+            }
             if (millis() > tickInterval)
             {
                 tickInterval = millis() + 1000;
@@ -7514,6 +7628,14 @@ void taskAPRS(void *pvParameters)
         // IGate Process
         if (config.igate_en)
         {
+            if (config.igate_sts_interval > 10)
+            {
+                if (millis() > igateSTSInterval)
+                {
+                    igateSTSInterval = millis() + (config.igate_sts_interval * 1000);
+                    igate_status(config.igate_status);
+                }
+            }
             // IGATE Position
             if (config.igate_bcn)
             {
@@ -7755,6 +7877,14 @@ void taskAPRS(void *pvParameters)
         // Digi Repeater Process
         if (config.digi_en)
         {
+            if (config.digi_sts_interval > 10)
+            {
+                if (millis() > digiSTSInterval)
+                {
+                    digiSTSInterval = millis() + (config.digi_sts_interval * 1000);
+                    digi_status(config.digi_status);
+                }
+            }
             // DIGI Position
             if (config.digi_bcn)
             {

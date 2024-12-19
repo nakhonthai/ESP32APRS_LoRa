@@ -3535,7 +3535,6 @@ void handle_system(AsyncWebServerRequest *request)
 	else if (request->hasArg("Factory"))
 	{
 		defaultConfig();
-		esp_restart();
 	}
 	else if (request->hasArg("LoadCFG"))
 	{
@@ -4617,6 +4616,14 @@ void handle_igate(AsyncWebServerRequest *request)
 						config.igate_interval = request->arg(i).toInt();
 				}
 			}
+			if (request->argName(i) == "igateSTSInv")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.igate_sts_interval = request->arg(i).toInt();
+				}
+			}
 			if (request->argName(i) == "igatePosLat")
 			{
 				if (request->arg(i) != "")
@@ -4700,6 +4707,17 @@ void handle_igate(AsyncWebServerRequest *request)
 				if (request->arg(i) != "")
 				{
 					strcpy(config.igate_comment, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.igate_comment, 0, sizeof(config.igate_comment));
+				}
+			}
+			if (request->argName(i) == "igateStatus")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.igate_status, request->arg(i).c_str());
 				}
 				else
 				{
@@ -5167,7 +5185,11 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" id=\"igateComment\" name=\"igateComment\" type=\"text\" value=\"" + String(config.igate_comment) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"32\" size=\"32\" id=\"igateComment\" name=\"igateComment\" type=\"text\" value=\"" + String(config.igate_comment) + "\" /></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Text Status:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"32\" size=\"32\" id=\"igateStatus\" name=\"igateStatus\" type=\"text\" value=\"" + String(config.igate_status) + "\" />  Interval:<input min=\"0\" max=\"3600\" step=\"1\" name=\"igateSTSInv\" type=\"number\" value=\"" + String(config.igate_sts_interval) + "\" />Sec.</td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RF2INET:</b></td>\n";
@@ -5558,6 +5580,14 @@ void handle_digi(AsyncWebServerRequest *request)
 						config.digi_interval = request->arg(i).toInt();
 				}
 			}
+			if (request->argName(i) == "digiSTSInv")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.digi_sts_interval = request->arg(i).toInt();
+				}
+			}
 			if (request->argName(i) == "digiPosLat")
 			{
 				if (request->arg(i) != "")
@@ -5632,11 +5662,11 @@ void handle_digi(AsyncWebServerRequest *request)
 					strcpy(config.digi_phg, request->arg(i).c_str());
 				}
 			}
-			if (request->argName(i) == "digiComment")
+			if (request->argName(i) == "digiStatus")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_comment, request->arg(i).c_str());
+					strcpy(config.digi_status, request->arg(i).c_str());
 				}
 			}
 			if (request->argName(i) == "digiPos2RF")
@@ -5939,6 +5969,10 @@ void handle_digi(AsyncWebServerRequest *request)
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" id=\"digiComment\" name=\"digiComment\" type=\"text\" value=\"" + String(config.digi_comment) + "\" /></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Text Status:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"32\" size=\"32\" id=\"digiStatus\" name=\"digiStatus\" type=\"text\" value=\"" + String(config.digi_status) + "\" />  Interval:<input min=\"0\" max=\"3600\" step=\"1\" name=\"digiSTSInv\" type=\"number\" value=\"" + String(config.digi_sts_interval) + "\" />Sec.</td>\n";
 		html += "</tr>\n";
 
 		html += "<tr><td style=\"text-align: right;\"><b>Repeat Delay:</b></td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"100\" id=\"digiDelay\" name=\"digiDelay\" type=\"number\" value=\"" + String(config.digi_delay) + "\" /> mSec. <i>*0 is auto,Other random of delay time</i></td></tr>";
@@ -7501,6 +7535,14 @@ void handle_tracker(AsyncWebServerRequest *request)
 						config.trk_interval = request->arg(i).toInt();
 				}
 			}
+			if (request->argName(i) == "trkSTSInv")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.trk_sts_interval = request->arg(i).toInt();
+				}
+			}
 			if (request->argName(i) == "trackerPosLat")
 			{
 				if (request->arg(i) != "")
@@ -7643,6 +7685,17 @@ void handle_tracker(AsyncWebServerRequest *request)
 				else
 				{
 					memset(config.trk_comment, 0, sizeof(config.trk_comment));
+				}
+			}
+			if (request->argName(i) == "trkStatus")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.trk_status, request->arg(i).c_str());
+				}
+				else
+				{
+					memset(config.trk_status, 0, sizeof(config.trk_status));
 				}
 			}
 
@@ -7882,6 +7935,10 @@ void handle_tracker(AsyncWebServerRequest *request)
 	html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
 	html += "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" id=\"trackerComment\" name=\"trackerComment\" type=\"text\" value=\"" + String(config.trk_comment) + "\" /></td>\n";
 	html += "</tr>\n";
+	html += "<tr>\n";
+		html += "<td align=\"right\"><b>Text Status:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"32\" size=\"32\" id=\"trkStatus\" name=\"trkStatus\" type=\"text\" value=\"" + String(config.trk_status) + "\" />  Interval:<input min=\"0\" max=\"3600\" step=\"1\" name=\"trkSTSInv\" type=\"number\" value=\"" + String(config.trk_sts_interval) + "\" />Sec.</td>\n";
+		html += "</tr>\n";
 	html += "<tr>\n";
 	html += "<td align=\"right\"><b>Smart Beacon:</b></td>\n";
 	String smartBcnEnFlag = "";
