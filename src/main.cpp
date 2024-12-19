@@ -33,7 +33,7 @@
 #include <parse_aprs.h>
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSerifItalic9pt7b.h>
-#include <Fonts/Seven_Segment24pt7b.h>
+#include "Font/Seven_Segment24pt7b.h"
 
 #include "wireguard_vpn.h"
 
@@ -203,6 +203,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #endif
 
 #ifdef ST7735_160x80
+#include <Adafruit_GFX_Buffer.h>
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include "Adafruit_miniTFTWing.h"
@@ -251,7 +252,10 @@ SPIClass TFT_SPI(HSPI);
 // }
 
 // Adafruit_ST7735 display = Adafruit_ST7735(ST7735_CS_Pin,  ST7735_DC_Pin,ST7735_MOSI_Pin,ST7735_SCLK_Pin, ST7735_REST_Pin);
-Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
+//Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
+typedef Adafruit_ST7735 display_t;
+typedef Adafruit_GFX_Buffer<display_t> GFXBuffer_t;
+GFXBuffer_t display = GFXBuffer_t(80, 160, display_t(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin));
 
 #endif
 
@@ -3996,12 +4000,14 @@ void setup()
         display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
         display.setCursor(85, 5);
         display.print("Copy@2024");
+        display.display();
 
         delay(1000);
         LED_Status(255, 0, 0);
         display.fillRect(69, 59, 50, 8, 0);
         display.setCursor(90, 60);
         display.print("3 Sec");
+        display.display();
 
         delay(1000);
         digitalWrite(LED_RX, HIGH);
@@ -4009,12 +4015,14 @@ void setup()
         display.fillRect(69, 59, 50, 8, 0);
         display.setCursor(90, 60);
         display.print("2 Sec");
+        display.display();
 
         delay(1000);
         LED_Status(0, 0, 255);
         display.fillRect(69, 59, 50, 8, 0);
         display.setCursor(90, 60);
         display.print("1 Sec");
+        display.display();
 
         delay(1000);
         LED_Status(0, 0, 0);
@@ -4027,6 +4035,7 @@ void setup()
             display.fillRect(69, 59, 50, 8, 0);
             display.setCursor(70, 60);
             display.print("Factory Reset!");
+            display.display();
 #endif
             while (digitalRead(BOOT_PIN) == LOW)
             {
@@ -4147,6 +4156,7 @@ void setup()
 #elif defined(ST7735_160x80)
     display.fillScreen(ST77XX_BLACK);
     display.setTextSize(1);
+    display.display();
 #endif
 
     showDisp = true;
@@ -5365,6 +5375,22 @@ long int sleep_timer = 0;
 bool save_mode = false;
 bool save_act = false;
 
+void msgBox(String msg)
+{
+    int x = msg.length() * 6;
+    int x1 = 64 - (x / 2);
+
+    display.fillRect(x1 - 7, 26, x + 14, 28, BLACK);
+    display.drawRect(x1 - 5, 28, x + 10, 24, WHITE);
+    display.drawLine(x1 - 3, 53, x1 + (x + 10) - 4, 53, WHITE);
+    display.drawLine(x1 + (x + 10) - 4, 30, x1 + (x + 10) - 4, 53, WHITE);
+    display.setCursor(x1, 37);
+    display.print(msg);
+    //#ifndef ST7735_160x80
+    display.display();
+    //#endif
+}
+
 void loop()
 {
     if (millis() > timeTask)
@@ -5525,9 +5551,20 @@ void loop()
                     gps_mode = false;
                 else
                     gps_mode = true;
+                msgBox("GPS SWAP");
+                while (digitalRead(BOOT_PIN) == LOW)
+                {
+                    delay(100);
+                }
+                
             }
             if (curTab == 4) // System display
             {
+                msgBox("POWER OFF");
+                while (digitalRead(BOOT_PIN) == LOW)
+                {
+                    delay(100);
+                }
                 PowerOff();
                 esp_deep_sleep_start();
             }
@@ -8881,6 +8918,7 @@ void dispTxWindow(txDisp txs)
         pch = strtok(NULL, "\n");
         y += 10;
     }
+    display.display();
 #endif
 }
 
@@ -9725,6 +9763,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 display.setCursor(2, 30);
                 display.setTextColor(WHITE);
                 display.print(line);
+                display.display();
                 return;
             }
 
@@ -9857,6 +9896,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                         }
                         bit <<= 1;
                     }
+                    display.display();
                 }
                 return;
             }
@@ -9874,6 +9914,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 // memcpy(&text[0], aprs.comment, aprs.comment_len);
                 display.setTextColor(WHITE);
                 display.print(aprs.comment);
+                display.display();
                 return;
             }
             else if (aprs.packettype & T_QUERY)
@@ -9889,6 +9930,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 display.setTextColor(WHITE);
                 display.setCursor(2, 30);
                 display.print(aprs.comment);
+                display.display();
                 return;
             }
             else if (aprs.packettype & T_MESSAGE)
@@ -9934,6 +9976,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setCursor(2, 40);
                     display.print("Msg: ");
                     display.println(text);
+                    display.display();
                 }
                 return;
             }
@@ -10207,6 +10250,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.print(aprs.comment);
                 }*/
             }
+            display.display();
 #endif
         }
     }
@@ -10363,6 +10407,7 @@ void statisticsDisp()
     x = str.length() * 6;
     display.setCursor(158 - x, 68);
     display.print(str);
+    display.display();
 #endif
 }
 
@@ -10558,6 +10603,7 @@ void pkgLastDisp()
                 break;
         }
     }
+    display.display();
 #endif
 }
 
@@ -10747,6 +10793,7 @@ void pkgCountDisp()
                 break;
         }
     }
+    display.display();
 #endif
 }
 
@@ -10921,7 +10968,7 @@ void systemDisp()
     display.setCursor(126 - x, 68);
     display.print(str);
 #endif
-
+display.display();
 #endif
 }
 
@@ -11085,6 +11132,7 @@ void wifiDisp()
     x = str.length() * 6;
     display.setCursor(158 - x, 68);
     display.print(str);
+    display.display();
 #endif
 }
 
@@ -11228,6 +11276,7 @@ void radioDisp()
     x = str.length() * 6;
     display.setCursor(158 - x, 58);
     display.print(str);
+    display.display();
 #endif
 }
 
@@ -11331,6 +11380,7 @@ void sensorDisp()
             display.print(str);
         }
     }
+    display.display();
 #endif
 }
 
@@ -11592,6 +11642,7 @@ void gpsDisp()
         display.drawLine(70, 29, 159, 29, WHITE);
         display.setFont();
     }
+    display.display();
 #endif
 }
 

@@ -1565,9 +1565,9 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "function loraVHF(){\n";
 		html += "const rftype=Number(document.querySelector('#rf_type').value);";
 		html += "if (rftype>5 && rftype<11) {\n"; // SX127x
-		html += "document.getElementById(\"rf_bw\").value='10.4';\n";
+		html += "document.getElementById(\"rf_bw\").value='10.40';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
-		html += "document.getElementById(\"rf_sf\").value=8;\n";
+		html += "document.getElementById(\"rf_sf\").value=9;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
 		html += "document.getElementById(\"freq\").value=144.410;\n";
 		html += "var x = document.getElementById(\"ax25En\");\n";
@@ -1578,7 +1578,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "}\n";
 
 		html += "function loraUHF(){\n";
-		html += "document.getElementById(\"rf_bw\").value='125.0';\n";
+		html += "document.getElementById(\"rf_bw\").value='125.00';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
 		html += "document.getElementById(\"rf_sf\").value=12;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
@@ -1588,7 +1588,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "}\n";
 
 		html += "function loraUHFCB(){\n";
-		html += "document.getElementById(\"rf_bw\").value='20.8';\n";
+		html += "document.getElementById(\"rf_bw\").value='20.80';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
 		html += "document.getElementById(\"rf_sf\").value=9;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
@@ -1604,7 +1604,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "if (rfmode===1) {\n"; // LoRa
 		html += "document.getElementById(\"loraGrp\").disabled=false;\n";
 		html += "document.getElementById(\"gfskGrp\").disabled=true;\n";
-		html += "document.getElementById(\"rf_bw\").value='125.0';\n";
+		html += "document.getElementById(\"rf_bw\").value='125.00';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
 		html += "document.getElementById(\"rf_sf\").value=12;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
@@ -1614,12 +1614,12 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "document.getElementById(\"loraGrp\").disabled=true;\n";
 		html += "document.getElementById(\"gfskGrp\").disabled=false;\n";
 		html += "if (rftype>5 && rftype<11) {\n"; // SX127x
-		html += "document.getElementById(\"rf_bw\").value=15.6;\n";
+		html += "document.getElementById(\"rf_bw\").value=15.60;\n";
 		html += "document.getElementById(\"rf_br\").value=9.6;\n";
 		html += "document.getElementById(\"rf_shaping\").value=2;\n";
 		html += "document.getElementById(\"rf_encoding\").value=0;\n";
 		html += "} else {\n";
-		html += "document.getElementById(\"rf_bw\").value=14.6;\n";
+		html += "document.getElementById(\"rf_bw\").value=14.60;\n";
 		html += "document.getElementById(\"rf_br\").value=9.7;\n";
 		html += "document.getElementById(\"rf_shaping\").value=2;\n";
 		html += "document.getElementById(\"rf_encoding\").value=0;\n";
