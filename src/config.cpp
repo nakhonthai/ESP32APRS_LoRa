@@ -97,6 +97,8 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["igatePHG"] = config.igate_phg;
     doc["igatePath"] = config.igate_path;
     doc["igateComment"] = config.igate_comment;
+    doc["igateSTSIntv"] = config.igate_sts_interval;
+    doc["igateStatus"] = config.igate_status;
     JsonArray igateTlmAvg = doc["igateTlmAvg"].to<JsonArray>();
     for (int i = 0; i < 5; i++)
         igateTlmAvg.add(config.igate_tlm_avg[i]);
@@ -141,6 +143,8 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["digiSymbol"] = config.digi_symbol;
     doc["digiPHG"] = config.digi_phg;
     doc["digiComment"] = config.digi_comment;
+    doc["digiSTSIntv"] = config.digi_sts_interval;
+    doc["digiStatus"] = config.digi_status;
     JsonArray digiTlmAvg = doc["digiTlmAvg"].to<JsonArray>();
     for (int i = 0; i < 5; i++)
         digiTlmAvg.add(config.digi_tlm_avg[i]);
@@ -194,6 +198,8 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["trkSymbolStop"] = config.trk_symstop;
     doc["trkItem"] = config.trk_item;
     doc["trkComment"] = config.trk_comment;
+    doc["trkSTSIntv"] = config.trk_sts_interval;
+    doc["trkStatus"] = config.trk_status;
     JsonArray trkTlmAvg = doc["trkTlmAvg"].to<JsonArray>();
     for (int i = 0; i < 5; i++)
         trkTlmAvg.add(config.trk_tlm_avg[i]);
@@ -516,6 +522,8 @@ bool loadConfiguration(const char *filename, Configuration &config)
         strlcpy(config.igate_object, doc["igateObject"] | "", sizeof(config.igate_object));
         strlcpy(config.igate_phg, doc["igatePHG"] | "", sizeof(config.igate_phg));
         strlcpy(config.igate_comment, doc["igateComment"] | "", sizeof(config.igate_comment));
+        strlcpy(config.igate_status, doc["igateStatus"] | "", sizeof(config.igate_status));
+        config.igate_sts_interval = doc["igateSTSIntv"];
         config.igate_path = doc["igatePath"];
 
         for (int i = 0; i < 5; i++)
@@ -555,6 +563,8 @@ bool loadConfiguration(const char *filename, Configuration &config)
         strlcpy(config.digi_symbol, doc["digiSymbol"] | "", sizeof(config.digi_symbol));
         strlcpy(config.digi_phg, doc["digiPHG"] | "", sizeof(config.digi_phg));
         strlcpy(config.digi_comment, doc["digiComment"] | "", sizeof(config.digi_comment));
+        strlcpy(config.digi_status, doc["digiStatus"] | "", sizeof(config.digi_status));
+        config.digi_sts_interval = doc["digiSTSIntv"];
         for (int i = 0; i < 5; i++)
             config.digi_tlm_avg[i] = doc["digiTlmAvg"][i];
         for (int i = 0; i < 5; i++)
@@ -601,6 +611,8 @@ bool loadConfiguration(const char *filename, Configuration &config)
         strlcpy(config.trk_symstop, doc["trkSymbolStop"] | "", sizeof(config.trk_symstop));
         strlcpy(config.trk_item, doc["trkItem"] | "", sizeof(config.trk_item));
         strlcpy(config.trk_comment, doc["trkComment"] | "", sizeof(config.trk_comment));
+        strlcpy(config.trk_status, doc["trkStatus"] | "", sizeof(config.trk_status));
+        config.trk_sts_interval = doc["trkSTSIntv"];
         for (int i = 0; i < 5; i++)
             config.trk_tlm_avg[i] = doc["trkTlmAvg"][i];
         for (int i = 0; i < 5; i++)

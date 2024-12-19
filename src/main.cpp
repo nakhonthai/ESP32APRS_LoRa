@@ -44,7 +44,7 @@
 
 #include <ModbusMaster.h>
 
-//#include <EEPROM.h>
+// #include <EEPROM.h>
 
 #include "IP5306_I2C.h"
 
@@ -73,18 +73,14 @@ XPowersAXP2101 PMU;
 XPowersAXP2101 PMU;
 #endif
 
-//#define EEPROM_SIZE 4096
+// #define EEPROM_SIZE 4096
 
 #ifdef BLUETOOTH
 #include "BluetoothSerial.h"
 #endif
 
 #if APRS_LORA_DONGLE
-#if APRS_LORA_DONGLE
 #define PIXELS_PIN 45
-#elif BV5DJ_BOARD
-#define PIXELS_PIN 12
-#endif
 #elif BV5DJ_BOARD
 #define PIXELS_PIN 12
 #endif
@@ -107,22 +103,11 @@ XPowersAXP2101 PMU;
 #define LED_RX 18
 #else
 #define LED_RX -1
+#endif
 
 #if APRS_LORA_DONGLE
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
-// portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
-void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
-{
-    // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
-    strip.setPixelColor(0, strip.Color(r, g, b));
-    strip.show();
-    // portEXIT_CRITICAL_ISR(&ledMux);
-}
-#elif defined(BV5DJ_BOARD)
-#include <Adafruit_NeoPixel.h>
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(2, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
-
 // portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
 void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -168,12 +153,27 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 bool i2c_busy = false;
 #include <Wire.h>
 
+#ifdef SSD1306_72x40
+// #include <Arduino_GFX.h>
+// #include <Arduino_G.h>
+// #include <Arduino_GFX_Library.h>
+
+// Arduino_DataBus *bus;// = new Arduino_Wire(I2C_ADDRESS, SDA, SCL);
+// Arduino_G *display;// = new Arduino_SSD1306(bus, -1, 72, 40);
+#endif
+
 #ifdef OLED
 #include <Adafruit_GFX.h>
 #include <Adafruit_I2CDevice.h>
 
+#ifdef SSD1306_72x40
+#define SCREEN_WIDTH 72  // OLED display width, in pixels
+#define SCREEN_HEIGHT 40 // OLED display height, in pixels
+#else
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#endif
+
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #ifdef SH1106
 #include <Adafruit_SH1106.h>
@@ -182,16 +182,17 @@ bool i2c_busy = false;
 Adafruit_SH1106 display(OLED_RESET);
 #else
 #include <Adafruit_SSD1306.h>
-#if defined(TTGO_LORA32_V1) || defined(TTGO_LORA32_V1_6) 
+#if defined(TTGO_LORA32_V1) || defined(TTGO_LORA32_V1_6)
 #define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #elif defined(HELTEC_V3_GPS)
 #define OLED_RESET 21
 #else
 #define OLED_RESET -1
 #endif
-#ifdef SSD1306_128x32
+#ifdef SSD1306_72x40
+#define SSD1306_NO_SPLASH
 #define SCREEN_ADDRESS 0x3C
-Adafruit_SSD1306 display(72, 40, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #else
 #define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -285,9 +286,9 @@ ModbusMaster modbus;
 #define BUTTON_RIGHT 32
 #define BUTTON_UP 34
 #define BUTTON_DOWN 35
-#define KEEP_ALIVE 25  //Trigger -pad in PCB
-#define SD_CS 13  //MicroSD card SlaveSelect
-#define GPS_PPS 26  //GPS PPS pin 
+#define KEEP_ALIVE 25 // Trigger -pad in PCB
+#define SD_CS 13      // MicroSD card SlaveSelect
+#define GPS_PPS 26    // GPS PPS pin
 #endif
 
 const char *str_status[] = {
@@ -993,30 +994,38 @@ void setupPower()
 }
 #endif
 
-void PowerOn(){
-    #ifdef ST7735_LED_K_Pin
-	ledcWrite(0, (uint32_t)config.disp_brightness);
-	#endif
-    //Power ON
-    if(config.pwr_active){
+void PowerOn()
+{
+#ifdef ST7735_LED_K_Pin
+    ledcWrite(0, (uint32_t)config.disp_brightness);
+#endif
+    // Power ON
+    if (config.pwr_active)
+    {
         pinMode(config.pwr_gpio, OUTPUT);
         digitalWrite(config.pwr_gpio, HIGH);
-    }else{
-        pinMode(config.pwr_gpio, OPEN_DRAIN);
+    }
+    else
+    {
+        pinMode(config.pwr_gpio, OUTPUT_OPEN_DRAIN);
         digitalWrite(config.pwr_gpio, LOW);
     }
 }
 
-void PowerOff(){
-    #ifdef ST7735_LED_K_Pin
-	ledcWrite(0, 0);
-	#endif
-    //Power OFF
-    if(config.pwr_active){
+void PowerOff()
+{
+#ifdef ST7735_LED_K_Pin
+    ledcWrite(0, 0);
+#endif
+    // Power OFF
+    if (config.pwr_active)
+    {
         pinMode(config.pwr_gpio, OUTPUT);
         digitalWrite(config.pwr_gpio, LOW);
-    }else{
-        pinMode(config.pwr_gpio, INPUT_PULLUP);
+    }
+    else
+    {
+        pinMode(config.pwr_gpio, OUTPUT_OPEN_DRAIN);
         digitalWrite(config.pwr_gpio, HIGH);
     }
 }
@@ -2015,7 +2024,7 @@ void defaultConfig()
     config.wx_en = false;
     config.wx_2rf = true;
     config.wx_2inet = true;
-    //config.wx_channel = 0;
+    // config.wx_channel = 0;
     config.wx_ssid = 13;
     sprintf(config.wx_mycall, "NOCALL");
     config.wx_path = 8;
@@ -2083,7 +2092,7 @@ void defaultConfig()
     config.wx_alt = 0;
     config.wx_interval = 600;
     config.wx_flage = 0;
-    //memset(config.wx_type, 0, sizeof(config.wx_type));
+    // memset(config.wx_type, 0, sizeof(config.wx_type));
 
     // OLED DISPLAY
     config.oled_enable = true;
@@ -2357,7 +2366,7 @@ void defaultConfig()
     config.rf_type = RF_SX1276;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = -1; //HPDIO1->33
+    config.rf_dio1_gpio = -1; // HPDIO1->33
     config.rf_reset_gpio = 14;
     config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
@@ -2398,7 +2407,7 @@ void defaultConfig()
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 22;
     config.pwr_gpio = -1;
-    config.pwr_active = 0;  
+    config.pwr_active = 0;
 #elif defined(TTGO_LORA32_V21)
     config.rf_en = true;
     config.rf_type = RF_SX1278;
@@ -2422,7 +2431,7 @@ void defaultConfig()
     config.i2c_sda_pin = 21;
     config.i2c_sck_pin = 22;
     config.pwr_gpio = -1;
-    config.pwr_active = 0;    
+    config.pwr_active = 0;
 #elif defined(HT_CT62)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -2441,6 +2450,29 @@ void defaultConfig()
     config.rf_nss_active = 0;
     config.pwr_gpio = -1;
     config.pwr_active = 1;
+#elif defined(ESP32C3_MINI)
+    config.rf_en = false;
+    config.rf_type = RF_SX1268;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = -1;
+    config.rf_reset_gpio = -1;
+    config.rf_dio0_gpio = 7;
+    config.rf_nss_gpio = 1;
+    config.rf_sclk_gpio = 10;
+    config.rf_miso_gpio = 4;
+    config.rf_mosi_gpio = 3;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.uart0_rx_gpio = 20;
+    config.uart0_tx_gpio = 21;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 5;
+    config.i2c_sck_pin = 6;
+    config.pwr_gpio = 8;
+    config.pwr_active = 0;    
 #elif defined(ESP32_C6_DEVKIT)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -2464,7 +2496,7 @@ void defaultConfig()
     config.rf_type = RF_SX1278;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = 33; //HPDIO1->33
+    config.rf_dio1_gpio = 33; // HPDIO1->33
     config.rf_reset_gpio = 14;
     config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
@@ -2494,7 +2526,7 @@ void defaultConfig()
     config.rf_type = RF_SX1278;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
-    config.rf_dio1_gpio = -1; 
+    config.rf_dio1_gpio = -1;
     config.rf_reset_gpio = 23;
     config.rf_dio0_gpio = 26;
     config.rf_nss_gpio = 18;
@@ -2505,8 +2537,8 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_nss_active = 0;
     config.rf_reset_active = 0;
-    //config.gnss_enable = true;
-    //config.gnss_channel = 2;
+    // config.gnss_enable = true;
+    // config.gnss_channel = 2;
     config.uart1_enable = true;
     config.uart1_baudrate = 9600;
     config.uart1_rx_gpio = 34;
@@ -2549,7 +2581,7 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
-#elif defined(HELTEC_V3_GPS)    
+#elif defined(HELTEC_V3_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
@@ -2565,8 +2597,8 @@ void defaultConfig()
     config.rf_rx_active = 1;
     config.rf_nss_active = 0;
     config.rf_reset_active = 0;
-    //config.gnss_enable = true;
-    //config.gnss_channel = 2;
+    // config.gnss_enable = true;
+    // config.gnss_channel = 2;
     config.uart1_enable = true;
     config.uart1_baudrate = 9600;
     config.uart1_rx_gpio = 19;
@@ -2790,7 +2822,7 @@ void defaultConfig()
     // else
     //     sprintf(config.wifi_ap_ssid,"%s-%d",config.trk_mycall,config.trk_ssid);
 
-    //saveConfiguration("/default.cfg",config);
+    // saveConfiguration("/default.cfg",config);
 }
 
 unsigned long NTP_Timeout;
@@ -2844,7 +2876,8 @@ int pkgList_Find(char *call, uint16_t type)
     int i;
     for (i = 0; i < PKGLISTSIZE; i++)
     {
-        if(pkgList[i].type == type){
+        if (pkgList[i].type == type)
+        {
             if (strstr(pkgList[i].calsign, call) != NULL)
             {
                 return i;
@@ -2854,16 +2887,17 @@ int pkgList_Find(char *call, uint16_t type)
     return -1;
 }
 
-int pkgList_Find(char *call,char *object, uint16_t type)
+int pkgList_Find(char *call, char *object, uint16_t type)
 {
     int i;
     for (i = 0; i < PKGLISTSIZE; i++)
     {
-        if(pkgList[i].type == type){
-            if (strnstr(pkgList[i].calsign, call,strlen(call)) != NULL)
+        if (pkgList[i].type == type)
+        {
+            if (strnstr(pkgList[i].calsign, call, strlen(call)) != NULL)
             {
-                if(strnstr(pkgList[i].object, object,strlen(object)) != NULL)
-                return i;
+                if (strnstr(pkgList[i].object, object, strlen(object)) != NULL)
+                    return i;
             }
         }
     }
@@ -3107,8 +3141,8 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     if (*raw == 0)
         return -1;
 
-    //int start_info = strchr(':',0);
-        
+    // int start_info = strchr(':',0);
+
     char callsign[11];
     char object[10];
     size_t sz = strlen(call);
@@ -3123,50 +3157,56 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         delay(1);
     psramBusy = true;
 #endif
-    int i=-1;
-    
-    memset(object,0,sizeof(object));
-    if(type & FILTER_ITEM){
-        int x=0;
-        char *body=strchr(raw, ':');
-        if(body!=NULL){
-        body+=2;
+    int i = -1;
 
-        for (int z = 0; z < 9 && body[z] != '!' && body[z] != '_'; z++)
+    memset(object, 0, sizeof(object));
+    if (type & FILTER_ITEM)
+    {
+        int x = 0;
+        char *body = strchr(raw, ':');
+        if (body != NULL)
         {
-            if (body[z] < 0x20 || body[z] > 0x7e)
+            body += 2;
+
+            for (int z = 0; z < 9 && body[z] != '!' && body[z] != '_'; z++)
             {
-                log_d("\titem name has unprintable characters");
-                break; /* non-printable */
+                if (body[z] < 0x20 || body[z] > 0x7e)
+                {
+                    log_d("\titem name has unprintable characters");
+                    break; /* non-printable */
+                }
+                object[x++] = body[z];
             }
-            object[x++]=body[z];
-        }
-        }
-        i = pkgList_Find(callsign,object, type);
-    }else if(type & FILTER_OBJECT){
-        int x=0;
-        char *body=strchr(raw, ':');
-        //log_d("body=%s",body);
-        if(body!=NULL){
-        body+=2;
-        for (int z = 0; z < 9; z++)
-        {
-            if (body[z] < 0x20 ||body[z] > 0x7e)
-            {
-                log_d("\tobject name has unprintable characters");
-                break; // non-printable
-            }
-            object[x++]=body[z];
-            //if (raw[i] != ' ')
-            //    namelen = i;
-        }
         }
         i = pkgList_Find(callsign, object, type);
-    }else{
+    }
+    else if (type & FILTER_OBJECT)
+    {
+        int x = 0;
+        char *body = strchr(raw, ':');
+        // log_d("body=%s",body);
+        if (body != NULL)
+        {
+            body += 2;
+            for (int z = 0; z < 9; z++)
+            {
+                if (body[z] < 0x20 || body[z] > 0x7e)
+                {
+                    log_d("\tobject name has unprintable characters");
+                    break; // non-printable
+                }
+                object[x++] = body[z];
+                // if (raw[i] != ' ')
+                //     namelen = i;
+            }
+        }
+        i = pkgList_Find(callsign, object, type);
+    }
+    else
+    {
         i = pkgList_Find(callsign, type);
     }
 
-    
     if (i > PKGLISTSIZE)
     {
         psramBusy = false;
@@ -3179,7 +3219,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             pkgList[i].time = time(NULL);
             pkgList[i].pkg++;
             pkgList[i].type = type;
-            //memcpy(pkgList[i].object,object,sizeof(object));
+            // memcpy(pkgList[i].object,object,sizeof(object));
             if (channel == 0)
             {
                 pkgList[i].rssi = rssi;
@@ -3193,16 +3233,20 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
                 pkgList[i].freqErr = 0;
             }
             len = strlen(raw);
-            pkgList[i].length=len+1;
-            if(pkgList[i].raw!=NULL){
-                 pkgList[i].raw = (char*)realloc(pkgList[i].raw,pkgList[i].length);
-            }else{
-                pkgList[i].raw = (char*)calloc(pkgList[i].length,sizeof(char));
+            pkgList[i].length = len + 1;
+            if (pkgList[i].raw != NULL)
+            {
+                pkgList[i].raw = (char *)realloc(pkgList[i].raw, pkgList[i].length);
             }
-            if(pkgList[i].raw){
+            else
+            {
+                pkgList[i].raw = (char *)calloc(pkgList[i].length, sizeof(char));
+            }
+            if (pkgList[i].raw)
+            {
                 memcpy(pkgList[i].raw, raw, len);
-                pkgList[i].raw[len]=0;
-                log_d("Update: pkgList_idx=%d callsign:%s object:%s", i,callsign,object);
+                pkgList[i].raw[len] = 0;
+                log_d("Update: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
             }
         }
     }
@@ -3219,11 +3263,14 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         pkgList[i].time = time(NULL);
         pkgList[i].pkg = 1;
         pkgList[i].type = type;
-        if(strlen(object)>3){
-            memcpy(pkgList[i].object,object,9);
-            pkgList[i].object[9]=0;
-        }else{
-            memset(pkgList[i].object,0,sizeof(pkgList[i].object));
+        if (strlen(object) > 3)
+        {
+            memcpy(pkgList[i].object, object, 9);
+            pkgList[i].object[9] = 0;
+        }
+        else
+        {
+            memset(pkgList[i].object, 0, sizeof(pkgList[i].object));
         }
         if (channel == 0)
         {
@@ -3240,16 +3287,20 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         // strcpy(pkgList[i].calsign, callsign);
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
         len = strlen(raw);
-        pkgList[i].length=len+1;
-        if(pkgList[i].raw!=NULL){
-            pkgList[i].raw = (char*)realloc(pkgList[i].raw,pkgList[i].length);
-        }else{
-            pkgList[i].raw = (char*)calloc(pkgList[i].length,sizeof(char));
+        pkgList[i].length = len + 1;
+        if (pkgList[i].raw != NULL)
+        {
+            pkgList[i].raw = (char *)realloc(pkgList[i].raw, pkgList[i].length);
         }
-        if(pkgList[i].raw){
+        else
+        {
+            pkgList[i].raw = (char *)calloc(pkgList[i].length, sizeof(char));
+        }
+        if (pkgList[i].raw)
+        {
             memcpy(pkgList[i].raw, raw, len);
-            pkgList[i].raw[len]=0;
-            log_d("New: pkgList_idx=%d callsign:%s object:%s", i,callsign,object);
+            pkgList[i].raw[len] = 0;
+            log_d("New: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
         }
     }
     psramBusy = false;
@@ -3270,7 +3321,8 @@ bool pkgTxDuplicate(AX25Msg ax25)
     {
         if (txQueue[i].Active)
         {
-            if (txQueue[i].Channel & INET_CHANNEL) continue;
+            if (txQueue[i].Channel & INET_CHANNEL)
+                continue;
 
             if (ax25.src.ssid > 0)
                 sprintf(callsign, "%s-%d", ax25.src.call, ax25.src.ssid);
@@ -3341,14 +3393,15 @@ bool pkgTxPush(const char *info, size_t len, int dly, uint8_t Ch)
     {
         if (txQueue[i].Active == false)
         {
-            if(len>sizeof(txQueue[i].Info)) len=sizeof(txQueue[i].Info);
+            if (len > sizeof(txQueue[i].Info))
+                len = sizeof(txQueue[i].Info);
             memset(txQueue[i].Info, 0, sizeof(txQueue[i].Info));
             memcpy(&txQueue[i].Info[0], info, len);
             txQueue[i].length = len;
             txQueue[i].Delay = dly;
             txQueue[i].Active = true;
             txQueue[i].timeStamp = millis();
-            txQueue[i].Channel = Ch;            
+            txQueue[i].Channel = Ch;
             break;
         }
     }
@@ -3373,15 +3426,18 @@ bool pkgTxSend()
             int decTime = millis() - txQueue[i].timeStamp;
             if (txQueue[i].Channel & INET_CHANNEL)
             {
-                if(config.igate_en==false){
+                if (config.igate_en == false)
+                {
                     txQueue[i].Channel &= ~INET_CHANNEL;
-                }else{
+                }
+                else
+                {
                     if (aprsClient.connected())
                     {
-                        //status.txCount++;
-                        //aprsClient.printf("%s\r\n", txQueue[i].Info); // Send packet to Inet
+                        // status.txCount++;
+                        // aprsClient.printf("%s\r\n", txQueue[i].Info); // Send packet to Inet
                         aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
-                        aprsClient.write("\r\n");     // Send CR LF the end frame packet
+                        aprsClient.write("\r\n");                             // Send CR LF the end frame packet
                         txQueue[i].Channel &= ~INET_CHANNEL;
                         log_d("TX->INET: %s", txQueue[i].Info);
                         continue;
@@ -3390,25 +3446,27 @@ bool pkgTxSend()
             }
             if (decTime > txQueue[i].Delay)
             {
-                if (config.rf_mode == RF_MODE_AIS) //AIS for RX Only
+                if (config.rf_mode == RF_MODE_AIS) // AIS for RX Only
                 {
                     txQueue[i].Channel &= ~RF_CHANNEL;
-                }else{
+                }
+                else
+                {
                     if (txQueue[i].Channel & RF_CHANNEL)
                     {
-                        char *info = (char *)calloc(txQueue[i].length+1, sizeof(char));
+                        char *info = (char *)calloc(txQueue[i].length + 1, sizeof(char));
                         if (info)
                         {
-                            memset(info, 0, txQueue[i].length);                        
-                            memcpy(info, txQueue[i].Info,txQueue[i].length);
+                            memset(info, 0, txQueue[i].length);
+                            memcpy(info, txQueue[i].Info, txQueue[i].length);
                             psramBusy = false;
                             // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
                             status.txCount++;
 
                             // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
-                            APRS_sendTNC2Pkt((uint8_t *)info,txQueue[i].length);
+                            APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);
                             igateTLM.TX++;
-                            //log_d("TX->RF: %s", info);
+                            // log_d("TX->RF: %s", info);
                             if (config.trk_en)
                             {
                                 timeSleep = millis() + 5000;
@@ -3447,7 +3505,7 @@ void aprs_msg_callback(struct AX25Msg *msg)
         int idx = info.lastIndexOf("?RSSI");
         if (idx > 0)
         {
-            info.remove(idx, 5);        
+            info.remove(idx, 5);
             info += "[RSSI:" + String((int)rssi) + "dBm] ";
             info.toCharArray((char *)msg->info, info.length(), 0);
             msg->len = info.length() - 1;
@@ -3550,13 +3608,13 @@ RTC_DATA_ATTR uint8_t curTab;
 
 void preTransmission()
 {
-    pinMode(config.modbus_de_gpio,OUTPUT);
+    pinMode(config.modbus_de_gpio, OUTPUT);
     digitalWrite(config.modbus_de_gpio, 1);
 }
 
 void postTransmission()
 {
-    pinMode(config.modbus_de_gpio,OUTPUT);
+    pinMode(config.modbus_de_gpio, OUTPUT);
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
@@ -3591,10 +3649,10 @@ void setup()
     if (LED_TX > -1)
         pinMode(LED_TX, OUTPUT);
 
-        // pinMode(0, INPUT);
-        // pinMode(1, INPUT);
-        //  Set the CPU frequency to 80 MHz for power optimization
-        // setCpuFrequencyMhz(80);
+    // pinMode(0, INPUT);
+    // pinMode(1, INPUT);
+    //  Set the CPU frequency to 80 MHz for power optimization
+    // setCpuFrequencyMhz(80);
 
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
@@ -3663,10 +3721,13 @@ void setup()
     {
         log_d("Factory Default");
         defaultConfig();
-        saveConfiguration("/default.cfg",config);
-    }else{
-        if(!loadConfiguration("/default.cfg",config)) defaultConfig();
-    } 
+        saveConfiguration("/default.cfg", config);
+    }
+    else
+    {
+        if (!loadConfiguration("/default.cfg", config))
+            defaultConfig();
+    }
 
 #ifdef BUOY
     config.wifi_mode |= WIFI_AP_FIX;
@@ -3676,15 +3737,15 @@ void setup()
     timeLEDon = 10;
 #else
     pinMode(BOOT_PIN, INPUT_PULLUP);
-    #ifdef BV5DJ_BOARD
-        pinMode(BUTTON_LEFT, INPUT_PULLUP);
-        pinMode(BUTTON_RIGHT, INPUT_PULLUP);
-        pinMode(BUTTON_UP, INPUT_PULLUP);
-        pinMode(BUTTON_DOWN, INPUT_PULLUP);
-        pinMode(SD_CS, OUTPUT);
-        pinMode(GPS_PPS, INPUT_PULLUP);
-        pinMode(KEEP_ALIVE, INPUT_PULLUP);
-    #endif
+#ifdef BV5DJ_BOARD
+    pinMode(BUTTON_LEFT, INPUT_PULLUP);
+    pinMode(BUTTON_RIGHT, INPUT_PULLUP);
+    pinMode(BUTTON_UP, INPUT_PULLUP);
+    pinMode(BUTTON_DOWN, INPUT_PULLUP);
+    pinMode(SD_CS, OUTPUT);
+    pinMode(GPS_PPS, INPUT_PULLUP);
+    pinMode(KEEP_ALIVE, INPUT_PULLUP);
+#endif
 #endif
 
     Sleep_Activate = config.pwr_sleep_activate;
@@ -3692,14 +3753,12 @@ void setup()
 
     if (config.i2c1_enable)
     {
-        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);        
+        Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
     }
 
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
     setupPower();
 #endif
-
-
 
 #ifdef OLED
     config.i2c_enable = true;
@@ -3750,44 +3809,63 @@ void setup()
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
     if (OLED_RESET > -1)
     {
-        #ifdef SH1106
-        display.begin(SH1106_SWITCHCAPVCC, 0x3C, true); // initialize with the I2C addr 0x3C (for the 128x64)
-        #else
-        display.begin(SSD1306_SWITCHCAPVCC, 0x3C, true, false); // initialize with the I2C addr 0x3C (for the 128x64)
-        #endif
+#ifdef SH1106
+        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, true); // initialize with the I2C addr 0x3C (for the 128x64)
+#else
+        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, true, false); // initialize with the I2C addr 0x3C (for the 128x64)
+#endif
     }
     else
     {
-        #ifdef SH1106
-        display.begin(SH1106_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
-        #else
-        display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false); // initialize with the I2C addr 0x3C (for the 128x64)
-        #endif
+#ifdef SH1106
+        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, false); // initialize with the I2C addr 0x3C (for the 128x64)
+#else
+        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false); // initialize with the I2C addr 0x3C (for the 128x64)
+#endif
     }
     // Initialising the UI will init the display too.
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
-        if(config.disp_flip)
+        if (config.disp_flip)
             display.setRotation(2);
         else
             display.setRotation(0);
         display.clearDisplay();
-        //display.setTextSize(1);
         display.setTextColor(WHITE);
 
         display.setTextSize(1);
         display.setFont(&FreeSansBold9pt7b);
 
-        #ifdef SSD1306_128x32
-        //display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
-        //display.drawRect(0, 0, 72, 40, WHITE);
-        display.drawCircle(20,20,10,WHITE);
+#ifdef SSD1306_72x40
+        if (config.disp_flip)
+            display.setRotation(2);
+        else
+            display.setRotation(0);
+        display.clearDisplay();
+        display.drawYBitmap(0, -4, LOGO, 48, 48, WHITE);
         display.display();
-
-        delay(3000);
-        // display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
-        // delay(3000);
-        #else
+        delay(1000);
+        LED_Status(255, 0, 0);
+        display.fillRect(50, 28, 20, 10, WHITE);
+        display.display();
+        delay(1000);
+        LED_Status(0, 255, 0);
+        display.fillRect(50, 16, 20, 10, WHITE);
+        display.display();
+        delay(1000);
+        display.fillRect(50, 4, 20, 10, WHITE);
+        display.display();
+        delay(1000);
+        display.clearDisplay();
+        display.setCursor(3, 19);
+        display.printf("V%s%c", VERSION, VERSION_BUILD);
+        display.setCursor(5, 38);
+        display.print("@2024");
+        display.display();
+        delay(1000);
+// display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
+// delay(3000);
+#else
 
         display.setCursor(0, 15);
         display.print("APRS");
@@ -3823,7 +3901,7 @@ void setup()
         display.print("1 Sec");
         display.display();
         delay(1000);
-        #endif
+#endif
 
         if (digitalRead(BOOT_PIN) == LOW)
         {
@@ -3831,8 +3909,13 @@ void setup()
             log_d("Manual Default configure!");
 #ifdef OLED
             display.clearDisplay();
+#ifdef SSD1306_72x40
+            display.setCursor(5, 25);
+            display.print("RST!");
+#else
             display.setCursor(10, 22);
             display.print("Factory Reset!");
+#endif
             display.display();
 #endif
             while (digitalRead(BOOT_PIN) == LOW)
@@ -3853,33 +3936,33 @@ void setup()
     i2c_busy = false;
 #else
 #ifdef ST7735_160x80
-if (config.i2c_enable)
+    if (config.i2c_enable)
     {
         Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
-        i2c_busy=false;
+        i2c_busy = false;
     }
     TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
     TFT_SPI.setFrequency(40000000);
-    //ledcAttachPin(ST7735_LED_K_Pin,0);
-    //pinMode(ST7735_LED_K_Pin, OUTPUT);
-    //ledcAttach(ST7735_LED_K_Pin,5000,8);
-    ledcSetup(0,5000,8);
-    ledcAttachPin(ST7735_LED_K_Pin,0);
+    // ledcAttachPin(ST7735_LED_K_Pin,0);
+    // pinMode(ST7735_LED_K_Pin, OUTPUT);
+    // ledcAttach(ST7735_LED_K_Pin,5000,8);
+    ledcSetup(0, 5000, 8);
+    ledcAttachPin(ST7735_LED_K_Pin, 0);
     ledcWrite(0, config.disp_brightness);
     display.initR(ST7735_MODEL); // initialize a ST7735S chip, mini display
-    if(config.disp_flip)
+    if (config.disp_flip)
         display.setRotation(3);
     else
         display.setRotation(1);
-    #ifdef NV3022B3
+#ifdef NV3022B3
     uint8_t madctl = 0;
-    madctl = ST77XX_MADCTL_MY| ST77XX_MADCTL_MX | ST77XX_MADCTL_MV | ST77XX_MADCTL_RGB;
+    madctl = ST77XX_MADCTL_MY | ST77XX_MADCTL_MX | ST77XX_MADCTL_MV | ST77XX_MADCTL_RGB;
     display.sendCommand(ST77XX_MADCTL, &madctl, 1);
     display.invertDisplay(true);
-    #else
+#else
     display.invertDisplay(false);
-    #endif
-    display.setAddrWindow(0,0,160,80);   
+#endif
+    display.setAddrWindow(0, 0, 160, 80);
     display.enableDisplay(true);
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
@@ -4170,7 +4253,7 @@ if (config.i2c_enable)
             0);             /* Core where the task should run */
     }
 
-    //if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
+    // if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
     if (config.ext_tnc_enable)
     {
         xTaskCreatePinnedToCore(
@@ -4185,11 +4268,10 @@ if (config.i2c_enable)
 
     timeTask = millis() + 10000;
 
-    if(config.gnss_enable)
-        curTab=0;
+    if (config.gnss_enable)
+        curTab = 0;
     else
-        curTab=6;
-        
+        curTab = 6;
 }
 
 String getTimeStamp()
@@ -4299,164 +4381,217 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
     return str_comp;
 }
 
-//String compress_position(double nowLat, double nowLng, int alt_feed, double course, uint16_t spdKnot, char table, char symbol, bool gps)
+// String compress_position(double nowLat, double nowLng, int alt_feed, double course, uint16_t spdKnot, char table, char symbol, bool gps)
 
-String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t* telem, size_t telemLen, char* grid, char* status, int32_t alt, char table, char symbol) 
+String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t *telem, size_t telemLen, char *grid, char *status, int32_t alt, char table, char symbol)
 {
-    String strRet="";
-  // sanity checks first
-  if(((telemLen == 0) && (telem != NULL)) || ((telemLen != 0) && (telem == NULL))) {
-    return strRet;
-  }
+    String strRet = "";
+    // sanity checks first
+    if (((telemLen == 0) && (telem != NULL)) || ((telemLen != 0) && (telem == NULL)))
+    {
+        return strRet;
+    }
 
-  if((telemLen != 0) && (telemLen != 2) && (telemLen != 5)) {
-    return strRet;
-  }
+    if ((telemLen != 0) && (telemLen != 2) && (telemLen != 5))
+    {
+        return strRet;
+    }
 
-  if((telemLen > 0) && ((grid != NULL) || (status != NULL) || (alt != RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED))) {
-    // can't have both telemetry and status
-    return strRet;
-  }
+    if ((telemLen > 0) && ((grid != NULL) || (status != NULL) || (alt != RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED)))
+    {
+        // can't have both telemetry and status
+        return strRet;
+    }
 
-  // prepare buffers
-  char destCallsign[7];
-  #if !RADIOLIB_STATIC_ONLY
+    // prepare buffers
+    char destCallsign[7];
+#if !RADIOLIB_STATIC_ONLY
     size_t infoLen = 10;
-    if(telemLen > 0) {
-      infoLen += 1 + telemLen;
-    } else {
-      if(grid != NULL) {
-        infoLen += strlen(grid) + 2;
-      }
-      if(status != NULL) {
-        infoLen += strlen(status);
-      }
-      if(alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED) {
-        infoLen += 4;
-      }
+    if (telemLen > 0)
+    {
+        infoLen += 1 + telemLen;
     }
-    char* info = new char[infoLen];
-  #else
+    else
+    {
+        if (grid != NULL)
+        {
+            infoLen += strlen(grid) + 2;
+        }
+        if (status != NULL)
+        {
+            infoLen += strlen(status);
+        }
+        if (alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED)
+        {
+            infoLen += 4;
+        }
+    }
+    char *info = new char[infoLen];
+#else
     char info[RADIOLIB_STATIC_ARRAY_SIZE];
-  #endif
-  size_t infoPos = 0;
+#endif
+    size_t infoPos = 0;
 
-  // the following is based on APRS Mic-E implementation by https://github.com/omegat
-  // as discussed in https://github.com/jgromes/RadioLib/issues/430
+    // the following is based on APRS Mic-E implementation by https://github.com/omegat
+    // as discussed in https://github.com/jgromes/RadioLib/issues/430
 
-  // latitude first, because that is in the destination field
-  float lat_abs = RADIOLIB_ABS(lat);
-  int lat_deg = (int)lat_abs;
-  int lat_min = (lat_abs - (float)lat_deg) * 60.0f;
-  int lat_hun = (((lat_abs - (float)lat_deg) * 60.0f) - lat_min) * 100.0f;
-  destCallsign[0] = lat_deg/10;
-  destCallsign[1] = lat_deg%10;
-  destCallsign[2] = lat_min/10;
-  destCallsign[3] = lat_min%10;
-  destCallsign[4] = lat_hun/10;
-  destCallsign[5] = lat_hun%10;
+    // latitude first, because that is in the destination field
+    float lat_abs = RADIOLIB_ABS(lat);
+    int lat_deg = (int)lat_abs;
+    int lat_min = (lat_abs - (float)lat_deg) * 60.0f;
+    int lat_hun = (((lat_abs - (float)lat_deg) * 60.0f) - lat_min) * 100.0f;
+    destCallsign[0] = lat_deg / 10;
+    destCallsign[1] = lat_deg % 10;
+    destCallsign[2] = lat_min / 10;
+    destCallsign[3] = lat_min % 10;
+    destCallsign[4] = lat_hun / 10;
+    destCallsign[5] = lat_hun % 10;
 
-  // next, add the extra bits
-  if(type & 0x04) { destCallsign[0] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
-  if(type & 0x02) { destCallsign[1] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
-  if(type & 0x01) { destCallsign[2] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
-  if(lat >= 0) { destCallsign[3] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
-  if(lon >= 100 || lon <= -100) { destCallsign[4] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
-  if(lon < 0) { destCallsign[5] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET; }
-  destCallsign[6] = '\0';
-
-  // now convert to Mic-E characters to get the "callsign"
-  for(uint8_t i = 0; i < 6; i++) {
-    if(destCallsign[i] <= 9) {
-      destCallsign[i] += '0';
-    } else {
-      destCallsign[i] += ('A' - 10);
+    // next, add the extra bits
+    if (type & 0x04)
+    {
+        destCallsign[0] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET;
     }
-  }
-
-  // setup the information field
-  info[infoPos++] = RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT;
-
-  // encode the longtitude
-  float lon_abs = RADIOLIB_ABS(lon);
-  int32_t lon_deg = (int32_t)lon_abs;
-  int32_t lon_min = (lon_abs - (float)lon_deg) * 60.0f;
-  int32_t lon_hun = (((lon_abs - (float)lon_deg) * 60.0f) - lon_min) * 100.0f;
-
-  if(lon_deg <= 9) {
-    info[infoPos++] = lon_deg + 118;
-  } else if(lon_deg <= 99) {
-    info[infoPos++] = lon_deg + 28;
-  } else if(lon_deg <= 109) {
-    info[infoPos++] = lon_deg + 8;
-  } else {
-    info[infoPos++] = lon_deg - 72;
-  }
-
-  if(lon_min <= 9){
-    info[infoPos++] = lon_min + 88;
-  } else {
-    info[infoPos++] = lon_min + 28;
-  }
-
-  info[infoPos++] = lon_hun + 28;
-
-  // now the speed and heading - this gets really weird
-  int32_t speed_hun_ten = speed/10;
-  int32_t speed_uni = speed%10;
-  int32_t head_hun = heading/100;
-  int32_t head_ten_uni = heading%100;
-
-  if(speed <= 199) {
-    info[infoPos++] = speed_hun_ten + 'l';
-  } else {
-    info[infoPos++] = speed_hun_ten + '0';
-  }
-
-  info[infoPos++] = speed_uni*10 + head_hun + 32;
-  info[infoPos++] = head_ten_uni + 28;
-  info[infoPos++] = symbol;
-  info[infoPos++] = table;
-
-  // onto the optional stuff - check telemetry first
-  if(telemLen > 0) {
-    if(telemLen == 2) {
-      info[infoPos++] = RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_2;
-    } else {
-      info[infoPos++] = RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_5;
+    if (type & 0x02)
+    {
+        destCallsign[1] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET;
     }
-    for(uint8_t i = 0; i < telemLen; i++) {
-      sprintf(&(info[infoPos]), "%02X", telem[i]);
-      infoPos += 2;
+    if (type & 0x01)
+    {
+        destCallsign[2] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET;
+    }
+    if (lat >= 0)
+    {
+        destCallsign[3] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET;
+    }
+    if (lon >= 100 || lon <= -100)
+    {
+        destCallsign[4] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET;
+    }
+    if (lon < 0)
+    {
+        destCallsign[5] += RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET;
+    }
+    destCallsign[6] = '\0';
+
+    // now convert to Mic-E characters to get the "callsign"
+    for (uint8_t i = 0; i < 6; i++)
+    {
+        if (destCallsign[i] <= 9)
+        {
+            destCallsign[i] += '0';
+        }
+        else
+        {
+            destCallsign[i] += ('A' - 10);
+        }
     }
 
-  } else {
-    if(grid != NULL) {
-      memcpy(&(info[infoPos]), grid, strlen(grid));
-      infoPos += strlen(grid);
-      info[infoPos++] = '/';
-      info[infoPos++] = 'G';
-    }
-    if(status != NULL) {
-      info[infoPos++] = ' ';
-      memcpy(&(info[infoPos]), status, strlen(status));
-      infoPos += strlen(status);
-    }
-    if(alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED) {
-      // altitude is offset by -10 km
-      int32_t alt_val = alt + 10000;
+    // setup the information field
+    info[infoPos++] = RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT;
 
-      // ... and encoded in base 91 for some reason
-      info[infoPos++] = (alt_val / 8281) + 33;
-      info[infoPos++] = ((alt_val % 8281) / 91) + 33;
-      info[infoPos++] = ((alt_val % 8281) % 91) + 33;
-      info[infoPos++] = '}';
-    }
-  }
-  info[infoPos++] = '\0';
+    // encode the longtitude
+    float lon_abs = RADIOLIB_ABS(lon);
+    int32_t lon_deg = (int32_t)lon_abs;
+    int32_t lon_min = (lon_abs - (float)lon_deg) * 60.0f;
+    int32_t lon_hun = (((lon_abs - (float)lon_deg) * 60.0f) - lon_min) * 100.0f;
 
-  strRet=String(info);
-  return strRet;
+    if (lon_deg <= 9)
+    {
+        info[infoPos++] = lon_deg + 118;
+    }
+    else if (lon_deg <= 99)
+    {
+        info[infoPos++] = lon_deg + 28;
+    }
+    else if (lon_deg <= 109)
+    {
+        info[infoPos++] = lon_deg + 8;
+    }
+    else
+    {
+        info[infoPos++] = lon_deg - 72;
+    }
+
+    if (lon_min <= 9)
+    {
+        info[infoPos++] = lon_min + 88;
+    }
+    else
+    {
+        info[infoPos++] = lon_min + 28;
+    }
+
+    info[infoPos++] = lon_hun + 28;
+
+    // now the speed and heading - this gets really weird
+    int32_t speed_hun_ten = speed / 10;
+    int32_t speed_uni = speed % 10;
+    int32_t head_hun = heading / 100;
+    int32_t head_ten_uni = heading % 100;
+
+    if (speed <= 199)
+    {
+        info[infoPos++] = speed_hun_ten + 'l';
+    }
+    else
+    {
+        info[infoPos++] = speed_hun_ten + '0';
+    }
+
+    info[infoPos++] = speed_uni * 10 + head_hun + 32;
+    info[infoPos++] = head_ten_uni + 28;
+    info[infoPos++] = symbol;
+    info[infoPos++] = table;
+
+    // onto the optional stuff - check telemetry first
+    if (telemLen > 0)
+    {
+        if (telemLen == 2)
+        {
+            info[infoPos++] = RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_2;
+        }
+        else
+        {
+            info[infoPos++] = RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_5;
+        }
+        for (uint8_t i = 0; i < telemLen; i++)
+        {
+            sprintf(&(info[infoPos]), "%02X", telem[i]);
+            infoPos += 2;
+        }
+    }
+    else
+    {
+        if (grid != NULL)
+        {
+            memcpy(&(info[infoPos]), grid, strlen(grid));
+            infoPos += strlen(grid);
+            info[infoPos++] = '/';
+            info[infoPos++] = 'G';
+        }
+        if (status != NULL)
+        {
+            info[infoPos++] = ' ';
+            memcpy(&(info[infoPos]), status, strlen(status));
+            infoPos += strlen(status);
+        }
+        if (alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED)
+        {
+            // altitude is offset by -10 km
+            int32_t alt_val = alt + 10000;
+
+            // ... and encoded in base 91 for some reason
+            info[infoPos++] = (alt_val / 8281) + 33;
+            info[infoPos++] = ((alt_val % 8281) / 91) + 33;
+            info[infoPos++] = ((alt_val % 8281) % 91) + 33;
+            info[infoPos++] = '}';
+        }
+    }
+    info[infoPos++] = '\0';
+
+    strRet = String(info);
+    return strRet;
 }
 
 String trk_gps_postion(String comment)
@@ -5002,8 +5137,8 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
         if (Packet.rpt_flags & (1 << i))
             tnc2 += "*";
     }
-    tnc2 += String(F(":"));    
-    tnc2 += String((const char *)Packet.info,Packet.len+1);
+    tnc2 += String(F(":"));
+    tnc2 += String((const char *)Packet.info, Packet.len + 1);
 
     return tnc2.length();
 }
@@ -5140,11 +5275,11 @@ void loop()
         analogSetAttenuation(ADC_11db);
         digitalWrite(2, HIGH);
         VBat = (double)analogReadMilliVolts(1) / 201.15357F;
-#elif defined(HELTEC_V3_GPS)   
+#elif defined(HELTEC_V3_GPS)
         analogReadResolution(12);
         analogSetAttenuation(ADC_11db);
         digitalWrite(37, HIGH);
-        VBat = (double)analogReadMilliVolts(1) / 201.15357F;     
+        VBat = (double)analogReadMilliVolts(1) / 201.15357F;
 #elif defined(APRS_LORA_HT)
         VBat = (double)analogReadMilliVolts(3) / 595.24F;
 #elif defined(BUOY)
@@ -5289,7 +5424,7 @@ void loop()
                 else
                     gps_mode = true;
             }
-            if (curTab == 4)    // System display
+            if (curTab == 4) // System display
             {
                 PowerOff();
                 esp_deep_sleep_start();
@@ -5319,15 +5454,17 @@ void loop()
                     save_act = true;
                 showDisp = true;
                 timeSec = timeHalfSec = millis();
-                #ifdef ST7735_LED_K_Pin
-				ledcWrite(0, (uint32_t)config.disp_brightness);
-				#endif
+#ifdef ST7735_LED_K_Pin
+                ledcWrite(0, (uint32_t)config.disp_brightness);
+#endif
+
                 // if (oledSleepTimeout > 0)
                 //{
                 curTab++;
                 if (curTab > 7)
                     curTab = 0;
                 //}
+                log_d("curTab=%d", curTab);
             }
         }
         btn_count = 0;
@@ -5352,7 +5489,7 @@ void loop()
                 i2c_busy = true;
                 char tnc2[300];
                 dispBuffer.pop(&tnc2);
-                //log_d("dispWindow info=%s",tnc2);
+                // log_d("dispWindow info=%s",tnc2);
                 dispWindow(String(tnc2), 0, false);
                 i2c_busy = false;
                 timeHalfSec = millis() + (config.dispDelay * 1000);
@@ -5492,7 +5629,7 @@ void loop()
                         log_d("System to save mode A %d Sec", config.pwr_sleep_interval);
                         StandByTick = millis() + (config.pwr_sleep_interval * 1000);
                         vTaskSuspend(taskSensorHandle);
-                        //Power OFF
+                        // Power OFF
                         PowerOff();
 
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
@@ -5557,11 +5694,11 @@ void loop()
                         StandByTick = millis() + (config.pwr_sleep_interval * 1000);
                         vTaskDelete(taskSensorHandle);
                         PowerOff();
-                        //adc_power_off();
+                        // adc_power_off();
                         vTaskDelete(taskNetworkHandle);
                         WiFi.disconnect(true); // Disconnect from the network
                         WiFi.persistent(false);
-                        WiFi.mode(WIFI_OFF);   // Switch WiFi off
+                        WiFi.mode(WIFI_OFF); // Switch WiFi off
 
                         // vTaskSuspend(taskNetworkHandle);
                         // delay(100);
@@ -5620,7 +5757,7 @@ void loop()
                         // esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
                         // esp_task_wdt_add(NULL);               // add current thread to WDT watch
                         // esp_task_wdt_reset();
-                        //adc_power_on();
+                        // adc_power_on();
                         // WiFi.disconnect(false);  // Reconnect the network
                         // WiFi.mode(WIFI_STA);    // Switch WiFi off
                         PowerOn();
@@ -5683,7 +5820,7 @@ void loop()
                     log_d("System to SLEEP Mode %d Sec", config.pwr_sleep_interval);
                     // radioSleep();
                     // esp_deep_sleep_enable_gpio_wakeup(BIT(DEFAULT_WAKEUP_PIN), DEFAULT_WAKEUP_LEVEL));
-                    PowerOff();                   
+                    PowerOff();
                     // delay(100);
                     // esp_sleep_enable_ext0_wakeup(GPIO_NUM_14,LOW);
                     radioSleep();
@@ -5870,7 +6007,7 @@ void sendTelemetry_0(char *raw, bool header)
         // char *rawP = (char *)malloc(rawData.length());
         //  rawData.toCharArray(rawP, rawData.length());
         // memcpy(rawP, rawData.c_str(), rawData.length());
-        pkgTxPush(str, strlen(str), 0,RF_CHANNEL);
+        pkgTxPush(str, strlen(str), 0, RF_CHANNEL);
         // pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
         // free(rawP);
     }
@@ -6642,22 +6779,22 @@ void taskSerial(void *pvParameters)
     }
     if (config.wx_en)
     {
-//         if (config.wx_channel == 1)
-//         {
-// #if ARDUINO_USB_CDC_ON_BOOT
-//             Serial0.setTimeout(10);
-// #else
-//             Serial.setTimeout(10);
-// #endif
-//         }
-//         else if (config.wx_channel == 2)
-//         {
-//             Serial1.setTimeout(10);
-//         }
-//         else if (config.wx_channel == 3)
-//         {
-//             // Serial2.setTimeout(10);
-//         }
+        //         if (config.wx_channel == 1)
+        //         {
+        // #if ARDUINO_USB_CDC_ON_BOOT
+        //             Serial0.setTimeout(10);
+        // #else
+        //             Serial.setTimeout(10);
+        // #endif
+        //         }
+        //         else if (config.wx_channel == 2)
+        //         {
+        //             Serial1.setTimeout(10);
+        //         }
+        //         else if (config.wx_channel == 3)
+        //         {
+        //             // Serial2.setTimeout(10);
+        //         }
     }
     for (;;)
     {
@@ -6667,38 +6804,38 @@ void taskSerial(void *pvParameters)
 
         if (config.wx_en)
         {
-//             if (config.wx_channel > 0 && config.wx_channel < 4)
-//             {
-//                 String wx = "";
-//                 if (config.wx_channel == 1)
-//                 {
-// #if ARDUINO_USB_CDC_ON_BOOT
-//                     wx = Serial.readString();
-// #else
-//                     wx = Serial.readString();
-// #endif
-//                 }
-//                 else if (config.wx_channel == 2)
-//                 {
-//                     wx = Serial1.readString();
-//                 }
-//                 else if (config.wx_channel == 3)
-//                 {
-//                     // wx = Serial2.readString();
-//                 }
-//                 // if (wx!="")
-//                 //{
-//                 // while (SerialWX->available())
-//                 //{
-//                 // String wx = SerialWX->readString();
-//                 if (wx != "" && wx.indexOf("DATA:") >= 0)
-//                 {
-//                     log_d("WX Raw >> %d", wx.c_str());
-//                     getCSV2Wx(wx);
-//                 }
-//                 //}
-//                 //}
-//             }
+            //             if (config.wx_channel > 0 && config.wx_channel < 4)
+            //             {
+            //                 String wx = "";
+            //                 if (config.wx_channel == 1)
+            //                 {
+            // #if ARDUINO_USB_CDC_ON_BOOT
+            //                     wx = Serial.readString();
+            // #else
+            //                     wx = Serial.readString();
+            // #endif
+            //                 }
+            //                 else if (config.wx_channel == 2)
+            //                 {
+            //                     wx = Serial1.readString();
+            //                 }
+            //                 else if (config.wx_channel == 3)
+            //                 {
+            //                     // wx = Serial2.readString();
+            //                 }
+            //                 // if (wx!="")
+            //                 //{
+            //                 // while (SerialWX->available())
+            //                 //{
+            //                 // String wx = SerialWX->readString();
+            //                 if (wx != "" && wx.indexOf("DATA:") >= 0)
+            //                 {
+            //                     log_d("WX Raw >> %d", wx.c_str());
+            //                     getCSV2Wx(wx);
+            //                 }
+            //                 //}
+            //                 //}
+            //             }
             // else if(config.wx_channel == 4){
             //     bool result=getM702Modbus(modbus);
             // }
@@ -6914,33 +7051,33 @@ void taskAPRS(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerAPRS_old = micros();
 
-        //if (config.rf_en)
+        // if (config.rf_en)
         //{ // RF Module enable
-            // SEND RF in time slot
-            if (now > timeSlot)
-            {
-                // Transmit in timeslot if enabled
-                // if (config.rf_sql_gpio > -1)
-                // { // Set SQL pin
-                //     if (digitalRead(config.rf_sql_gpio) ^ config.rf_sql_active)
-                //     { // RX State Fail
-                //         if (pkgTxSend())
-                //             timeSlot = millis() + config.tx_timeslot; // Tx Time Slot >2sec.
-                //         else
-                //             timeSlot = millis() + 3000;
-                //     }
-                //     else
-                //     {
-                //         timeSlot = millis() + 1500;
-                //     }
-                // }
-                // else
-                //if (pkgTxSend())
-                pkgTxSend();
-                    //     timeSlot = millis() + config.tx_timeslot; // Tx Time Slot > 2sec.
-                    // else
-                timeSlot = millis() + 100;
-            }
+        //  SEND RF in time slot
+        if (now > timeSlot)
+        {
+            // Transmit in timeslot if enabled
+            // if (config.rf_sql_gpio > -1)
+            // { // Set SQL pin
+            //     if (digitalRead(config.rf_sql_gpio) ^ config.rf_sql_active)
+            //     { // RX State Fail
+            //         if (pkgTxSend())
+            //             timeSlot = millis() + config.tx_timeslot; // Tx Time Slot >2sec.
+            //         else
+            //             timeSlot = millis() + 3000;
+            //     }
+            //     else
+            //     {
+            //         timeSlot = millis() + 1500;
+            //     }
+            // }
+            // else
+            // if (pkgTxSend())
+            pkgTxSend();
+            //     timeSlot = millis() + config.tx_timeslot; // Tx Time Slot > 2sec.
+            // else
+            timeSlot = millis() + 100;
+        }
         //}
 
         if (config.trk_en)
@@ -7035,7 +7172,7 @@ void taskAPRS(void *pvParameters)
                     char tlm_result[100];
                     char tlm_data[200];
                     size_t tlm_sz;
-                    if ((TLM_SEQ%100) == 0)
+                    if ((TLM_SEQ % 100) == 0)
                     {
                         char rawInfo[100];
                         char name[10];
@@ -7360,7 +7497,7 @@ void taskAPRS(void *pvParameters)
                     if (config.rx_display && config.dispRF && (type & config.dispFilter))
                     {
                         dispBuffer.push(tnc2.c_str());
-                        log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call,tnc2.c_str());
+                        log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, tnc2.c_str());
                     }
                 }
 #endif
@@ -7414,7 +7551,7 @@ void taskAPRS(void *pvParameters)
                             char tlm_result[100];
                             char tlm_data[200];
                             size_t tlm_sz;
-                            if ((IGATE_TLM_SEQ%100) == 0)
+                            if ((IGATE_TLM_SEQ % 100) == 0)
                             {
                                 char rawInfo[100];
                                 char name[10];
@@ -7592,7 +7729,7 @@ void taskAPRS(void *pvParameters)
             if (newIGatePkg)
             {
                 newIGatePkg = false;
-                //if (config.rf2inet && aprsClient.connected())
+                // if (config.rf2inet && aprsClient.connected())
                 if (config.rf2inet)
                 {
                     int ret = 0;
@@ -7655,7 +7792,7 @@ void taskAPRS(void *pvParameters)
                             char tlm_result[100];
                             char tlm_data[200];
                             size_t tlm_sz;
-                            if ((DIGI_TLM_SEQ%100) == 0)
+                            if ((DIGI_TLM_SEQ % 100) == 0)
                             {
                                 char rawInfo[100];
                                 char name[10];
@@ -7875,17 +8012,17 @@ void taskAPRS(void *pvParameters)
                         packet2Raw(digiPkg, incomingPacket);
                         log_d("DIGI_REPEAT: %s", digiPkg.c_str());
                         log_d("DIGI delay=%d ms.", digiDelay);
-                        //char *rawP = (char *)calloc(digiPkg.length()+1, sizeof(char));
-                        // digiPkg.toCharArray(rawP, digiPkg.length());
-                        //memcpy(rawP, digiPkg.c_str(), digiPkg.length());
+                        // char *rawP = (char *)calloc(digiPkg.length()+1, sizeof(char));
+                        //  digiPkg.toCharArray(rawP, digiPkg.length());
+                        // memcpy(rawP, digiPkg.c_str(), digiPkg.length());
                         pkgTxPush(digiPkg.c_str(), digiPkg.length(), digiDelay, RF_CHANNEL);
                         digiPkg.clear();
-                        //pkgTxPush(rawP, digiPkg.length(), digiDelay, RF_CHANNEL);
+                        // pkgTxPush(rawP, digiPkg.length(), digiDelay, RF_CHANNEL);
                         sprintf(sts, "--src call--\n%s\nDelay: %dms.", incomingPacket.src.call, digiDelay);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_DIGI, "DIGI REPEAT", sts);
 #endif
-                        //free(rawP);
+                        // free(rawP);
                     }
                 }
             }
@@ -8065,8 +8202,7 @@ void taskAPRSPoll(void *pvParameters)
     for (;;)
     {
         vTaskDelay(10 / portTICK_PERIOD_MS);
-
-        if (AFSKInitAct == true)
+        if ((config.rf_en == true) && (AFSKInitAct == true))
         {
             if (APRS_poll())
             {
@@ -8341,8 +8477,8 @@ void taskNetwork(void *pvParameters)
                     log_d("GW Fail!\n");
                     WiFi.disconnect();
                     WiFi.persistent(false);
-                    WiFi.mode(WIFI_OFF);   // Switch WiFi off
-                    
+                    WiFi.mode(WIFI_OFF); // Switch WiFi off
+
                     wifiTTL = 0;
                     delay(3000);
                     if (config.wifi_mode == WIFI_STA_FIX)
@@ -8365,7 +8501,7 @@ void taskNetwork(void *pvParameters)
                         WiFi.mode(WIFI_MODE_NULL);
                     }
                     WiFi.reconnect();
-                    wifiMulti.run(5000);                    
+                    wifiMulti.run(5000);
                 }
                 if (config.vpn)
                 {
@@ -8647,8 +8783,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
         memset(&aprs, 0, sizeof(pbuf_t));
         aprs.buf_len = 300;
         aprs.packet_len = line.length();
-        memcpy(aprs.data,line.c_str(),line.length());
-        //line.toCharArray(&aprs.data[0], aprs.packet_len);
+        memcpy(aprs.data, line.c_str(), line.length());
+        // line.toCharArray(&aprs.data[0], aprs.packet_len);
         int start_info = line.indexOf(":", 0);
         int end_ssid = line.indexOf(",", start_val);
         int start_dst = line.indexOf(">", 2);
@@ -8796,11 +8932,11 @@ void dispWindow(String line, uint8_t mode, bool filter)
         {
 
 #ifdef OLED
-            #ifdef SH1106
+#ifdef SH1106
             display.SH1106_command(0xE4);
-            #else
+#else
             display.ssd1306_command(0xE4);
-            #endif
+#endif
             delay(10);
             display.clearDisplay();
 
@@ -9839,16 +9975,16 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 display.setCursor(60, x += 10);
                 display.print("LAT:");
                 str = String(aprs.lat, 5);
-                //l = str.length() * 6;
-                //display.setCursor(160 - l-2, x);
+                // l = str.length() * 6;
+                // display.setCursor(160 - l-2, x);
                 display.setCursor(85, x);
                 display.print(str);
 
                 display.setCursor(60, x += 9);
                 display.print("LON:");
                 str = String(aprs.lng, 5);
-                //l = str.length() * 6;
-                //display.setCursor(160 - l-2, x);
+                // l = str.length() * 6;
+                // display.setCursor(160 - l-2, x);
                 display.setCursor(85, x);
                 display.print(str);
 
@@ -9964,6 +10100,33 @@ void statisticsDisp()
     // display.print("1/5");
     // display.setTextColor(WHITE);
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(10, 1);
+    display.print("STATISTIC");
+    display.setTextColor(WHITE);
+    display.setCursor(0, 12);
+    display.print("A:");
+    str = String(status.allCount, DEC);
+    x = str.length() * 6;
+    display.setCursor(71 - x, 12);
+    display.print(str);
+    display.setCursor(0, 22);
+    display.print("G:");
+    str = String(status.rf2inet, DEC);
+    x = str.length() * 6;
+    display.setCursor(71 - x, 22);
+    display.print(str);
+    display.setCursor(0, 32);
+    display.print("E:");
+    str = String(status.errorCount + status.dropCount, DEC);
+    x = str.length() * 6;
+    display.setCursor(71 - x, 32);
+    display.print(str);
+    display.display();
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10013,9 +10176,10 @@ void statisticsDisp()
     display.setCursor(126 - x, 53);
     display.print(str);
     display.display();
+#endif
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(20, 7);
@@ -10083,6 +10247,31 @@ void pkgLastDisp()
     // String times;
     // pkgListType *ptr[100];
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(15, 1);
+    display.print("STATION");
+    display.setTextColor(WHITE);
+    sort(pkgList, PKGLISTSIZE);
+    k = 0;
+    for (i = 0; i < PKGLISTSIZE; i++)
+    {
+        if (pkgList[i].time > 0)
+        {
+            y = 12 + (k * 9);
+            display.setCursor(0, y);
+            pkgList[i].calsign[10] = 0;
+            display.setTextColor(WHITE);
+            display.setCursor(0, y);
+            display.printf("%d:%s", i + 1, pkgList[i].calsign);
+            k++;
+            if (k >= 3)
+                break;
+        }
+    }
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10169,11 +10358,11 @@ void pkgLastDisp()
                 break;
         }
     }
-
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(30, 7);
@@ -10254,6 +10443,31 @@ void pkgCountDisp()
     // String times;
     // pkgListType *ptr[100];
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(15, 1);
+    display.print("TOP PKG");
+    display.setTextColor(WHITE);
+    sortPkgDesc(pkgList, PKGLISTSIZE);
+    k = 0;
+    for (i = 0; i < PKGLISTSIZE; i++)
+    {
+        if (pkgList[i].time > 0)
+        {
+            y = 12 + (k * 9);
+            display.setCursor(0, y);
+            pkgList[i].calsign[10] = 0;
+            display.setTextColor(WHITE);
+            display.setCursor(0, y);
+            display.printf("%d:%s", i + 1, pkgList[i].calsign);
+            k++;
+            if (k >= 3)
+                break;
+        }
+    }
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10334,11 +10548,11 @@ void pkgCountDisp()
                 break;
         }
     }
-
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
@@ -10418,6 +10632,35 @@ void systemDisp()
     // String times;
     // pkgListType *ptr[100];
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(18, 1);
+    display.print("SYSTEM");
+    display.setTextColor(WHITE);
+    display.setCursor(0, 12);
+    display.print("UP:");
+    str = String(day(upTime) - 1, DEC) + "D " + String(hour(upTime), DEC) + ":" + String(minute(upTime), DEC) + ":" + String(second(upTime), DEC);
+    x = str.length() * 6;
+    display.setCursor(71 - x, 12);
+    display.print(str);
+
+    display.setCursor(0, 22);
+    display.print("FW:");
+    str = "V" + String(VERSION) + String(VERSION_BUILD);
+    x = str.length() * 6;
+    display.setCursor(71 - x, 22);
+    display.print(str);
+
+    display.setCursor(0, 32);
+    display.print("RAM:");
+    // str = String((float)ESP.getFreeHeap() / 1024, 1) + "/" + String((float)ESP.getHeapSize() / 1024, 1) + "KB";
+    str = String((float)ESP.getFreeHeap() / 1024, 1) + "KB";
+    x = str.length() * 6;
+    display.setCursor(71 - x, 32);
+    display.print(str);
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10489,11 +10732,11 @@ void systemDisp()
     display.setCursor(126 - x, 53);
     display.print(str);
 #endif
-
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
@@ -10564,6 +10807,24 @@ void wifiDisp()
     // String times;
     // pkgListType *ptr[100];
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    // display.drawRect(0, 0, 72, 40, WHITE);
+    display.fillRect(0, 0, 72, 9, WHITE);
+    // display.fillRect(1, 17, 126, 46, BLACK);
+    display.setTextColor(BLACK);
+    display.setCursor(25, 1);
+    display.print("WiFi");
+    display.setTextColor(WHITE);
+    display.setCursor(6, 10);
+    display.print("IP Address");
+    str = String(WiFi.localIP().toString());
+    // x = str.length() * 6;
+    // display.setCursor(126 - x, 44);
+    display.setCursor(0, 20);
+    display.print(str);
+    display.display();
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10625,9 +10886,10 @@ void wifiDisp()
     display.setCursor(126 - x, 53);
     display.print(str);
     display.display();
+#endif
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
@@ -10708,6 +10970,28 @@ void radioDisp()
     // String times;
     // pkgListType *ptr[100];
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(21, 1);
+    display.print("RADIO");
+    display.setTextColor(WHITE);
+    // str = String(config.rf_freq, 3) + " MHz";
+    // x = str.length() * 6;
+    // display.setCursor(126 - x, 18);
+    display.setCursor(0, 12);
+    display.printf("%.3f Mhz", config.rf_freq);
+    display.setCursor(0, 22);
+    display.printf("BW: %.1fKhz", config.rf_bw);
+    if (config.rf_power >= 0)
+        str = "Pwr:+" + String(config.rf_power) + " dBm";
+    else
+        str = "Pwr:-" + String(config.rf_power) + " dBm";
+    x = str.length() * 6;
+    display.setCursor(0, 32);
+    display.print(str);
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10760,11 +11044,11 @@ void radioDisp()
     x = str.length() * 6;
     display.setCursor(126 - x, 53);
     display.print(str);
-
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(25, 7);
@@ -10829,6 +11113,31 @@ void sensorDisp()
     // String times;
     // pkgListType *ptr[100];
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(18, 1);
+    display.print("SENSOR");
+    display.setTextColor(WHITE);
+    for (i = 0; i < 10; i++)
+    {
+        if (config.sensor[i].enable)
+        {
+            y = 12 + (k * 9);
+            if (++k > 5)
+                break;
+            display.setTextColor(WHITE);
+            display.setCursor(0, y);
+            display.printf("%i:", i + 1);
+            // display.print(String(config.sensor[i].parm).substring(0, 12));
+            str = String(sen[i].sample, 2) + String(config.sensor[i].unit);
+            x = str.length() * 6;
+            display.setCursor(71 - x, y);
+            display.print(str);
+        }
+    }
+#else
     display.fillRect(0, 0, 128, 15, WHITE);
     display.drawRect(0, 16, 128, 48, WHITE);
     display.fillRect(1, 17, 126, 46, BLACK);
@@ -10859,11 +11168,11 @@ void sensorDisp()
             display.print(str);
         }
     }
-
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillRect(0, 0, 160, 15, WHITE);
-    //display.drawRect(0, 16, 160, 64, WHITE);
+    // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
     display.setCursor(35, 7);
@@ -10901,6 +11210,24 @@ void gpsDisp()
     String str;
 
 #ifdef OLED
+#ifdef SSD1306_72x40
+    display.clearDisplay();
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(24, 1);
+    display.print("GNSS");
+    display.setTextColor(WHITE);
+    str = "LAT " + String(gps.location.lat(), 4);
+    display.setCursor(0, 12);
+    display.print(str);
+    str = "LON " + String(gps.location.lng(), 4);
+    display.setCursor(0, 22);
+    display.print(str);
+    str = "Alt " + String(gps.altitude.meters(), 0) + "m";
+    display.setCursor(0, 32);
+    display.print(str);
+
+#else
     if (gps_mode == 0)
     {
         display.fillRect(0, 0, 128, 15, WHITE);
@@ -11031,12 +11358,13 @@ void gpsDisp()
         display.drawLine(60, 29, 127, 29, WHITE);
         display.setFont();
     }
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     if (gps_mode == 0)
     {
         display.fillRect(0, 0, 160, 15, WHITE);
-        //display.drawRect(0, 16, 160, 64, WHITE);
+        // display.drawRect(0, 16, 160, 64, WHITE);
         display.fillRect(0, 15, 160, 64, BLACK);
 
         display.setCursor(35, 7);

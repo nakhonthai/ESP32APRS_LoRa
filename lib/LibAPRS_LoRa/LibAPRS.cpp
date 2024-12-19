@@ -328,6 +328,9 @@ bool APRS_init(Configuration *cfg)
 {
     bool ret = true;
     int state = -1;
+    if (config.rf_en == false)
+        return false;
+
     if (config.rf_type == 0)
         return true;
 

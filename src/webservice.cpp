@@ -1527,7 +1527,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		config.rf_en = radioEnable;
 		config.rf_ax25 = ax25Enable;
 		String html = "OK";
-		if (APRS_init(&config))
+		if (APRS_init(&config) || (config.rf_en == false))
 		{
 			html = "Setup completed successfully";
 			saveConfiguration("/default.cfg", config);
@@ -4189,7 +4189,7 @@ void handle_system(AsyncWebServerRequest *request)
 			LowFlag = "checked=\"checked\"";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>PWR GPIO:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"pwr\" type=\"number\" value=\"" + String(config.pwr_gpio) + "\" />  Active:<input type=\"radio\" name=\"pwr_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"pwr_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"pwr\" type=\"number\" value=\"" + String(config.pwr_gpio) + "\" /> Output Active:<input type=\"radio\" name=\"pwr_active\" value=\"0\" " + LowFlag + "/>LOW <input type=\"radio\" name=\"pwr_active\" value=\"1\" " + HighFlag + "/>HIGH </td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -8581,8 +8581,12 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\">";
 #ifdef HT_CT62
 	webString += "HT-CT62,ESP32-C3 DIY";
+#elif ESP32C3_MINI
+	webString += "ESP32-C3-Mini,ESP32-C3 DIY";
 #elif defined(TTGO_LORA32_V1)
 	webString += "TTGO LORA32 V1,ESP32 DIY";
+#elif defined(TTGO_LORA32_V1_6)
+	webString += "TTGO LORA32(T3) V1.6,ESP32 DIY";
 #elif defined(TTGO_T_Beam_V1_2)
 	webString += "TTGO_T_Beam_V1.2,ESP32 DIY";
 #elif defined(TTGO_T_Beam_V1_0)
@@ -8601,6 +8605,8 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "APRS LoRa Dongle,ESP32-S3 DIY";
 #elif defined(TTGO_T_Beam_V1_2_SX1262) || defined(TTGO_T_Beam_V1_2_SX1268)
 	webString += "TTGO_T_Beam_V1_2_SX1262,TTGO_T_Beam_V1_2_SX1268";
+#elif defined(BV5DJ_BOARD)
+	webString += "BV5DJ BOARD";	
 #endif
 	webString += "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
@@ -8623,7 +8629,7 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>Github: </b></td><td align=\"left\"><a href=\"https://github.com/nakhonthai\" target=\"_github\">https://github.com/nakhonthai</a></td></tr>";
 	webString += "<tr><td align=\"right\"><b>Youtube: </b></td><td align=\"left\"><a href=\"https://www.youtube.com/@HS5TQA\" target=\"_youtube\">https://www.youtube.com/@HS5TQA</a></td></tr>";
 	webString += "<tr><td align=\"right\"><b>Facebook: </b></td><td align=\"left\"><a href=\"https://www.facebook.com/atten\" target=\"_facebook\">https://www.facebook.com/atten</a></td></tr>";
-	webString += "<tr><td align=\"right\"><b>Chat: </b></td><td align=\"left\">Telegram:<a href=\"https://t.me/HS5TQA\" target=\"_line\">@HS5TQA</a>,WeChat ID: HS5TQA</td></tr>";
+	webString += "<tr><td align=\"right\"><b>Chat: </b></td><td align=\"left\">Telegram:<a href=\"https://t.me/HS5TQA\" target=\"_line\">@HS5TQA</a> , WeChat:HS5TQA</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Sponsors: </b></td><td align=\"left\"><a href=\"https://github.com/sponsors/nakhonthai\" target=\"_sponsor\">https://github.com/sponsors/nakhonthai</a></td></tr>";
 	webString += "<tr><td align=\"right\"><b>Donate: </b></td><td align=\"left\"><a href=\"https://www.paypal.me/0hs5tqa0\" target=\"_sponsor\">https://www.paypal.me/0hs5tqa0</a></td></tr>";
 
