@@ -1567,7 +1567,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "if (rftype>5 && rftype<11) {\n"; // SX127x
 		html += "document.getElementById(\"rf_bw\").value='10.40';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
-		html += "document.getElementById(\"rf_sf\").value=9;\n";
+		html += "document.getElementById(\"rf_sf\").value=8;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
 		html += "document.getElementById(\"freq\").value=144.410;\n";
 		html += "var x = document.getElementById(\"ax25En\");\n";
@@ -1588,11 +1588,11 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "}\n";
 
 		html += "function loraUHFCB(){\n";
-		html += "document.getElementById(\"rf_bw\").value='20.80';\n";
+		html += "document.getElementById(\"rf_bw\").value='62.50';\n";
 		html += "document.getElementById(\"rf_sync\").value=18;\n";
-		html += "document.getElementById(\"rf_sf\").value=9;\n";
+		html += "document.getElementById(\"rf_sf\").value=10;\n";
 		html += "document.getElementById(\"rf_cr\").value=5;\n";
-		html += "document.getElementById(\"freq\").value=433.3;\n";
+		html += "document.getElementById(\"freq\").value=433.9;\n";
 		html += "var x = document.getElementById(\"ax25En\");\n";
 		html += "x.checked = true;\n";
 		html += "}\n";
@@ -1689,32 +1689,6 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "</td>\n";
 		float freqMin = 137;
 		float freqMax = 1020;
-		// switch (config.rf_type)
-		// {
-		// case RF_SX1261:
-		// case RF_SX1262:
-		// case RF_SX1268:
-		// 	freqMin = 150.0F;
-		// 	freqMax = 960.0F;
-		// 	break;
-		// case RF_SX1276:
-		// 	// case RF_SX1277:
-		// 	freqMin = 137.0F;
-		// 	freqMax = 1020.0F;
-		// 	break;
-		// case RF_SX1278:
-		// 	freqMin = 137.0F;
-		// 	freqMax = 525.0F;
-		// 	break;
-		// case RF_SX1279:
-		// 	freqMin = 137.0F;
-		// 	freqMax = 960.0F;
-		// 	break;
-		// default:
-		// 	freqMin = 137.0F;
-		// 	freqMax = 1020.0F;
-		// 	break;
-		// }
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Frequency:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"freq\" name=\"freq\" min=\"" + String(freqMin, 3) + "\" max=\"" + String(freqMax, 3) + "\"\n";
@@ -1725,11 +1699,6 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"freq_offset\" name=\"freq_offset\" min=\"-30000\" max=\"30000\"\n";
 		html += "step=\"1\" value=\"" + String(config.rf_freq_offset) + "\" /> Hz   <i>[SX1276:137-175Mhz,410-525Mhz,862-1020Mhz]</i></td>\n";
 		html += "</tr>\n";
-		// html += "<tr>\n";
-		// html += "<td align=\"right\"><b>Band Width:</b></td>\n";
-		// html += "<td style=\"text-align: left;\"><input type=\"number\" id=\"rf_bw\" name=\"rf_bw\" min=\"0.0\" max=\"500.0\"\n";
-		// html += "step=\"0.01\" value=\"" + String(config.rf_bw, 2) + "\" />(LoRa 7.8,10.4,15.6,20.8,31.25,41.7,62.5,125.0,250.0,500.0 kHz)</td>\n";
-		// html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>RF Power:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";

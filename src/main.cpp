@@ -252,7 +252,7 @@ SPIClass TFT_SPI(HSPI);
 // }
 
 // Adafruit_ST7735 display = Adafruit_ST7735(ST7735_CS_Pin,  ST7735_DC_Pin,ST7735_MOSI_Pin,ST7735_SCLK_Pin, ST7735_REST_Pin);
-//Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
+// Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
 typedef Adafruit_ST7735 display_t;
 typedef Adafruit_GFX_Buffer<display_t> GFXBuffer_t;
 GFXBuffer_t display = GFXBuffer_t(80, 160, display_t(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin));
@@ -741,7 +741,7 @@ void setupPower()
     PMU.setIrqLevel(2);
 
     // Set the precharge charging current
-    PMU.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_150MA);
+    PMU.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_200MA);
 
     // Set constant current charge current limit
     //! Using inferior USB cables and adapters will not reach the maximum charging current.
@@ -2679,12 +2679,12 @@ void defaultConfig()
     config.pwr_active = 1;
 #elif defined(APRS_LORA_DONGLE)
     config.rf_en = true;
-    config.rf_type = RF_SX1276;
+    config.rf_type = RF_SX1278;
 #ifdef VHF
     config.rf_freq = 144.410;
     config.rf_freq_offset = 1300;
-    config.rf_bw = 7.8F;
-    config.rf_sf = 7;
+    config.rf_bw = 10.4F;
+    config.rf_sf = 8;
     config.rf_cr = 5;
     config.rf_power = 20;
 #endif
@@ -3464,7 +3464,7 @@ bool pkgTxSend()
                 {
                     if (txQueue[i].Channel & RF_CHANNEL)
                     {
-                        if(config.rf_en)
+                        if (config.rf_en)
                         {
                             char *info = (char *)calloc(txQueue[i].length + 1, sizeof(char));
                             if (info)
@@ -5374,6 +5374,8 @@ uint8_t morseState = 0;
 long int sleep_timer = 0;
 bool save_mode = false;
 bool save_act = false;
+bool manualWiFi = false;
+uint8_t heapCount = 0;
 
 void msgBox(String msg)
 {
@@ -5386,9 +5388,9 @@ void msgBox(String msg)
     display.drawLine(x1 + (x + 10) - 4, 30, x1 + (x + 10) - 4, 53, WHITE);
     display.setCursor(x1, 37);
     display.print(msg);
-    //#ifndef ST7735_160x80
+    // #ifndef ST7735_160x80
     display.display();
-    //#endif
+    // #endif
 }
 
 void loop()
@@ -5465,6 +5467,26 @@ void loop()
         log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\t \n", timerAPRS, timerNetwork, timerGPS, timerSerial);
         log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
         // log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
+
+        // Automatic Restart when heap memory not enough
+        if (ESP.getFreeHeap() < 60000)
+        {
+            if (++heapCount > 60)
+            {
+                heapCount = 0;
+                vTaskSuspendAll();
+                WiFi.disconnect(true); // Disconnect from the network
+                WiFi.persistent(false);
+                WiFi.mode(WIFI_OFF); // Switch WiFi off
+                PowerOff();
+                esp_restart();
+            }
+        }
+        else
+        {
+            if (heapCount > 0)
+                heapCount--;
+        }
 
         if (!((WiFi.isConnected() == true) || (WiFi.softAPgetStationNum() > 0)))
         {
@@ -5556,9 +5578,8 @@ void loop()
                 {
                     delay(100);
                 }
-                
             }
-            if (curTab == 4) // System display
+            else if (curTab == 4) // System display
             {
                 msgBox("POWER OFF");
                 while (digitalRead(BOOT_PIN) == LOW)
@@ -5567,6 +5588,38 @@ void loop()
                 }
                 PowerOff();
                 esp_deep_sleep_start();
+            }
+            else if (curTab == 6) // Wifi display
+            {
+                if (manualWiFi)
+                {
+                    manualWiFi = false;
+                    msgBox("WiFi OFF");
+                    vTaskSuspend(taskNetworkHandle);
+                    WiFi.disconnect(true); // Disconnect from the network
+                    WiFi.persistent(false);
+                    WiFi.mode(WIFI_OFF); // Switch WiFi off
+                }
+                else
+                {
+                    manualWiFi = true;
+                    msgBox("WiFi ON");
+                    vTaskResume(taskNetworkHandle);
+                }
+                while (digitalRead(BOOT_PIN) == LOW)
+                {
+                    delay(100);
+                }
+            }
+            else if (curTab == 1) // Status display
+            {
+                msgBox("MANUAL TX");
+                while (digitalRead(BOOT_PIN) == LOW)
+                {
+                    delay(100);
+                }
+                EVENT_TX_POSITION = 6;
+                tx_interval = config.trk_interval;
             }
         }
         else
@@ -8394,6 +8447,7 @@ void taskNetwork(void *pvParameters)
     int c = 0;
     // char raw[500];
     log_d("Task Network has been start");
+    manualWiFi = true;
 
     // WiFi.onEvent(Wifi_connected,SYSTEM_EVENT_STA_CONNECTED);
     // WiFi.onEvent(Get_IPAddress, SYSTEM_EVENT_STA_GOT_IP);
@@ -10968,7 +11022,7 @@ void systemDisp()
     display.setCursor(126 - x, 68);
     display.print(str);
 #endif
-display.display();
+    display.display();
 #endif
 }
 

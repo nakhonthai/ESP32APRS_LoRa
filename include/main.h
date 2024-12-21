@@ -11,8 +11,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.4"
-#define VERSION_BUILD 'c'
+#define VERSION "0.5"
+#define VERSION_BUILD ' '
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
