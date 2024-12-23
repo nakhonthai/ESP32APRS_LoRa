@@ -802,7 +802,6 @@ bool loadConfiguration(const char *filename, Configuration &config)
 
         config.log = doc["logFile"];
 
-        JsonArray sensor = doc["Sensor"].to<JsonArray>();
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
             config.sensor[i].enable = doc["Sensor"][(i * 11) + 0];
