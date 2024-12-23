@@ -3085,7 +3085,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>SCK GPIO:</b></td>\n";
+		html += "<td align=\"right\"><b>SCL GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"sck\" type=\"number\" value=\"" + String(config.i2c_sck_pin) + "\" /></td>\n";
 		html += "</tr>\n";
 
@@ -3155,7 +3155,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>SCK GPIO:</b></td>\n";
+		html += "<td align=\"right\"><b>SCL GPIO:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\" name=\"sck\" type=\"number\" value=\"" + String(config.i2c1_sck_pin) + "\" /></td>\n";
 		html += "</tr>\n";
 

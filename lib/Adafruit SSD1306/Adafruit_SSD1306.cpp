@@ -513,8 +513,8 @@ bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset,
   if (wire) { // Using I2C
     // If I2C address is unspecified, use default
     // (0x3C for 32-pixel-tall displays, 0x3D for all others).
-    //i2caddr = addr ? addr : ((HEIGHT == 32) ? 0x3C : 0x3D);
-    i2caddr = addr;
+    i2caddr = addr ? addr : ((HEIGHT == 32 || HEIGHT == 40) ? 0x3C : 0x3D);
+    //i2caddr = addr;
     // TwoWire begin() function might be already performed by the calling
     // function if it has unusual circumstances (e.g. TWI variants that
     // can accept different SDA/SCL pins, or if two SSD1306 instances

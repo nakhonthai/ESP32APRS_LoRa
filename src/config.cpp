@@ -723,7 +723,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
 
         for (int i = 0; i < 4; i++)
         {
-            strlcpy(config.path[i], doc["path"] | "", sizeof(config.path[i]));
+            strlcpy(config.path[i], doc["path"][i] | "", sizeof(config.path[i]));
         }
 
         // MOD GNSS group

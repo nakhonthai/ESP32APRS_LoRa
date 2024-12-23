@@ -153,22 +153,13 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 bool i2c_busy = false;
 #include <Wire.h>
 
-#ifdef SSD1306_72x40
-// #include <Arduino_GFX.h>
-// #include <Arduino_G.h>
-// #include <Arduino_GFX_Library.h>
-
-// Arduino_DataBus *bus;// = new Arduino_Wire(I2C_ADDRESS, SDA, SCL);
-// Arduino_G *display;// = new Arduino_SSD1306(bus, -1, 72, 40);
-#endif
-
 #ifdef OLED
 #include <Adafruit_GFX.h>
 #include <Adafruit_I2CDevice.h>
 
-#ifdef SSD1306_72x40
+#if defined(SSD1306_72x40)
 #define SCREEN_WIDTH 72  // OLED display width, in pixels
-#define SCREEN_HEIGHT 40 // OLED display height, in pixels
+#define SCREEN_HEIGHT 40 // OLED display height, in pixels 
 #else
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -178,12 +169,12 @@ bool i2c_busy = false;
 #ifdef SH1106
 #include <Adafruit_SH1106.h>
 #define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SH1106 display(OLED_RESET);
 #else
 #include <Adafruit_SSD1306.h>
-#if defined(TTGO_LORA32_V1) || defined(TTGO_LORA32_V1_6)
-#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#if defined(TTGO_LORA32_V1)
+#define OLED_RESET 16 // Reset pin # (or -1 if sharing Arduino reset pin)
 #elif defined(HELTEC_V3_GPS)
 #define OLED_RESET 21
 #else
@@ -194,7 +185,7 @@ Adafruit_SH1106 display(OLED_RESET);
 #define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #else
-#define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+#define SCREEN_ADDRESS 0x3C //(0x3C for 32-pixel-tall displays, 0x3D for all others).
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #endif
 
@@ -202,11 +193,14 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #endif
 
-#ifdef ST7735_160x80
+#if defined(ST7735_160x80) || defined(NV3022B3)
 #include <Adafruit_GFX_Buffer.h>
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include "Adafruit_miniTFTWing.h"
+
+#define SCREEN_WIDTH 160 
+#define SCREEN_HEIGHT 80 
 
 // SPIClass hspi;
 Adafruit_miniTFTWing ss;
@@ -225,8 +219,8 @@ Adafruit_miniTFTWing ss;
 #define ST7735_SCLK_Pin 41
 #define ST7735_MOSI_Pin 42
 #define ST7735_VTFT_CTRL_Pin 3
-#define ST7735_WIDTH 160
-#define ST7735_HEIGHT 80
+#define ST7735_WIDTH SCREEN_WIDTH
+#define ST7735_HEIGHT SCREEN_HEIGHT
 #ifdef NV3022B3
 #define ST7735_MODEL INITR_MINI160x80
 #else
@@ -235,27 +229,9 @@ Adafruit_miniTFTWing ss;
 #endif
 
 SPIClass TFT_SPI(HSPI);
-// class Adafruit_ST7735{
-//     public:
-//       void clearDisplay();
-//       void display();
-// };
-
-// void Adafruit_ST7735::clearDisplay()
-// {
-//     fillScreen(ST77XX_BLACK);
-// }
-
-// void Adafruit_ST7735::display()
-// {
-//     delay(1);
-// }
-
-// Adafruit_ST7735 display = Adafruit_ST7735(ST7735_CS_Pin,  ST7735_DC_Pin,ST7735_MOSI_Pin,ST7735_SCLK_Pin, ST7735_REST_Pin);
-// Adafruit_ST7735 display = Adafruit_ST7735(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin);
 typedef Adafruit_ST7735 display_t;
 typedef Adafruit_GFX_Buffer<display_t> GFXBuffer_t;
-GFXBuffer_t display = GFXBuffer_t(80, 160, display_t(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin));
+GFXBuffer_t display = GFXBuffer_t(SCREEN_HEIGHT, SCREEN_WIDTH, display_t(&TFT_SPI, ST7735_CS_Pin, ST7735_DC_Pin, ST7735_REST_Pin));
 
 #endif
 
@@ -3820,22 +3796,12 @@ void setup()
     // }
     i2c_busy = true;
     // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-    if (OLED_RESET > -1)
-    {
-#ifdef SH1106
-        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, true); // initialize with the I2C addr 0x3C (for the 128x64)
-#else
-        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, true, false); // initialize with the I2C addr 0x3C (for the 128x64)
-#endif
-    }
-    else
-    {
-#ifdef SH1106
-        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, false); // initialize with the I2C addr 0x3C (for the 128x64)
-#else
-        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false); // initialize with the I2C addr 0x3C (for the 128x64)
-#endif
-    }
+    #ifdef SH1106
+        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1);
+    #else
+        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1, false);
+    #endif
+
     // Initialising the UI will init the display too.
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
@@ -4138,8 +4104,6 @@ void setup()
 #endif
 
 #ifdef OLED
-    if (config.oled_enable == true)
-    {
         int i2c_timeout = 0;
         while (i2c_busy)
         {
@@ -4152,7 +4116,6 @@ void setup()
         display.setTextSize(1);
         display.display();
         i2c_busy = false;
-    }
 #elif defined(ST7735_160x80)
     display.fillScreen(ST77XX_BLACK);
     display.setTextSize(1);
@@ -5380,17 +5343,16 @@ uint8_t heapCount = 0;
 void msgBox(String msg)
 {
     int x = msg.length() * 6;
-    int x1 = 64 - (x / 2);
+    int x1 = (SCREEN_WIDTH/2) - (x / 2);
+    int y1 = (SCREEN_HEIGHT/2);
 
-    display.fillRect(x1 - 7, 26, x + 14, 28, BLACK);
-    display.drawRect(x1 - 5, 28, x + 10, 24, WHITE);
-    display.drawLine(x1 - 3, 53, x1 + (x + 10) - 4, 53, WHITE);
-    display.drawLine(x1 + (x + 10) - 4, 30, x1 + (x + 10) - 4, 53, WHITE);
-    display.setCursor(x1, 37);
+    display.fillRect(x1 - 7, y1-6, x + 14, 28, BLACK);
+    display.drawRect(x1 - 5, y1-4, x + 10, 24, WHITE);
+    display.drawLine(x1 - 3, y1+21, x1 + (x + 10) - 4, y1+21, WHITE);
+    display.drawLine(x1 + (x + 10) - 4, y1-2, x1 + (x + 10) - 4, y1+21, WHITE);
+    display.setCursor(x1, y1+5);
     display.print(msg);
-    // #ifndef ST7735_160x80
     display.display();
-    // #endif
 }
 
 void loop()
