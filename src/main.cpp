@@ -4169,7 +4169,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        4096,            /* Stack size in words */
+        8192,            /* Stack size in words */
         NULL,            /* Task input parameter */
         2,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -8463,6 +8463,8 @@ void taskNetwork(void *pvParameters)
         NTP_Timeout = millis() + 2000;
     }
 
+    WiFi.setSleep(false);
+
     pingTimeout = millis() + 10000;
     unsigned long timeNetworkOld = millis();
     timeNetwork = 0;
@@ -9971,7 +9973,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     strncpy(&txtID[0], aprs.msg.msgid, aprs.msg.msgid_len);
                     int msgid = atoi(txtID);
                     // display.print(msgid, DEC);
-                    display.printf("%s", txtID);
+                    display.print(txtID);
+
                     display.print("}");
                     // memset(&text[0], 0, sizeof(text));
                     // memcpy(&text[0], aprs.comment, aprs.comment_len);
@@ -10018,20 +10021,26 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(68, x += 10);
                     display.drawYBitmap(61, x, &Temperature_Symbol[0], 5, 8, WHITE);
-                    display.printf("%.2fC", aprs.wave_report.Temp);
+                    //display.printf("%.2fC", aprs.wave_report.Temp);
+                    display.print(aprs.wave_report.Temp,2);
+                    display.print("C");
                 }
                 if (aprs.wave_report.flags & O_HS)
                 {
                     // display.setCursor(102, x);
                     display.setCursor(68, x += 9);
-                    display.printf("Hs:");
-                    display.printf("%0.1f M", aprs.wave_report.Hs / 100);
+                    display.print("Hs: ");
+                    //display.printf("%0.1f M", aprs.wave_report.Hs / 100);
+                    display.print(aprs.wave_report.Hs/100,1);
+                    display.print("M");
                 }
                 if (aprs.wave_report.flags & O_TZ)
                 {
                     display.setCursor(68, x += 9);
-                    display.printf("Tz: ");
-                    display.printf("%0.1f S", aprs.wave_report.Tz);
+                    display.print("Tz: ");
+                    //display.printf("%0.1f S", aprs.wave_report.Tz);
+                    display.print(aprs.wave_report.Tz,1);
+                    display.print("S");
                 }
                 // if (aprs.wave_report.flags & O_TC)
                 // {
@@ -10042,37 +10051,50 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 if (aprs.wave_report.flags & O_BAT)
                 {
                     display.setCursor(68, x += 9);
-                    display.printf("BAT: ");
-                    display.printf("%0.2fV", aprs.wave_report.Bat);
+                    display.print("BAT: ");
+                    //display.printf("%0.2fV", aprs.wave_report.Bat);
+                    display.print(aprs.wave_report.Bat,2);
+                    display.print("V");
                 }
             }
+
             if (aprs.packettype & T_WX)
             {
+                display.setFont();
+                display.setTextColor(WHITE);
                 // Serial.println("WX Display");
                 if (aprs.wx_report.flags & W_TEMP)
                 {
                     display.setCursor(68, x += 10);
                     display.drawYBitmap(61, x, &Temperature_Symbol[0], 5, 8, WHITE);
-                    display.printf("%.1fC", aprs.wx_report.temp);
+                    //display.printf("%.1fC", aprs.wx_report.temp);
+                    display.print(aprs.wx_report.temp,2);
+                    display.print("C");
                 }
                 if (aprs.wx_report.flags & W_HUM)
                 {
-                    display.setCursor(112, x);
-                    display.drawYBitmap(105, x, &Humidity_Symbol[0], 5, 8, WHITE);
-                    display.printf("%d%%", aprs.wx_report.humidity);
+                    display.setCursor(122, x);
+                    display.drawYBitmap(115, x, &Humidity_Symbol[0], 5, 8, WHITE);
+                    //display.printf("%d%%", aprs.wx_report.humidity);
+                    display.print(aprs.wx_report.humidity,1);
+                    display.print("%%");
                 }
                 if (aprs.wx_report.flags & W_BAR)
                 {
                     display.setCursor(68, x += 9);
                     display.drawYBitmap(61, x, &Pressure_Symbol[0], 5, 8, WHITE);
-                    display.printf("%.1fhPa", aprs.wx_report.pressure);
+                    //display.printf("%.1fhPa", aprs.wx_report.pressure);
+                    display.print(aprs.wx_report.pressure,1);
+                    display.print("hPa");
                 }
                 if (aprs.wx_report.flags & W_R24H)
                 {
                     // if (aprs.wx_report.rain_1h > 0) {
                     display.setCursor(68, x += 9);
                     display.drawYBitmap(61, x, &Rain_Symbol[0], 5, 8, WHITE);
-                    display.printf("%.1fmm.", aprs.wx_report.rain_24h);
+                    //display.printf("%.1fmm.", aprs.wx_report.rain_24h);
+                    display.print(aprs.wx_report.rain_24h,1);
+                    display.print("mm");
                     //}
                 }
                 if (aprs.wx_report.flags & W_PAR)
@@ -10081,10 +10103,14 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setCursor(61, x += 9);
                     display.printf("%c", 0x0f);
                     display.setCursor(68, x);
-                    display.printf("%dW/m", aprs.wx_report.luminosity);
+                    //display.printf("%dW/m", aprs.wx_report.luminosity);
+                    display.print(aprs.wx_report.luminosity);
+                    display.print("W/m");
                     if (aprs.wx_report.flags & W_UV)
                     {
-                        display.printf(" UV%d", aprs.wx_report.uv);
+                        //display.printf(" UV%d", aprs.wx_report.uv);
+                        display.print("UV:");
+                        display.print(aprs.wx_report.uv);
                     }
                     //}
                 }
@@ -10096,7 +10122,11 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     int dirIdx = ((aprs.wx_report.wind_dir + 22) / 45) % 8;
                     if (dirIdx > 8)
                         dirIdx = 8;
-                    display.printf("%.1fkPh(%s)", aprs.wx_report.wind_speed, directions[dirIdx]);
+                    //display.printf("%.1fkPh(%s)", aprs.wx_report.wind_speed, directions[dirIdx]);
+                    display.print(aprs.wx_report.wind_speed,1);
+                    display.print("kPh(");
+                    display.print(directions[dirIdx]);
+                    display.print(")");
                 }
                 // Serial.printf("%.1fkPh(%d)", aprs.wx_report.wind_speed, aprs.wx_report.wind_dir);
                 if (aprs.flags & F_HASPOS)
@@ -10130,7 +10160,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                         }
                         compass_label(25, 37, 20, course, ST77XX_GREEN);
                         display.setCursor(0, 17);
-                        display.printf("H");
+                        display.print("H");
                     }
                     else
                     {
@@ -10142,15 +10172,17 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.drawFastVLine(1, 68, 5, WHITE);
                     display.drawFastVLine(56, 68, 5, WHITE);
                     display.setCursor(4, 65);
-                    if (dist > 999)
-                        display.printf("%.fKm", dist);
-                    else
-                        display.printf("%.1fKm", dist);
+                    // if (dist > 999)
+                    //     //display.printf("%.fKm", dist);
+                    //     display.print(dist,0);
+                    // else
+                    display.print(dist,1);
+                    display.print("Km");
                 }
                 else
                 {
                     display.setCursor(20, 30);
-                    display.printf("NO\nPOSITION");
+                    display.print("NO\nPOSITION");
                 }
             }
             else if (aprs.flags & F_HASPOS)
@@ -10205,7 +10237,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     }
                     compass_label(25, 37, 20, course, ST77XX_GREEN);
                     display.setCursor(0, 17);
-                    display.printf("H");
+                    display.print("H");
                 }
                 else
                 {
@@ -10217,27 +10249,41 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 // display.drawFastVLine(56, 65, 5, WHITE);
                 display.setTextColor(ST77XX_ORANGE);
                 display.setCursor(0, 70);
-                if (dist > 99)
-                    display.printf("DX:%dKm", (int)dist);
-                else
-                    display.printf("DX:%.1fKm", dist);
+                // if (dist > 99)
+                //     display.printf("DX:%dKm", (int)dist);
+                // else
+                //     display.printf("DX:%.1fKm", dist);
+                display.print("DX:");
+                display.print(dist,1);
+                display.print("Km");
                 display.setTextColor(WHITE);
                 if (aprs.flags & F_CSRSPD)
                 {
                     display.setCursor(61, x += 9);
                     // display.printf("SPD %d/", aprs.course);
                     // display.setCursor(50, x += 9);
-                    display.printf("SPD %.1fkPh\n", aprs.speed);
+                    //display.printf("SPD %.1fkPh\n", aprs.speed);
+                    display.print("SPD: ");
+                    display.print(aprs.speed,1);
+                    display.print("Kph");
                     int dirIdx = ((aprs.course + 22) / 45) % 8;
                     if (dirIdx > 8)
                         dirIdx = 8;
                     display.setCursor(61, x += 9);
-                    display.printf("CSD %d(%s)", aprs.course, directions[dirIdx]);
+                    //display.printf("CSD %d(%s)", aprs.course, directions[dirIdx]);
+                    display.print("CSD: ");
+                    display.print(aprs.course);
+                    display.print("(");
+                    display.print(directions[dirIdx]);
+                    display.print(")");
                 }
                 if (aprs.flags & F_ALT)
                 {
                     display.setCursor(61, x += 9);
-                    display.printf("ALT %.1fM\n", aprs.altitude);
+                    //display.printf("ALT %.1fM\n", aprs.altitude);
+                    display.print("ALT: ");
+                    display.print(aprs.altitude,1);
+                    display.print("M");
                 }
                 if (aprs.flags & F_PHG)
                 {
@@ -10250,16 +10296,28 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     height = height / 3.2808;
                     gain = (int)aprs.phg[2] - 0x30;
                     display.setCursor(61, x += 9);
-                    display.printf("PHG %dM.\n", height);
+                    //display.printf("PHG %dM.\n", height);
+                    display.print("PHG: ");
+                    display.print(height);
+                    display.print("M");
                     display.setCursor(61, x += 9);
-                    display.printf("PWR %dWatt\n", power);
+                    //display.printf("PWR %dWatt\n", power);
+                    display.print("PWR: ");
+                    display.print(power);
+                    display.print("Watt");
                     display.setCursor(61, x += 9);
-                    display.printf("ANT %ddBi\n", gain);
+                    //display.printf("ANT %ddBi\n", gain);
+                    display.print("ANT: ");
+                    display.print(gain);
+                    display.print("dBi");
                 }
                 if (aprs.flags & F_RNG)
                 {
                     display.setCursor(61, x += 9);
-                    display.printf("RNG %dKm\n", aprs.radio_range);
+                    //display.printf("RNG %dKm\n", aprs.radio_range);
+                    display.print("RNG: ");
+                    display.print(aprs.radio_range);
+                    display.print("Km");
                 }
                 /*if (aprs.comment_len > 0) {
                     display.setCursor(0, 56);

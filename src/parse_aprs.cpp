@@ -7,7 +7,7 @@
 #define debug 0
 
 // #define log_d(...) Serial.printf(__VA_ARGS__)     //DPRINT is a macro, debug print
-#define log_d
+//#define log_d
 // #define log_d Serial.printf
 
 /// Max amount of path elements.
@@ -2157,7 +2157,6 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	/* Look for wind and temperature. Remaining bytes are copied to report var. */
 	rest = (char *)input;
 	rest_len = input_len;
-
 	// Serial.print(rest);
 	if (rest[3] == '/')
 	{
@@ -2171,6 +2170,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	}
 	else
 	{
+		if(rest_len>3){
 		if (tmp_str = strchr(rest, 'c'))
 		{
 			if (strlen(tmp_str) > 3)
@@ -2194,9 +2194,10 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 				rest_len = tmp_us;
 			}
 		}
+		}
 	}
 
-	if (tmp_str = strchr(rest, 'g'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'g')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2209,7 +2210,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 't'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 't')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2222,7 +2223,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'r'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'r')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2235,7 +2236,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'p'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'p')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2247,7 +2248,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			flage++;
 		}
 	}
-	if (tmp_str = strchr(rest, 'P'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'P')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2260,7 +2261,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'h'))
+	if ((rest_len>2) && (tmp_str = strchr(rest, 'h')))
 	{
 		if (strlen(tmp_str) > 2)
 		{
@@ -2272,7 +2273,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			flage++;
 		}
 	}
-	if (tmp_str = strchr(rest, 'b'))
+	if ((rest_len>5) && (tmp_str = strchr(rest, 'b')))
 	{
 		if (strlen(tmp_str) > 5)
 		{
@@ -2285,6 +2286,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
+	if(rest_len>3){
 	if (tmp_str = strchr(rest, 'l'))
 	{
 		if (strlen(tmp_str) > 3)
@@ -2317,8 +2319,9 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			}
 		}
 	}
+	}
 
-	if (tmp_str = strchr(rest, 'S'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'S')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2331,7 +2334,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'm'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'm')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2344,7 +2347,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'M'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'M')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2357,7 +2360,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'w'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'w')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2370,7 +2373,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'W'))
+	if ((rest_len>4) && (tmp_str = strchr(rest, 'W')))
 	{
 		if (strlen(tmp_str) > 4)
 		{
@@ -2383,7 +2386,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'v'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'v')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2396,7 +2399,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'o'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'o')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2409,7 +2412,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'O'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'O')))
 	{
 		if (strlen(tmp_str) > 3)
 		{
@@ -2422,7 +2425,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'X'))
+	if ((rest_len>4) && (tmp_str = strchr(rest, 'X')))
 	{
 		if (strlen(tmp_str) > 4)
 		{
@@ -2435,7 +2438,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			flage++;
 		}
 	}
-	else if (tmp_str = strchr(rest, 'x'))
+	else if ((rest_len>3) && (tmp_str = strchr(rest, 'x')))
 	{
 		if (strlen(tmp_str) > 4)
 		{
@@ -2449,7 +2452,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'F'))
+	if ((rest_len>4) && (tmp_str = strchr(rest, 'F')))
 	{
 		if (strlen(tmp_str) > 4)
 		{
@@ -2461,7 +2464,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			flage++;
 		}
 	}
-	if (tmp_str = strchr(rest, 'T'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'T')))
 	{
 		if (strlen(tmp_str) > 4)
 		{
@@ -2474,7 +2477,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
-	if (tmp_str = strchr(rest, 'u'))
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'u')))
 	{
 		if (strlen(tmp_str) > 2)
 		{
