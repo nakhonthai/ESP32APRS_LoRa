@@ -9221,21 +9221,21 @@ void dispWindow(String line, uint8_t mode, bool filter)
             display.setTextColor(BLACK);
             display.print(src_call);
 
-            if (aprs.srcname_len > 0)
-            {
-                memset(&itemname, 0, sizeof(itemname));
-                memcpy(&itemname, aprs.srcname, aprs.srcname_len);
-                // Serial.println(itemname);
-                display.setCursor(16, 0);
-                display.print(itemname);
-                display.setCursor(16, 7);
-                display.print(src_call);
-            }
-            else
-            {
-                display.setCursor(16, 4);
-                display.print(src_call);
-            }
+            // if (aprs.srcname_len > 0)
+            // {
+            //     memset(&itemname, 0, sizeof(itemname));
+            //     memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+            //     // Serial.println(itemname);
+            //     display.setCursor(16, 0);
+            //     display.print(itemname);
+            //     display.setCursor(16, 7);
+            //     display.print(src_call);
+            // }
+            // else
+            // {
+            //     display.setCursor(16, 4);
+            //     display.print(src_call);
+            // }
 
             display.setTextColor(WHITE);
 
@@ -9473,6 +9473,19 @@ void dispWindow(String line, uint8_t mode, bool filter)
             display.setFont();
             display.drawFastHLine(0, 16, 70, WHITE);
             //display.drawFastVLine(48, 16, 48, WHITE);
+            display.setCursor(16, 4);
+            if (aprs.srcname_len > 0)
+            {
+                memset(&itemname, 0, sizeof(itemname));
+                memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+                // Serial.println(itemname);
+                display.print(itemname);
+            }
+            else
+            {
+                display.print(src_call);
+            }
+
             x = 8;
 
             // if (aprs.srcname_len > 0)
