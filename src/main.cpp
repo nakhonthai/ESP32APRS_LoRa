@@ -8801,6 +8801,56 @@ void dispTxWindow(txDisp txs)
     disp_delay = config.dispDelay * 1000;
     timeHalfSec = millis() + disp_delay;
 
+    #ifdef SSD1306_72x40
+    display.fillRect(0, 0, 72, 9, WHITE);
+    display.setTextColor(BLACK);
+    display.setCursor(0, 1);
+    //display.print("");
+
+    txs.name[sizeof(txs.name) - 1] = 0;
+    if (strlen(txs.name))
+    {
+        display.print(txs.name);
+    }
+
+    display.setTextColor(WHITE);
+    display.setFont(&FreeSerifItalic9pt7b);
+
+    if (txs.tx_ch == TXCH_TCP)
+    {
+        display.setCursor(10, 30);
+        display.print("TCP");
+    }
+    else if (txs.tx_ch == TXCH_RF)
+    {
+        display.setCursor(15, 30);
+        display.print("RF");
+    }
+    else if (txs.tx_ch == TXCH_DIGI)
+    {
+        display.setCursor(10, 30);
+        display.print("RPT");
+    }
+    else if (txs.tx_ch == TXCH_3PTY)
+    {
+        display.setCursor(0, 30);
+        display.print("IP>RF");
+    }
+
+    display.setFont();
+    display.setTextColor(WHITE);
+
+    // char *pch;
+    // int y = 30;
+    // pch = strtok(txs.info, "\n");
+    // while (pch != NULL)
+    // {
+    //     display.setCursor(50, y);
+    //     display.printf("%s", pch);
+    //     pch = strtok(NULL, "\n");
+    //     y += 9;
+    // }
+    #else
     display.setFont(&FreeSansBold9pt7b);
     display.setCursor(0, 14);
     txs.name[sizeof(txs.name) - 1] = 0;
@@ -8864,6 +8914,7 @@ void dispTxWindow(txDisp txs)
         pch = strtok(NULL, "\n");
         y += 9;
     }
+    #endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillScreen(ST77XX_BLACK);
@@ -8877,7 +8928,7 @@ void dispTxWindow(txDisp txs)
     txs.name[sizeof(txs.name) - 1] = 0;
     if (strlen(txs.name))
     {
-        display.printf("%s", txs.name);
+        display.print(txs.name);
     }
 
     display.setTextColor(ST77XX_RED);
@@ -9165,6 +9216,534 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 display.drawChar(5, 4, aprs.symbol[0], BLACK, WHITE, 1);
                 display.drawChar(6, 5, aprs.symbol[0], BLACK, WHITE, 1);
             }
+        #ifdef SSD1306_72x40
+            display.setFont();
+            display.setTextColor(BLACK);
+            display.print(src_call);
+
+            if (aprs.srcname_len > 0)
+            {
+                memset(&itemname, 0, sizeof(itemname));
+                memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+                // Serial.println(itemname);
+                display.setCursor(16, 0);
+                display.print(itemname);
+                display.setCursor(16, 7);
+                display.print(src_call);
+            }
+            else
+            {
+                display.setCursor(16, 4);
+                display.print(src_call);
+            }
+
+            display.setTextColor(WHITE);
+
+            if (aprs.packettype & T_TELEMETRY)
+            {
+                bool show = false;
+                int idx = tlmList_Find((char *)src_call.c_str());
+                if (idx < 0)
+                {
+                    idx = tlmListOld();
+                    if (idx > -1)
+                        memset(&Telemetry[idx], 0, sizeof(Telemetry_struct));
+                }
+                if (idx > -1)
+                {
+                    Telemetry[idx].time = now();
+                    strcpy(Telemetry[idx].callsign, (char *)src_call.c_str());
+
+                    // for (int i = 0; i < 3; i++) Telemetry[idx].UNIT[i][5] = 0;
+                    if (aprs.flags & F_UNIT)
+                    {
+                        memcpy(Telemetry[idx].UNIT, aprs.tlm_unit.val, sizeof(Telemetry[idx].UNIT));
+                    }
+                    else if (aprs.flags & F_PARM)
+                    {
+                        memcpy(Telemetry[idx].PARM, aprs.tlm_parm.val, sizeof(Telemetry[idx].PARM));
+                    }
+                    else if (aprs.flags & F_EQNS)
+                    {
+                        for (int i = 0; i < 15; i++)
+                            Telemetry[idx].EQNS[i] = aprs.tlm_eqns.val[i];
+                    }
+                    else if (aprs.flags & F_BITS)
+                    {
+                        Telemetry[idx].BITS_FLAG = aprs.telemetry.bitsFlag;
+                    }
+                    else if (aprs.flags & F_TLM)
+                    {
+                        for (int i = 0; i < 5; i++)
+                            Telemetry[idx].VAL[i] = aprs.telemetry.val[i];
+                        Telemetry[idx].BITS = aprs.telemetry.bits;
+                        show = true;
+                    }
+
+                    for (int i = 0; i < 4; i++)
+                    { // Cut length
+                        if (strstr(Telemetry[idx].PARM[i], "RxTraffic") != 0)
+                            sprintf(Telemetry[idx].PARM[i], "RX");
+                        if (strstr(Telemetry[idx].PARM[i], "TxTraffic") != 0)
+                            sprintf(Telemetry[idx].PARM[i], "TX");
+                        if (strstr(Telemetry[idx].PARM[i], "RxDrop") != 0)
+                            sprintf(Telemetry[idx].PARM[i], "DROP");
+                        Telemetry[idx].PARM[i][6] = 0;
+                        Telemetry[idx].UNIT[i][3] = 0;
+                        for (int a = 0; a < 3; a++)
+                        {
+                            if (Telemetry[idx].UNIT[i][a] == '/')
+                                Telemetry[idx].UNIT[i][a] = 0;
+                        }
+                    }
+
+                    for (int i = 0; i < 5; i++)
+                    {
+                        if (Telemetry[idx].PARM[i][0] == 0)
+                        {
+                            sprintf(Telemetry[idx].PARM[i], "CH%d", i + 1);
+                        }
+                    }
+                }
+                if (show || filter == false)
+                {
+                    display.fillRect(0, 0, 72, 9, WHITE);
+                    display.setTextColor(BLACK);
+                    display.setCursor(10, 1);
+                    display.print("TELEMETRY");
+                    display.setFont();
+                    display.setTextColor(WHITE);
+                    display.setCursor(0, 12);
+                    //display.print(Telemetry[idx].PARM[0]);
+                    //display.print(":");
+
+                    if (fmod(Telemetry[idx].VAL[0], 1) == 0)
+                        display.print(Telemetry[idx].VAL[0], 0);
+                    else
+                        display.print(Telemetry[idx].VAL[0], 1);
+                    display.print(Telemetry[idx].UNIT[0]);
+                    display.setCursor(20, 12);
+                    //display.print(Telemetry[idx].PARM[1]);
+                    //display.print(":");
+                    if (fmod(Telemetry[idx].VAL[1], 1) == 0)
+                        display.print(Telemetry[idx].VAL[1], 0);
+                    else
+                        display.print(Telemetry[idx].VAL[1], 1);
+                    display.print(Telemetry[idx].UNIT[1]);
+                    display.setCursor(0, 22);
+                    //display.print(Telemetry[idx].PARM[2]);
+                    //display.print(":");
+                    if (fmod(Telemetry[idx].VAL[2], 1) == 0)
+                        display.print(Telemetry[idx].VAL[2], 0);
+                    else
+                        display.print(Telemetry[idx].VAL[2], 1);
+                    display.print(Telemetry[idx].UNIT[2]);
+                    display.setCursor(21, 22);
+                    //display.print(Telemetry[idx].PARM[3]);
+                    //display.print(":");
+                    if (fmod(Telemetry[idx].VAL[3], 1) == 0)
+                        display.print(Telemetry[idx].VAL[3], 0);
+                    else
+                        display.print(Telemetry[idx].VAL[3], 1);
+                    display.print(Telemetry[idx].UNIT[3]);
+                    display.setCursor(0, 32);
+                    //display.print(Telemetry[idx].PARM[4]);
+                    //display.print(":");
+                    display.print(Telemetry[idx].VAL[4], 1);
+                    display.print(Telemetry[idx].UNIT[4]);
+
+                    // display.setCursor(4, 55);
+                    // display.print("BIT");
+                    // uint8_t bit = Telemetry[idx].BITS;
+                    // for (int i = 0; i < 8; i++)
+                    // {
+                    //     if (bit & 0x80)
+                    //     {
+                    //         display.fillCircle(30 + (i * 12), 58, 3, WHITE);
+                    //     }
+                    //     else
+                    //     {
+                    //         display.drawCircle(30 + (i * 12), 58, 3, WHITE);
+                    //     }
+                    //     bit <<= 1;
+                    // }
+                    display.display();
+                }
+                return;
+            }
+            else if (aprs.packettype & T_STATUS)
+            {
+                display.fillRect(0, 0, 72, 9, WHITE);
+                display.setTextColor(BLACK);
+                display.setCursor(10, 1);
+                display.print("STATUS");
+
+                display.setFont();
+                display.setCursor(0, 10);
+                // memset(&text[0], 0, sizeof(text));
+                // memcpy(&text[0], aprs.comment, aprs.comment_len);
+                display.setTextColor(WHITE);
+                display.print(aprs.comment);
+                display.display();
+                return;
+            }
+            else if (aprs.packettype & T_QUERY)
+            {
+                display.fillRect(0, 0, 72, 9, WHITE);
+                display.setTextColor(BLACK);
+                display.setCursor(10, 1);
+                display.print("?QUERY?");
+                // memset(&text[0], 0, sizeof(text));
+                // memcpy(&text[0], aprs.comment, aprs.comment_len);
+                display.setFont();
+                display.setTextColor(WHITE);
+                display.setCursor(2, 10);
+                display.print(aprs.comment);
+                display.display();
+                return;
+            }
+            else if (aprs.packettype & T_MESSAGE)
+            {
+                if (aprs.msg.is_ack == 1)
+                {
+                }
+                else if (aprs.msg.is_rej == 1)
+                {
+                }
+                else
+                {
+                    display.fillRect(0, 0, 72, 9, WHITE);
+                    display.setTextColor(BLACK);
+                    display.setCursor(10, 1);
+                    display.print("MESSAGE");
+                    display.setCursor(0, 10);
+                    display.print("{");
+                    //char txtID[7];
+                    //memset(txtID, 0, sizeof(txtID));
+                    //strncpy(&txtID[0], aprs.msg.msgid, aprs.msg.msgid_len);
+                    //int msgid = atoi(txtID);
+                    // display.print(msgid, DEC);
+                    //display.printf("%s", txtID);
+                    //display.print("}");
+                    // memset(&text[0], 0, sizeof(text));
+                    // memcpy(&text[0], aprs.comment, aprs.comment_len);
+                    display.setFont();
+                    display.setTextColor(WHITE);
+                    // display.setCursor(2, 10);
+                    // display.print("To: ");
+                    // memset(text, 0, sizeof(text));
+                    // strncpy(&text[0], aprs.dstname, aprs.dstname_len);
+                    // display.print(text);
+                    // String mycall = "";
+                    // if (config.aprs_ssid > 0)
+                    //     mycall = String(config.aprs_mycall) + String("-") + String(config.aprs_ssid, DEC);
+                    // else
+                    //     mycall = String(config.aprs_mycall);
+                    // if (strcmp(mycall.c_str(), text) == 0)
+                    // {
+                    //     display.setCursor(2, 54);
+                    //     display.print("ACK:");
+                    //     display.println(msgid);
+                    //     String rawData = sendIsAckMsg(src_call, txtID);
+                    //     log_d("IGATE_MSG: %s", rawData.c_str());
+                    //     //if (config.igate_loc2rf)
+                    //     { // IGATE SEND POSITION TO RF
+                    //         char *rawP = (char *)malloc(rawData.length());
+                    //         memcpy(rawP, rawData.c_str(), rawData.length());
+                    //         pkgTxPush(rawP, rawData.length(), 0);
+                    //         free(rawP);
+                    //     }
+                    //     // if (config.igate_loc2inet)
+                    //     // { // IGATE SEND TO APRS-IS
+                    //     //     if (aprsClient.connected())
+                    //     //     {
+                    //     //         aprsClient.println(rawData); // Send packet to Inet
+                    //     //     }
+                    //     // }
+                    // }
+                    memset(text, 0, sizeof(text));
+                    strncpy(&text[0], aprs.msg.body, aprs.msg.body_len);
+                    display.setCursor(2, 10);
+                    display.print("Msg: ");
+                    display.println(text);
+                    display.display();
+                }
+                return;
+            }
+            display.setFont();
+            display.drawFastHLine(0, 16, 70, WHITE);
+            //display.drawFastVLine(48, 16, 48, WHITE);
+            x = 8;
+
+            // if (aprs.srcname_len > 0)
+            // {
+            //     x += 9;
+            //     display.fillRoundRect(0, 8, 70, 32, 0, WHITE);
+            //     display.setTextColor(BLACK);
+            //     display.setCursor(0, x);
+            //     display.print("By " + src_call);
+            //     display.setTextColor(WHITE);
+            // }
+
+            if (aprs.packettype & T_WAVE)
+            {
+                // Serial.println("WX Display");
+                if (aprs.wave_report.flags & O_TEMP)
+                {
+                    display.setCursor(0, x += 10);
+                    display.drawYBitmap(51, x, &Temperature_Symbol[0], 5, 8, WHITE);
+                    display.printf("%.2fC", aprs.wave_report.Temp);
+                }
+                if (aprs.wave_report.flags & O_HS)
+                {
+                    // display.setCursor(102, x);
+                    display.setCursor(0, x += 9);
+                    display.printf("Hs:");
+                    display.printf("%0.1f M", aprs.wave_report.Hs / 100);
+                }
+                if (aprs.wave_report.flags & O_TZ)
+                {
+                    display.setCursor(0, x += 9);
+                    display.printf("Tz: ");
+                    display.printf("%0.1f S", aprs.wave_report.Tz);
+                }
+                // if (aprs.wave_report.flags & O_TC)
+                // {
+                //     display.setCursor(58, x += 9);
+                //     display.printf("Tc: ");
+                //     display.printf("%0.1fS.", aprs.wave_report.Tc);
+                // }
+                if (aprs.wave_report.flags & O_BAT)
+                {
+                    display.setCursor(0, x += 9);
+                    display.printf("BAT: ");
+                    display.printf("%0.2fV", aprs.wave_report.Bat);
+                }
+            }
+            if (aprs.packettype & T_WX)
+            {
+                // Serial.println("WX Display");
+                if (aprs.wx_report.flags & W_TEMP)
+                {
+                    display.setCursor(8, x += 10);
+                    display.drawYBitmap(0, x, &Temperature_Symbol[0], 5, 8, WHITE);
+                    display.printf("%.1fC", aprs.wx_report.temp);
+                }
+                if (aprs.wx_report.flags & W_HUM)
+                {
+                    display.setCursor(28, x);
+                    display.drawYBitmap(20, x, &Humidity_Symbol[0], 5, 8, WHITE);
+                    display.printf("%d%%", aprs.wx_report.humidity);
+                }
+                if (aprs.wx_report.flags & W_BAR)
+                {
+                    display.setCursor(28, x += 9);
+                    display.drawYBitmap(20, x, &Pressure_Symbol[0], 5, 8, WHITE);
+                    display.printf("%.1fhPa", aprs.wx_report.pressure);
+                }
+                if (aprs.wx_report.flags & W_R24H)
+                {
+                    // if (aprs.wx_report.rain_1h > 0) {
+                    display.setCursor(28, x += 9);
+                    display.drawYBitmap(20, x, &Rain_Symbol[0], 5, 8, WHITE);
+                    display.printf("%.1fmm.", aprs.wx_report.rain_24h);
+                    //}
+                }
+                if (aprs.wx_report.flags & W_PAR)
+                {
+                    // if (aprs.wx_report.luminosity > 10) {
+                    display.setCursor(21, x += 9);
+                    display.printf("%c", 0x0f);
+                    display.setCursor(28, x);
+                    display.printf("%dW/m", aprs.wx_report.luminosity);
+                    if (aprs.wx_report.flags & W_UV)
+                    {
+                        display.printf(" UV%d", aprs.wx_report.uv);
+                    }
+                    //}
+                }
+                if (aprs.wx_report.flags & W_WS)
+                {
+                    display.setCursor(28, x += 9);
+                    display.drawYBitmap(21, x, &Wind_Symbol[0], 5, 8, WHITE);
+                    // int dirIdx=map(aprs.wx_report.wind_dir, -180, 180, 0, 8); ((angle+22)/45)%8]
+                    int dirIdx = ((aprs.wx_report.wind_dir + 22) / 45) % 8;
+                    if (dirIdx > 8)
+                        dirIdx = 8;
+                    display.printf("%.1fkPh(%s)", aprs.wx_report.wind_speed, directions[dirIdx]);
+                }
+                // Serial.printf("%.1fkPh(%d)", aprs.wx_report.wind_speed, aprs.wx_report.wind_dir);
+                if (aprs.flags & F_HASPOS)
+                {
+                    // Serial.println("POS Display");
+                    double lat, lon;
+                    if (gps.location.isValid())
+                    {
+                        lat = gps.location.lat();
+                        lon = gps.location.lng();
+                    }
+                    else
+                    {
+                        lat = config.igate_lat;
+                        lon = config.igate_lon;
+                    }
+                    //double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
+                    //double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
+                    // if (config.h_up == true)
+                    // {
+                    //     // double course = gps.course.deg();
+                    //     double course = SB_HEADING;
+                    //     if (dtmp >= course)
+                    //     {
+                    //         dtmp -= course;
+                    //     }
+                    //     else
+                    //     {
+                    //         double diff = dtmp - course;
+                    //         dtmp = diff + 360.0F;
+                    //     }
+                    //     compass_label(25, 37, 15, course, WHITE);
+                    //     display.setCursor(0, 17);
+                    //     display.printf("H");
+                    // }
+                    // else
+                    // {
+                    //     compass_label(25, 37, 15, 0.0F, WHITE);
+                    // }
+                    // compass_label(25, 37, 15, 0.0F, WHITE);
+                    // compass_arrow(25, 37, 12, dtmp, WHITE);
+                    // display.drawFastHLine(1, 63, 45, WHITE);
+                    // display.drawFastVLine(1, 58, 5, WHITE);
+                    // display.drawFastVLine(46, 58, 5, WHITE);
+                    // display.setCursor(4, 55);
+                    // if (dist > 999)
+                    //     display.printf("%.fKm", dist);
+                    // else
+                    //     display.printf("%.1fKm", dist);
+                }
+                // else
+                // {
+                //     display.setCursor(0, 30);
+                //     display.printf("NO\nPOSITION");
+                // }
+            }
+            else if (aprs.flags & F_HASPOS)
+            {
+                // display.setCursor(50, x += 10);
+                // display.printf("LAT %.5f\n", aprs.lat);
+                // display.setCursor(51, x+=9);
+                // display.printf("LNG %.4f\n", aprs.lng);
+                String str;
+                int l = 0;
+                display.setCursor(0, x += 10);
+                display.print("LAT:");
+                str = String(aprs.lat, 5);
+                l = str.length() * 6;
+                display.setCursor(70 - l, x);
+                display.print(str);
+
+                display.setCursor(0, x += 9);
+                display.print("LON:");
+                str = String(aprs.lng, 5);
+                l = str.length() * 6;
+                display.setCursor(70 - l, x);
+                display.print(str);
+
+                double lat, lon;
+                if (gps.location.isValid())
+                {
+                    lat = gps.location.lat();
+                    lon = gps.location.lng();
+                }
+                else
+                {
+                    lat = config.igate_lat;
+                    lon = config.igate_lon;
+                }
+                double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
+                double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
+                // if (config.h_up == true)
+                // {
+                //     // double course = gps.course.deg();
+                //     double course = SB_HEADING;
+                //     if (dtmp >= course)
+                //     {
+                //         dtmp -= course;
+                //     }
+                //     else
+                //     {
+                //         double diff = dtmp - course;
+                //         dtmp = diff + 360.0F;
+                //     }
+                //     compass_label(25, 37, 15, course, WHITE);
+                //     display.setCursor(0, 17);
+                //     display.printf("H");
+                // }
+                // else
+                // {
+                //     compass_label(25, 37, 15, 0.0F, WHITE);
+                // }
+                // compass_arrow(25, 37, 12, dtmp, WHITE);
+                // display.drawFastHLine(1, 55, 45, WHITE);
+                // display.drawFastVLine(1, 55, 5, WHITE);
+                // display.drawFastVLine(46, 55, 5, WHITE);
+                // display.setCursor(0, 57);
+                // if (dist > 999)
+                //     display.printf("%.fKm", dist);
+                // else
+                //     display.printf("%.1fKm", dist);
+
+                display.setCursor(0, x += 9);
+                display.print("DX: ");
+                str = String(dist, 5)+"Km";
+                l = str.length() * 6;
+                display.setCursor(70 - l, x);
+                display.print(str);
+                if (aprs.flags & F_CSRSPD)
+                {
+                    display.setCursor(0, x += 9);
+                    // display.printf("SPD %d/", aprs.course);
+                    // display.setCursor(50, x += 9);
+                    display.printf("SPD %.1fkPh\n", aprs.speed);
+                    int dirIdx = ((aprs.course + 22) / 45) % 8;
+                    if (dirIdx > 8)
+                        dirIdx = 8;
+                    display.setCursor(0, x += 9);
+                    display.printf("CSD %d(%s)", aprs.course, directions[dirIdx]);
+                }
+                if (aprs.flags & F_ALT)
+                {
+                    display.setCursor(0, x += 9);
+                    display.printf("ALT %.1fM\n", aprs.altitude);
+                }
+                if (aprs.flags & F_PHG)
+                {
+                    int power, height, gain;
+                    unsigned char tmp;
+                    power = (int)aprs.phg[0] - 0x30;
+                    power *= power;
+                    height = (int)aprs.phg[1] - 0x30;
+                    height = 10 << (height + 1);
+                    height = height / 3.2808;
+                    gain = (int)aprs.phg[2] - 0x30;
+                    display.setCursor(0, x += 9);
+                    display.printf("PHG %dM.\n", height);
+                    display.setCursor(0, x += 9);
+                    display.printf("PWR %dWatt\n", power);
+                    display.setCursor(0, x += 9);
+                    display.printf("ANT %ddBi\n", gain);
+                }
+                if (aprs.flags & F_RNG)
+                {
+                    display.setCursor(0, x += 9);
+                    display.printf("RNG %dKm\n", aprs.radio_range);
+                }
+                /*if (aprs.comment_len > 0) {
+                    display.setCursor(0, 56);
+                    display.print(aprs.comment);
+                }*/
+            }
+        #else
             display.setCursor(20, 7);
             display.setTextSize(1);
             display.setFont(&FreeSansBold9pt7b);
@@ -9705,7 +10284,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setCursor(0, 56);
                     display.print(aprs.comment);
                 }*/
-            }
+            #endif
             display.display();
 #elif defined(ST7735_160x80)
             display.fillScreen(ST77XX_BLACK);

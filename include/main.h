@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.5"
-#define VERSION_BUILD ' '
+#define VERSION_BUILD 'a'
 
 #include <Arduino.h>
 //#include "ModbusMaster.h"
