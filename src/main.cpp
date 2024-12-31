@@ -10297,6 +10297,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setCursor(0, 56);
                     display.print(aprs.comment);
                 }*/
+            }
             #endif
             display.display();
 #elif defined(ST7735_160x80)

@@ -119,7 +119,7 @@ void getSensor(uint32_t type, float *val, int i)
         {
             
             weather.visable |= type;
-            if ((config.wx_sensor_avg[i] && (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate)) || (sen[senIdx].timeAvg == 0))
+            if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
                 *val = sen[senIdx].sample;
             else
                 *val = sen[senIdx].average;
@@ -144,7 +144,7 @@ void getSensor(uint32_t type, uint16_t *val, int i)
         if (sen[senIdx].visable)
         {
             weather.visable |= type;
-            if ((config.wx_sensor_avg[i] && (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate)) || (sen[senIdx].timeAvg == 0))
+            if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
                 *val = sen[senIdx].sample;
             else
                 *val = sen[senIdx].average;
@@ -169,7 +169,7 @@ void getSensor(uint32_t type, uint32_t *val, int i)
         if (sen[senIdx].visable)
         {            
             weather.visable |= type;
-            if ((config.wx_sensor_avg[i] && (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate)) || (sen[senIdx].timeAvg == 0))
+            if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
                 *val = sen[senIdx].sample;
             else
                 *val = sen[senIdx].average;
@@ -268,7 +268,7 @@ int getRawWx(char *strData)
             getSensor(senType, (uint16_t*)&weather.uv, i);
             break;
         case WX_SOUND:
-            getSensor(senType, (uint16_t*)&weather.sound, i);
+            getSensor(senType, &weather.sound, i);
             break;
         }
         senType <<= 1;
@@ -291,7 +291,7 @@ int getRawWx(char *strData)
     if (config.wx_flage & WX_WIND_SPD)
     {
         if (weather.visable & WX_WIND_SPD)
-            sprintf(strtmp, "%03u", (unsigned int)(weather.windspeed * 0.621));
+            sprintf(strtmp, "%03u", (unsigned int)round(weather.windspeed * 0.621));
         else
             sprintf(strtmp, "...");
     }
@@ -303,7 +303,7 @@ int getRawWx(char *strData)
 
     if ((weather.visable & WX_WIND_SPD) && (weather.visable & WX_WIND_GUST))
     {
-        sprintf(strtmp, "g%03u", (unsigned int)(weather.windgust * 0.621));
+        sprintf(strtmp, "g%03u", (unsigned int)round(weather.windgust * 0.621));
     }
     else
     {
@@ -315,7 +315,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_TEMP)
         {
-            unsigned int tempF = (unsigned int)((weather.temperature * 9 / 5) + 32);
+            unsigned int tempF = (unsigned int)round((weather.temperature * 9 / 5) + 32);
             sprintf(strtmp, "t%03u", tempF);
         }
         else
@@ -329,9 +329,9 @@ int getRawWx(char *strData)
     }
     strcat(strData, strtmp);
 
-    unsigned int rain = (unsigned int)((weather.rain * 100.0F) / 25.6F);
-    unsigned int rain24 = (unsigned int)((weather.rain24hr * 100.0F) / 25.6F);
-    unsigned int rainGMT = (unsigned int)((weather.rainmidnight * 100.0F) / 25.6F);
+    unsigned int rain = (unsigned int)round((weather.rain * 100.0F) / 25.6F);
+    unsigned int rain24 = (unsigned int)round((weather.rain24hr * 100.0F) / 25.6F);
+    unsigned int rainGMT = (unsigned int)round((weather.rainmidnight * 100.0F) / 25.6F);
     time_t now;
     time(&now);
     struct tm *info = gmtime(&now);
@@ -387,7 +387,7 @@ int getRawWx(char *strData)
     if (config.wx_flage & WX_HUMIDITY)
     {
         if (weather.visable & WX_HUMIDITY)
-            sprintf(strtmp, "h%02u", (unsigned int)weather.humidity);
+            sprintf(strtmp, "h%02u", (unsigned int)round(weather.humidity));
         else
             sprintf(strtmp, "h..");
     }
@@ -441,7 +441,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_SOIL_TEMP)
         {
-            sprintf(strtmp, "m%03u", (int)((weather.soil_temp * 9 / 5) + 32));
+            sprintf(strtmp, "m%03u", (int)round((weather.soil_temp * 9 / 5) + 32));
             strcat(strData, strtmp);
         }
     }
@@ -450,7 +450,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_SOIL_MOISTURE)
         {
-            sprintf(strtmp, "M%03u", (unsigned int)(weather.soil_moisture * 10));
+            sprintf(strtmp, "M%03u", (unsigned int)round(weather.soil_moisture * 10));
             strcat(strData, strtmp);
         }
     }
@@ -459,7 +459,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_WATER_TEMP)
         {
-            sprintf(strtmp, "w%03u", (int)((weather.water_temp * 9 / 5) + 32));
+            sprintf(strtmp, "w%03u", (int)round((weather.water_temp * 9 / 5) + 32));
             strcat(strData, strtmp);
         }
     }
@@ -544,7 +544,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_SOUND)
         {
-            sprintf(strtmp, "n%03u", (unsigned int)weather.sound);
+            sprintf(strtmp, "n%03u", (unsigned int)round(weather.sound));
             strcat(strData, strtmp);
         }
     }
