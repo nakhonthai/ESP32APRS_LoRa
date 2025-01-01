@@ -4690,7 +4690,7 @@ void handle_igate(AsyncWebServerRequest *request)
 				}
 				else
 				{
-					memset(config.igate_comment, 0, sizeof(config.igate_comment));
+					memset(config.igate_status, 0, sizeof(config.igate_status));
 				}
 			}
 			if (request->argName(i) == "texttouse")
