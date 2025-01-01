@@ -3935,7 +3935,7 @@ void setup()
         display.setRotation(1);
 #ifdef NV3022B3
     uint8_t madctl = 0;
-    madctl = ST77XX_MADCTL_MY | ST77XX_MADCTL_MX | ST77XX_MADCTL_MV | ST77XX_MADCTL_RGB;
+    madctl = ST77XX_MADCTL_MY | ST77XX_MADCTL_RGB;
     display.sendCommand(ST77XX_MADCTL, &madctl, 1);
     display.invertDisplay(true);
 #else
@@ -8409,7 +8409,7 @@ void taskNetwork(void *pvParameters)
     int c = 0;
     // char raw[500];
     log_d("Task Network has been start");
-    manualWiFi = true;
+    manualWiFi = false;
 
     // WiFi.onEvent(Wifi_connected,SYSTEM_EVENT_STA_CONNECTED);
     // WiFi.onEvent(Get_IPAddress, SYSTEM_EVENT_STA_GOT_IP);
@@ -8437,6 +8437,7 @@ void taskNetwork(void *pvParameters)
 
     if (config.wifi_mode & WIFI_STA_FIX)
     {
+        manualWiFi = true;
         for (int i = 0; i < 5; i++)
         {
             if (config.wifi_sta[i].enable)
@@ -8449,6 +8450,7 @@ void taskNetwork(void *pvParameters)
 
     if (config.wifi_mode & WIFI_AP_FIX)
     {
+        manualWiFi = true;
         // กำหนดค่าการทำงานไวไฟเป็นแอสเซสพ้อย
         WiFi.softAP(config.wifi_ap_ssid, config.wifi_ap_pass); // Start HOTspot removing password will disable security
         WiFi.softAPConfig(local_IP, gateway, subnet);
@@ -11740,7 +11742,10 @@ void wifiDisp()
     display.setTextSize(1);
     display.setFont(&FreeSansBold9pt7b);
     display.setTextColor(BLACK);
-    display.print("WiFi Info");
+    if(manualWiFi)
+    display.print("WiFi [ON]");
+    else
+    display.print("WiFi [OFF]");
     display.setFont();
     display.setCursor(150, 7);
     display.print("6");
@@ -11896,11 +11901,14 @@ void radioDisp()
     // display.drawRect(0, 16, 160, 64, WHITE);
     display.fillRect(0, 15, 160, 64, BLACK);
 
-    display.setCursor(25, 7);
+    display.setCursor(35, 7);
     display.setTextSize(1);
     display.setFont(&FreeSansBold9pt7b);
     display.setTextColor(BLACK);
-    display.print("RADIO Info");
+    if(config.rf_en)
+        display.print("RADIO [ON]");
+    else
+        display.print("RADIO [OFF]");
     display.setFont();
     display.setCursor(150, 7);
     display.print("5");
@@ -12214,11 +12222,11 @@ void gpsDisp()
         // display.drawRect(0, 16, 160, 64, WHITE);
         display.fillRect(0, 15, 160, 64, BLACK);
 
-        display.setCursor(35, 7);
+        display.setCursor(60, 7);
         display.setTextSize(1);
         display.setFont(&FreeSansBold9pt7b);
         display.setTextColor(BLACK);
-        display.print("GPS Info");
+        display.print("GNSS");
         display.setFont();
         display.setCursor(150, 7);
         display.print("0");
