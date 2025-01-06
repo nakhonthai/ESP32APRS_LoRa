@@ -4128,15 +4128,11 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-
-    // #if !defined(CONFIG_IDF_TARGET_ESP32C6)
-    // esp_task_wdt_init(WDT_TIMEOUT); // enable panic so ESP32 restarts
-    // #else
-    // esp_task_wdt_init(WDT_TIMEOUT); // enable panic so ESP32 restarts
-    // #endif
-    // esp_task_wdt_add(NULL);               // add current thread to WDT watch
-
-    // esp_task_wdt_deinit
+    #if !defined(CONFIG_IDF_TARGET_ESP32C6)
+    esp_task_wdt_init(WDT_TIMEOUT,true); // enable panic so ESP32 restarts
+    #else
+    esp_task_wdt_init(WDT_TIMEOUT); // enable panic so ESP32 restarts
+    #endif
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -4247,6 +4243,8 @@ void setup()
             &taskSerialHandle, /* Task handle. */
             0);                /* Core where the task should run */
     }
+
+    esp_task_wdt_add(taskAPRSPollHandle);
 
     timeTask = millis() + 10000;
 
@@ -8386,6 +8384,7 @@ void taskAPRSPoll(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         if ((config.rf_en == true) && (AFSKInitAct == true))
         {
+            esp_task_wdt_reset();
             if (APRS_poll())
             {
                 // StandByTick += millis() + 10000;

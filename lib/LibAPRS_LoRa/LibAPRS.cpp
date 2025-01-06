@@ -1211,7 +1211,7 @@ bool APRS_poll(void)
                     }
                 }
                 else
-                {
+                {                    
                     radioHal->transmit(byteArr, i);
                 }
                 free(byteArr);
