@@ -1210,6 +1210,25 @@ String deg2lat(double deg)
     return String(dmm);
 }
 
+void deg2lat(char *dmm,double deg)
+{
+    char sign;
+    if (deg > 0.0F)
+    {
+        sign = 'N';
+    }
+    else
+    {
+        sign = 'S';
+        deg *= -1;
+    }
+
+    uint id = (uint)floor(deg);
+    uint im = (uint)((deg - (double)id) * 60);
+    uint imm = (uint)round((((deg - (double)id) * 60) - (double)im) * 100);
+    sprintf(dmm, "%02d%02d.%02d%c", id, im, imm, sign);
+}
+
 String deg2lon(double deg)
 {
     char sign;
@@ -1228,6 +1247,24 @@ String deg2lon(double deg)
     char dmm[10];
     sprintf(dmm, "%03d%02d.%02d%c", id, im, imm, sign);
     return String(dmm);
+}
+
+void deg2lon(char *dmm,double deg)
+{
+    char sign;
+    if (deg > 0.0F)
+    {
+        sign = 'E';
+    }
+    else
+    {
+        sign = 'W';
+        deg *= -1;
+    }
+    uint id = (uint)floor(deg);
+    uint im = (uint)((deg - (double)id) * 60);
+    uint imm = (uint)round((((deg - (double)id) * 60) - (double)im) * 100);
+    sprintf(dmm, "%03d%02d.%02d%c", id, im, imm, sign);
 }
 
 time_t setGpsTime()
@@ -4289,14 +4326,17 @@ void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS)
 String compress_position(double nowLat, double nowLng, int alt_feed, double course, uint16_t spdKnot, char table, char symbol, bool gps)
 {
     String str_comp = "";
-    String lat, lon;
-    lat = deg2lat(nowLat);
-    lon = deg2lon(nowLng);
+    // String lat, lon;
+    // lat = deg2lat(nowLat);
+    // lon = deg2lon(nowLng);
+    char lat[15], lon[15];
+    deg2lat(lat,nowLat);
+    deg2lon(lon,nowLng);
     // ESP_LOGE("GPS", "Aprs Compress");
     //  Translate from semicircles to Base91 format
     char aprs_position[13];
-    long latitude = semicircles((char *)lat.c_str(), (nowLat < 0));
-    long longitude = semicircles((char *)lon.c_str(), (nowLng < 0));
+    long latitude = semicircles(lat, (nowLat < 0));
+    long longitude = semicircles(lon, (nowLng < 0));
     long ltemp = 1073741824L - latitude; // 90 degrees - latitude
     // ESP_LOGE("GPS", "lat=%u lon=%u", latitude, longitude);
     memset(aprs_position, 0, sizeof(aprs_position));

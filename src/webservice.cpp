@@ -611,7 +611,7 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 	sort(pkgList, PKGLISTSIZE);
 
 	html = "<table>\n";
-	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n";
+	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[Live Feed]]</a></th>\n";
 	html += "<tr>\n";
 	html += "<th style=\"min-width:10ch\"><span><b>Time (";
 	if (config.timeZone >= 0)
@@ -873,7 +873,7 @@ void event_lastHeard()
 	sort(pkgList, PKGLISTSIZE);
 
 	html = "<table>\n";
-	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n";
+	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[Live Feed]</a></th>\n";
 	html += "<tr>\n";
 	html += "<th style=\"min-width:10ch\"><span><b>Time (";
 	if (config.timeZone >= 0)
