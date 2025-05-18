@@ -576,7 +576,10 @@ void ax25_decode(AX25Ctx *ctx)
 
     memset(msg.info, 0, sizeof(msg.info));
     msg.len = ctx->frame_len - 2 - (buf - ctx->buf);
-    memcpy(msg.info, buf, msg.len);
+    if(msg.len>0)
+        strncpy((char*)msg.info, (const char*)buf, msg.len);
+    else
+        msg.len=0;
     // msg.info[msg.len]=0;
     // msg.info = buf;
 

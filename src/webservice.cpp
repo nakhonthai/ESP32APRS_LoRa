@@ -321,7 +321,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "</tr>\n";
 	webString += "</table>\n";
 	webString += "<br />\n";
-#ifdef BLUETOOTH
+
 	webString += "<table>\n";
 	webString += "<tr>\n";
 
@@ -358,7 +358,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "</tr>\n";
 	webString += "<tr>\n";
 	webString += "</table>\n";
-#endif
+
 	webString += "</div>\n";
 
 	webString += "</div>\n";
@@ -8215,6 +8215,82 @@ void handle_wireless(AsyncWebServerRequest *request)
 		}
 		WiFi.setTxPower((wifi_power_t)config.wifi_power);
 	}
+	else if (request->hasArg("commitBluetooth"))
+	{
+		bool btMaster = false;
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			if (request->argName(i) == "btMaster")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						btMaster = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "bt_name")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.bt_name, request->arg(i).c_str());
+				}
+			}
+			#if !defined(CONFIG_IDF_TARGET_ESP32)
+			if (request->argName(i) == "bt_uuid")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.bt_uuid, request->arg(i).c_str());
+				}
+			}
+			if (request->argName(i) == "bt_uuid_rx")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.bt_uuid_rx, request->arg(i).c_str());
+				}
+			}
+			if (request->argName(i) == "bt_uuid_tx")
+			{
+				if (request->arg(i) != "")
+				{
+					strcpy(config.bt_uuid_tx, request->arg(i).c_str());
+				}
+			}
+			#endif
+			if (request->argName(i) == "bt_mode")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.bt_mode = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "bt_pin")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.bt_pin = request->arg(i).toInt();
+				}
+			}
+		}
+		config.bt_master = btMaster;
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
+	}
 	else
 	{
 		String html = "<script type=\"text/javascript\">\n";
@@ -8325,16 +8401,14 @@ void handle_wireless(AsyncWebServerRequest *request)
 		html += "<input type=\"hidden\" name=\"commitWiFiClient\"/>\n";
 		html += "</form><br />";
 		/************************ Bluetooth **************************/
-#ifdef BLUETOOTH
 		html += "<br />\n";
 		html += "<form id='formBluetooth' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		// html += "<h2>Bluetooth Master (BLE)</h2>\n";
 		html += "<table>\n";
-		// html += "<tr>\n";
-		// html += "<th width=\"200\"><span><b>Setting</b></span></th>\n";
-		// html += "<th><span><b>Value</b></span></th>\n";
-		// html += "</tr>\n";
+		#if !defined(CONFIG_IDF_TARGET_ESP32)
 		html += "<th colspan=\"2\"><span><b>Bluetooth Master (BLE)</b></span></th>\n";
+		#else
+		html += "<th colspan=\"2\"><span><b>Bluetooth Master (SPP)</b></span></th>\n";
+		#endif
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Enable:</b></td>\n";
 		String btEnFlag = "";
@@ -8347,6 +8421,11 @@ void handle_wireless(AsyncWebServerRequest *request)
 		html += "<td style=\"text-align: left;\"><input maxlength=\"20\" id=\"bt_name\" name=\"bt_name\" type=\"text\" value=\"" + String(config.bt_name) + "\" /></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
+		html += "<td align=\"right\"><b>PIN:</b></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"0\" max=\"999999\" id=\"bt_pin\" name=\"bt_pin\" type=\"number\" value=\"" + String(config.bt_pin,DEC) + "\" /></td> <i>*Value 0 is no auth.</i>\n";
+		html += "</tr>\n";
+		#if !defined(CONFIG_IDF_TARGET_ESP32)
+		html += "<tr>\n";
 		html += "<td align=\"right\"><b>UUID:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid\" name=\"bt_uuid\" type=\"text\" value=\"" + String(config.bt_uuid) + "\" /></td>\n";
 		html += "</tr>\n";
@@ -8358,6 +8437,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		html += "<td align=\"right\"><b>UUID TX:</b></td>\n";
 		html += "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_tx\" name=\"bt_uuid_tx\" type=\"text\" value=\"" + String(config.bt_uuid_tx) + "\" /></td>\n";
 		html += "</tr>\n";
+		#endif
 
 		html += "<td align=\"right\"><b>MODE:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
@@ -8384,11 +8464,12 @@ void handle_wireless(AsyncWebServerRequest *request)
 
 		html += "<label style=\"font-size: 8pt;text-align: right;\">*See the following for generating UUIDs: <a href=\"https://www.uuidgenerator.net\" target=\"_blank\">https://www.uuidgenerator.net</a></label></td>\n";
 		html += "</tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitBluetooth'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "<tr><td colspan=\"2\" align=\"right\">\n";
+		html += "<div><button class=\"button\" type='submit' id='submitBluetooth'  name=\"commitBluetooth\"> Apply Change </button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitBluetooth\"/>\n";
+		html += "</td></tr></table><br />\n";
 		html += "</form>";
-#endif
+
 		request->send(200, "text/html", html); // send to someones browser when asked
 	}
 }

@@ -56,6 +56,8 @@
 
 #include <time.h>
 
+//#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
+
 // #include <PPPoS.h>
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
 #include <XPowersLib.h>
@@ -75,9 +77,6 @@ XPowersAXP2101 PMU;
 
 // #define EEPROM_SIZE 4096
 
-#ifdef BLUETOOTH
-#include "BluetoothSerial.h"
-#endif
 
 #if APRS_LORA_DONGLE
 #define PIXELS_PIN 45
@@ -384,9 +383,214 @@ SoftwareSerial SerialRF;
 bool firstGpsTime = true;
 time_t startTime = 0;
 
-#ifdef BLUETOOTH
-BluetoothSerial SerialBT;
+#if !defined(CONFIG_IDF_TARGET_ESP32)
+#include <NimBLEDevice.h>
+#include <NimBLEServer.h>
+NimBLEServer *pServer = NULL;
+NimBLECharacteristic *pTxCharacteristic,**pGATTCharacteristic;
+bool BTdeviceConnected = false;
+bool BToldDeviceConnected = false;
+uint8_t BTtxValue = 0;
+/**  None of these are required as they will be handled by the library with defaults. **
+ **                       Remove as you see fit for your needs                        */
+class ServerCallbacks : public NimBLEServerCallbacks
+{
+  void onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo) override
+  {
+    log_d("Client connect address: %s\n", connInfo.getAddress().toString().c_str());
 
+    /**
+     *  We can use the connection handle here to ask for different connection parameters.
+     *  Args: connection handle, min connection interval, max connection interval
+     *  latency, supervision timeout.
+     *  Units; Min/Max Intervals: 1.25 millisecond increments.
+     *  Latency: number of intervals allowed to skip.
+     *  Timeout: 10 millisecond increments.
+     */
+    BTdeviceConnected = true;
+    pServer->updateConnParams(connInfo.getConnHandle(), 48, 96, 1, 360);
+  }
+
+  void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override
+  {
+    log_d("Client disconnected - start advertising\n");
+    NimBLEDevice::startAdvertising();
+    BTdeviceConnected = false;
+  }
+
+  void onMTUChange(uint16_t MTU, NimBLEConnInfo &connInfo) override
+  {
+    log_d("MTU updated: %u for connection ID: %u\n", MTU, connInfo.getConnHandle());
+  }
+
+  /********************* Security handled here *********************/
+  uint32_t onPassKeyDisplay() override
+  {
+    log_d("Server Passkey Display\n");
+    /**
+     * This should return a random 6 digit number for security
+     *  or make your own static passkey as done here.
+     */
+    return 123456;
+  }
+
+  void onConfirmPassKey(NimBLEConnInfo &connInfo, uint32_t pass_key) override
+  {
+    log_d("The passkey YES/NO number: %" PRIu32 "\n", pass_key);
+    /** Inject false if passkeys don't match. */
+    NimBLEDevice::injectConfirmPasskey(connInfo, true);
+  }
+
+  void onAuthenticationComplete(NimBLEConnInfo &connInfo) override
+  {
+    /** Check that encryption was successful, if not we disconnect the client */
+    if (!connInfo.isEncrypted())
+    {
+      NimBLEDevice::getServer()->disconnect(connInfo.getConnHandle());
+      log_d("Encrypt connection failed - disconnecting client\n");
+      return;
+    }
+
+    log_d("Secured connection to: %s\n", connInfo.getAddress().toString().c_str());
+  }
+} serverCallbacks;
+
+/** Handler class for characteristic actions */
+class CharacteristicCallbacks : public NimBLECharacteristicCallbacks
+{
+  /**
+   *  The value returned in code is the NimBLE host return code.
+   */
+  void onStatus(NimBLECharacteristic *pCharacteristic, int code) override
+  {
+    log_d("Notification/Indication return code: %d, %s\n", code, NimBLEUtils::returnCodeToString(code));
+  }
+
+  /** Peer subscribed to notifications/indications */
+  void onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) override
+  {
+    std::string str = "Client ID: ";
+    str += connInfo.getConnHandle();
+    str += " Address: ";
+    str += connInfo.getAddress().toString();
+    if (subValue == 0)
+    {
+      str += " Unsubscribed to ";
+    }
+    else if (subValue == 1)
+    {
+      str += " Subscribed to notifications for ";
+    }
+    else if (subValue == 2)
+    {
+      str += " Subscribed to indications for ";
+    }
+    else if (subValue == 3)
+    {
+      str += " Subscribed to notifications and indications for ";
+    }
+    str += std::string(pCharacteristic->getUUID());
+    log_d("%s\n", str.c_str());
+  }
+} chrCallbacks;
+
+/** Handler class for descriptor actions */
+class DescriptorCallbacks : public NimBLEDescriptorCallbacks
+{
+  void onWrite(NimBLEDescriptor *pDescriptor, NimBLEConnInfo &connInfo) override
+  {
+    std::string dscVal = pDescriptor->getValue();
+    log_d("Descriptor written value: %s\n", dscVal.c_str());
+  }
+
+  void onRead(NimBLEDescriptor *pDescriptor, NimBLEConnInfo &connInfo) override
+  {
+    log_d("%s Descriptor read\n", pDescriptor->getUUID().toString().c_str());
+  }
+} dscCallbacks;
+
+class MyServerCallbacks : public NimBLEServerCallbacks
+{
+  void onConnect(NimBLEServer *pServer)
+  {
+    BTdeviceConnected = true;
+    log_d("BLE Connected");
+  };
+
+  void onDisconnect(NimBLEServer *pServer)
+  {
+    BTdeviceConnected = false;
+    log_d("BLE Disconnect");
+  }
+};
+
+class MyCallbacks : public NimBLECharacteristicCallbacks
+{
+  void onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override
+  {
+    log_d("%s : onRead(), value: %s\n",
+          pCharacteristic->getUUID().toString().c_str(),
+          pCharacteristic->getValue().c_str());
+  }
+  // void onWrite(NimBLECharacteristic *pCharacteristic)
+  //{
+  void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override
+  {
+    log_d("%s : onWrite(), Length: %d\n",
+          pCharacteristic->getUUID().toString().c_str(),
+          pCharacteristic->getLength());    
+
+    if (pCharacteristic->getLength() > 0)
+    {
+      // Serial.println("*********");
+      // Serial.print("Received Value: ");
+      // char raw[500];
+      // int i = 0;
+      // memset(raw, 0, sizeof(raw));
+      // for (i = 0; i < rxValue.length(); i++)
+      // {
+      //   if (i > sizeof(raw))
+      //     break;
+      //   raw[i] = (char)rxValue[i];
+      //   if (raw[i] == 0)
+      //     break;
+      // }
+      if (config.bt_mode == 1)
+      { // TNC2RAW MODE
+        String rxValue = pCharacteristic->getValue();
+        uint8_t SendMode = TNC_CHANNEL;
+        if (config.igate_loc2rf)
+          SendMode |= RF_CHANNEL;
+        if (config.igate_loc2inet)
+          SendMode |= INET_CHANNEL;
+        pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
+      }
+      else if (config.bt_mode == 2)
+      {
+        // KISS MODE   
+        for(int i=0;i<pCharacteristic->getLength();i++)
+          kiss_serial((uint8_t)pCharacteristic->getValue().c_str()[i]);
+        //char raw[500];   
+         
+        // int len = kiss_serial((uint8_t *)raw,(uint8_t *)pCharacteristic->getValue().c_str(),pCharacteristic->getLength());
+        // log_d("Parse KISS len=%d",len);
+        // if(len>0){          
+        //   // AX25Msg pkg;
+        //   // String tnc2;
+        //   // ax25_decode(raw, len, mV, &pkg);
+        //   // packet2Raw(tnc2, pkg);
+        //   // uint8_t SendMode = TNC_CHANNEL;
+        //   // SendMode |= RF_CHANNEL;
+        //   // pkgTxPush(tnc2.c_str(), tnc2.length(), 1, SendMode);
+        //   APRS_sendRawPkt((uint8_t *)raw, len);
+        // }
+      }
+    }
+  }
+};
+#else
+#include "BluetoothSerial.h"
+BluetoothSerial SerialBT;
 void Bluetooth()
 {
     if (SerialBT.available())
@@ -1928,6 +2132,21 @@ void defaultConfig()
     }
     sprintf(config.wifi_ap_ssid, "ESP32APRS_LoRa");
     sprintf(config.wifi_ap_pass, "aprsthnetwork");
+
+    // Blutooth
+    config.bt_slave = false;
+    config.bt_master = false;
+    config.bt_mode = 1; // 0-None,1-TNC2RAW,2-KISS
+    config.bt_power = 3;
+    sprintf(config.bt_name, "ESP32APRS_LoRa");
+    config.bt_pin = 123456;
+    #if !defined(CONFIG_IDF_TARGET_ESP32)
+    //Bluetooth BLE
+    sprintf(config.bt_uuid, "00000001-ba2a-46c9-ae49-01b0961f68bb");
+    sprintf(config.bt_uuid_rx, "00000002-ba2a-46c9-ae49-01b0961f68bb");
+    sprintf(config.bt_uuid_tx, "00000003-ba2a-46c9-ae49-01b0961f68bb");
+    #endif
+
 
     //--RF Module
     config.rf_en = false;
@@ -4135,10 +4354,47 @@ void setup()
     }
 
     log_d("Free heap: %d", ESP.getHeapSize());
-#ifdef BLUETOOTH
-    if (config.bt_master)
-        SerialBT.begin(config.bt_name); // Bluetooth device name
-#endif
+
+    if (config.bt_master == true)
+    {
+    #if !defined(CONFIG_IDF_TARGET_ESP32)
+      // Create the BLE Device
+      NimBLEDevice::init(config.bt_name);
+      NimBLEDevice::setPower(config.bt_power); /** +3db */
+      // BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);  // The line you told me to add
+      // BLESecurity *pSecurity = new BLESecurity();
+      // pSecurity->setStaticPIN(config.bt_pin);
+  
+      // Create the BLE Server
+      pServer = NimBLEDevice::createServer();
+      pServer->setCallbacks(&serverCallbacks);
+      pServer->advertiseOnDisconnect(false);
+  
+      //BLE Auth
+      if(config.bt_pin>0){
+       NimBLEDevice::setSecurityAuth(true, true, true); /** bonding, MITM, BLE secure connections */
+       NimBLEDevice::setSecurityPasskey(config.bt_pin);
+       NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY); /** Display only passkey */
+      }
+  
+      //pServer->getAdvertising()->addServiceUUID(config.bt_uuid);
+  
+      // Create the BLE Service as Nordic UART Service
+      NimBLEService *pService = pServer->createService(config.bt_uuid);
+      // Create a BLE TX Characteristic
+      pTxCharacteristic = pService->createCharacteristic(config.bt_uuid_tx, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+      pTxCharacteristic->setCallbacks(&chrCallbacks);
+      // Create a BLE RX Characteristic
+      static NimBLECharacteristic *pRxCharacteristic = pService->createCharacteristic(config.bt_uuid_rx, NIMBLE_PROPERTY::WRITE);
+      pRxCharacteristic->setCallbacks(new MyCallbacks());   
+  
+      // Start the service
+      pService->start();
+      pServer->startAdvertising();
+      #else
+      #endif
+    }
+
 
 #ifdef OLED
         int i2c_timeout = 0;
@@ -7653,7 +7909,7 @@ void taskAPRS(void *pvParameters)
                     }
                 }
             }
-#ifdef BLUETOOTH
+
             if (config.bt_master)
             { // Output TNC2RAW to BT Serial
               // SerialBT.println(tnc2);
@@ -7661,21 +7917,27 @@ void taskAPRS(void *pvParameters)
                 {
                     char *rawP = (char *)malloc(tnc2.length());
                     memcpy(rawP, tnc2.c_str(), tnc2.length());
+                    #if defined(CONFIG_IDF_TARGET_ESP32)
                     SerialBT.write((uint8_t *)rawP, tnc2.length());
-                    // pTxCharacteristic->setValue((uint8_t *)rawP, tnc2.length());
-                    // pTxCharacteristic->notify();
+                    #else
+                    pTxCharacteristic->setValue((uint8_t *)rawP, tnc2.length());
+                    pTxCharacteristic->notify();
+                    #endif
                     free(rawP);
                 }
                 else if (config.bt_mode == 2)
                 { // KISS
                     uint8_t pkg[500];
                     int sz = kiss_wrapper(pkg);
+                    #if defined(CONFIG_IDF_TARGET_ESP32)
                     SerialBT.write(pkg, sz);
-                    // pTxCharacteristic->setValue(pkg, sz);
-                    // pTxCharacteristic->notify();
+                    #else
+                    pTxCharacteristic->setValue(pkg, sz);
+                    pTxCharacteristic->notify();
+                    #endif
                 }
             }
-#endif
+
             log_d("RX: %s", tnc2.c_str());
 
             // SerialBT.println(tnc2);
@@ -8504,7 +8766,7 @@ void taskNetwork(void *pvParameters)
         NTP_Timeout = millis() + 2000;
     }
 
-    WiFi.setSleep(false);
+    //WiFi.setSleep(false);
 
     pingTimeout = millis() + 10000;
     unsigned long timeNetworkOld = millis();

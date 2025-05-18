@@ -2809,7 +2809,8 @@ int ParseAPRS::parse_aprs_comment(struct pbuf_t *pb, char const *input, unsigned
 	/*fapint_parse_comment_telemetry(packet, &rest, &rest_len);*/
 
 	/* If there's something left, save it as a comment. */
-	rest_len = strlen(rest);
+	//rest_len = strlen(rest);
+	rest_len = &input[input_len]-rest;
 
 	if (rest_len > 0)
 	{

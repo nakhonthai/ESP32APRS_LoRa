@@ -96,6 +96,19 @@ typedef struct Config_Struct
 	char wifi_ap_ssid[32];
 	char wifi_ap_pass[63];
 
+	//--Blue Tooth
+	bool bt_slave;
+	bool bt_master;
+	uint8_t bt_mode;
+	char bt_name[20];
+	uint32_t bt_pin;
+	uint8_t bt_power;
+	#if !defined(CONFIG_IDF_TARGET_ESP32)
+	char bt_uuid[37];
+	char bt_uuid_rx[37];
+	char bt_uuid_tx[37];
+	#endif
+
 	//--RF Module
 	bool rf_en;
 	uint8_t rf_type;
