@@ -70,6 +70,24 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["rfBR"] = config.rf_br;
     doc["rfShaping"] = config.rf_shaping;
     doc["rfEncoding"] = config.rf_encoding;
+#ifdef NAWS4
+    doc["rf1Enable"] = config.rf1_en;
+    doc["rf1Type"] = config.rf1_type;
+    doc["rf1Freq"] = config.rf1_freq;
+    doc["rf1Offset"] = config.rf1_freq_offset;
+    doc["rf1BW"] = config.rf1_bw;
+    doc["rf1SF"] = config.rf1_sf;
+    doc["rf1CR"] = config.rf1_cr;
+    doc["rf1Sync"] = config.rf1_sync;
+    doc["rf1Pwr"] = config.rf1_power;
+    doc["rf1Pream"] = config.rf1_preamable;
+    doc["rf1LNA"] = config.rf1_lna;
+    doc["rf1Mode"] = config.rf1_mode;
+    doc["rf1AX25"] = config.rf1_ax25;
+    doc["rf1BR"] = config.rf1_br;
+    doc["rf1Shaping"] = config.rf1_shaping;
+    doc["rf1Encoding"] = config.rf1_encoding;
+#endif
 
     // IGate group
     doc["igateEn"] = config.igate_en;
@@ -351,16 +369,34 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["rfRxAct"] = config.rf_rx_active;
     doc["rfRSTAct"] = config.rf_reset_active;
     doc["rfNSSAct"] = config.rf_nss_active;
+#ifdef NAWS4
+    doc["rf1Tx"] = config.rf1_tx_gpio;
+    doc["rf1Rx"] = config.rf1_rx_gpio;
+    doc["rf1RST"] = config.rf1_reset_gpio;
+    doc["rf1DIO0"] = config.rf1_dio0_gpio;
+    doc["rf1DIO1"] = config.rf1_dio1_gpio;
+    doc["rf1DIO2"] = config.rf1_dio2_gpio;
+    doc["rf1NSS"] = config.rf1_nss_gpio;
+    doc["rf1SCK"] = config.rf1_sclk_gpio;
+    doc["rf1MISO"] = config.rf1_miso_gpio;
+    doc["rf1MOSI"] = config.rf1_mosi_gpio;
+    doc["rf1TxAct"] = config.rf1_tx_active;
+    doc["rf1RxAct"] = config.rf1_rx_active;
+    doc["rf1RSTAct"] = config.rf1_reset_active;
+    doc["rf1NSSAct"] = config.rf1_nss_active;
+#endif
     // MOD I2C group
     doc["i2cEn"] = config.i2c_enable;
     doc["i2cSDA"] = config.i2c_sda_pin;
     doc["i2cSCK"] = config.i2c_sck_pin;
     // doc["i2cRST"]=config.i2c_rst_pin;
     doc["i2cFreq"] = config.i2c_freq;
+#if SOC_I2C_NUM > 1
     doc["i2c1En"] = config.i2c1_enable;
     doc["i2c1SDA"] = config.i2c1_sda_pin;
     doc["i2c1SCK"] = config.i2c1_sck_pin;
     doc["i2c1Freq"] = config.i2c1_freq;
+#endif
     // MOD 1-Wire group
     doc["oneWireEn"] = config.onewire_enable;
     doc["oneWireIO"] = config.onewire_gpio;
@@ -376,6 +412,12 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["uart1TX"] = config.uart1_tx_gpio;
     doc["uart1RX"] = config.uart1_rx_gpio;
     doc["uart1RTS"] = config.uart1_rts_gpio;
+#if SOC_UART_NUM > 2
+    doc["uart2En"] = config.uart2_enable;
+    doc["uart2BR"] = config.uart2_baudrate;
+    doc["uart2TX"] = config.uart2_tx_gpio;
+    doc["uart2RX"] = config.uart2_rx_gpio;
+#endif
     // MOD Modbus
     doc["modbusEn"] = config.modbus_enable;
     doc["modbusAddr"] = config.modbus_address;
@@ -408,12 +450,12 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["btPower"] = config.bt_power;
     doc["btPin"] = config.bt_pin;
     doc["btName"] = config.bt_name;
-    #if !defined(CONFIG_IDF_TARGET_ESP32)
-        //Bluetooth BLE        
-        doc["btUUID"] = config.bt_uuid;
-        doc["btUUIDRx"] = config.bt_uuid_rx;
-        doc["btUUIDTx"] = config.bt_uuid_tx;        
-    #endif    
+#if !defined(CONFIG_IDF_TARGET_ESP32)
+    // Bluetooth BLE
+    doc["btUUID"] = config.bt_uuid;
+    doc["btUUIDRx"] = config.bt_uuid_rx;
+    doc["btUUIDTx"] = config.bt_uuid_tx;
+#endif
 
     doc["logFile"] = config.log;
 
@@ -433,6 +475,39 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         sensor.add(config.sensor[i].unit);
     }
 
+    // PPP Modem
+    doc["pppEn"] = config.ppp_enable;
+    doc["pppAPN"] = config.ppp_apn;
+    doc["pppRST"] = config.ppp_rst_gpio;
+    doc["pppRSTAct"] = config.ppp_rst_active;
+    doc["pppTX"] = config.ppp_tx_gpio;
+    doc["pppRX"] = config.ppp_rx_gpio;
+    doc["pppRTS"] = config.ppp_rts_gpio;
+    doc["pppDTR"] = config.ppp_dtr_gpio;
+    doc["pppCTS"] = config.ppp_cts_gpio;
+    doc["pppRI"] = config.ppp_ri_gpio;
+    doc["pppPWR"] = config.ppp_pwr_gpio;
+    doc["pppPWRAct"] = config.ppp_pwr_active;
+    doc["pppRSTDelay"] = config.ppp_rst_delay;
+    doc["pppPin"] = config.ppp_pin;
+    doc["pppSerial"] = config.ppp_serial;
+    doc["pppSerialBaudrate"] = config.ppp_serial_baudrate;
+    doc["pppModel"] = config.ppp_model;
+    doc["pppFlow"] = config.ppp_flow_ctrl;
+    doc["pppGNSS"] = config.ppp_gnss;
+
+    doc["mqttEnable"] = config.en_mqtt;
+    doc["mqttHost"] = config.mqtt_host;
+    doc["mqttTopic"] = config.mqtt_topic;
+    doc["mqttSub"] = config.mqtt_subscribe;
+    doc["mqttPort"] = config.mqtt_port;
+
+    doc["trkMicEType"] = config.trk_mice_type;
+    doc["trkTlmInv"] = config.trk_tlm_interval;
+    doc["digiTlmInv"] = config.digi_tlm_interval;
+    doc["igateTlmInv"] = config.igate_tlm_interval;
+    doc["hostName"] = config.host_name;
+
     // Serialize JSON to file
     if (serializeJson(doc, file) == 0)
     {
@@ -450,7 +525,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
 
     if (!LITTLEFS.exists(filename))
     {
-        log_d("File %s not found.",filename);
+        log_d("File %s not found.", filename);
         return false;
     }
 
@@ -459,11 +534,11 @@ bool loadConfiguration(const char *filename, Configuration &config)
     if (f)
     {
         // Open file for reading
-        log_d("Loading %s file. Size=%d",filename,f.size());
+        log_d("Loading %s file. Size=%d", filename, f.size());
 
-        //String str=f.readString();
-        //log_d("%s",str.c_str());
-        // Allocate a temporary JsonDocument
+        // String str=f.readString();
+        // log_d("%s",str.c_str());
+        //  Allocate a temporary JsonDocument
         JsonDocument doc;
 
         // Deserialize the JSON document
@@ -484,14 +559,14 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.wifi_ap_ch = doc["WiFiAPCH"];
         strlcpy(config.wifi_ap_ssid, doc["WiFiAP_SSID"] | "ESP32LoRa", sizeof(config.wifi_ap_ssid));
         strlcpy(config.wifi_ap_pass, doc["WiFiAP_PASS"] | "aprsthnetwork", sizeof(config.wifi_ap_pass));
-        //log_d("Load WiFiAP: SSID=%s Pass=%s",config.wifi_ap_ssid,config.wifi_ap_pass);
+        // log_d("Load WiFiAP: SSID=%s Pass=%s",config.wifi_ap_ssid,config.wifi_ap_pass);
         for (int i = 0; i < 5; i++)
         {
             config.wifi_sta[i].enable = doc["WiFiSTA"][i * 3];
             strlcpy(config.wifi_sta[i].wifi_ssid, doc["WiFiSTA"][(i * 3) + 1] | "APRSTH", sizeof(config.wifi_sta[i].wifi_ssid));
             strlcpy(config.wifi_sta[i].wifi_pass, doc["WiFiSTA"][(i * 3) + 2] | "aprsthnetwork", sizeof(config.wifi_sta[i].wifi_pass));
-            //if(config.wifi_sta[i].enable)
-            //log_d("Load WiFiSTA[%i]: SSID=%s Pass=%s",i,config.wifi_sta[i].wifi_ssid,config.wifi_sta[i].wifi_pass);
+            // if(config.wifi_sta[i].enable)
+            // log_d("Load WiFiSTA[%i]: SSID=%s Pass=%s",i,config.wifi_sta[i].wifi_ssid,config.wifi_sta[i].wifi_pass);
         }
 
         config.rf_en = doc["rfEnable"];
@@ -510,6 +585,25 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.rf_br = doc["rfBR"];
         config.rf_shaping = doc["rfShaping"];
         config.rf_encoding = doc["rfEncoding"];
+
+#ifdef NAWS4
+        config.rf1_en = doc["rf1Enable"];
+        config.rf1_type = doc["rf1Type"];
+        config.rf1_freq = doc["rf1Freq"];
+        config.rf1_freq_offset = doc["rf1Offset"];
+        config.rf1_bw = doc["rf1BW"];
+        config.rf1_sf = doc["rf1SF"];
+        config.rf1_cr = doc["rf1CR"];
+        config.rf1_sync = doc["rf1Sync"];
+        config.rf1_power = doc["rf1Pwr"];
+        config.rf1_preamable = doc["rf1Pream"];
+        config.rf1_lna = doc["rf1LNA"];
+        config.rf1_mode = doc["rf1Mode"];
+        config.rf1_ax25 = doc["rf1AX25"];
+        config.rf1_br = doc["rf1BR"];
+        config.rf1_shaping = doc["rf1Shaping"];
+        config.rf1_encoding = doc["rf1Encoding"];
+#endif
 
         // IGate group
         config.igate_en = doc["igateEn"];
@@ -762,17 +856,35 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.rf_rx_active = doc["rfRxAct"];
         config.rf_reset_active = doc["rfRSTAct"];
         config.rf_nss_active = doc["rfNSSAct"];
+#ifdef NAWS4
+        config.rf1_tx_gpio = doc["rf1Tx"];
+        config.rf1_rx_gpio = doc["rf1Rx"];
+        config.rf1_reset_gpio = doc["rf1RST"];
+        config.rf1_dio0_gpio = doc["rf1DIO0"];
+        config.rf1_dio1_gpio = doc["rf1DIO1"];
+        config.rf1_dio2_gpio = doc["rf1DIO2"];
+        config.rf1_nss_gpio = doc["rf1NSS"];
+        config.rf1_sclk_gpio = doc["rf1SCK"];
+        config.rf1_miso_gpio = doc["rf1MISO"];
+        config.rf1_mosi_gpio = doc["rf1MOSI"];
+        config.rf1_tx_active = doc["rf1TxAct"];
+        config.rf1_rx_active = doc["rf1RxAct"];
+        config.rf1_reset_active = doc["rf1RSTAct"];
+        config.rf1_nss_active = doc["rf1NSSAct"];
+#endif
         // MOD I2C group
         config.i2c_enable = doc["i2cEn"];
         config.i2c_sda_pin = doc["i2cSDA"];
         config.i2c_sck_pin = doc["i2cSCK"];
         // doc["i2cRST"]=config.i2c_rst_pin;
         config.i2c_freq = doc["i2cFreq"];
+        // #if SOC_I2C_NUM > 1
         config.i2c1_enable = doc["i2c1En"];
         config.i2c1_sda_pin = doc["i2c1SDA"];
         config.i2c1_sck_pin = doc["i2c1SCK"];
         config.i2c1_freq = doc["i2c1Freq"];
-        // MOD 1-Wire group
+        // #endif
+        //  MOD 1-Wire group
         config.onewire_enable = doc["oneWireEn"];
         config.onewire_gpio = doc["oneWireIO"];
 
@@ -787,7 +899,12 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.uart1_tx_gpio = doc["uart1TX"];
         config.uart1_rx_gpio = doc["uart1RX"];
         config.uart1_rts_gpio = doc["uart1RTS"];
-        // MOD Modbus
+        // #if SOC_UART_NUM > 2
+        config.uart2_baudrate = doc["uart2BR"];
+        config.uart2_tx_gpio = doc["uart2TX"];
+        config.uart2_rx_gpio = doc["uart2RX"];
+        // #endif
+        //  MOD Modbus
         config.modbus_enable = doc["modbusEn"];
         config.modbus_address = doc["modbusAddr"];
         config.modbus_channel = doc["modbusCh"];
@@ -819,13 +936,12 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.bt_power = doc["btPower"];
         config.bt_pin = doc["btPin"];
         strlcpy(config.bt_name, doc["btName"] | "", sizeof(config.bt_name));
-        #if !defined(CONFIG_IDF_TARGET_ESP32)
-        //Bluetooth BLE 
+#if !defined(CONFIG_IDF_TARGET_ESP32)
+        // Bluetooth BLE
         strlcpy(config.bt_uuid, doc["btUUID"] | "", sizeof(config.bt_uuid));
         strlcpy(config.bt_uuid_rx, doc["btUUIDRx"] | "", sizeof(config.bt_uuid_rx));
         strlcpy(config.bt_uuid_tx, doc["btUUIDTx"] | "", sizeof(config.bt_uuid_tx));
-        #endif
-
+#endif
 
         config.log = doc["logFile"];
 
@@ -844,11 +960,46 @@ bool loadConfiguration(const char *filename, Configuration &config)
             strlcpy(config.sensor[i].unit, doc["Sensor"][(i * 11) + 10] | "", sizeof(config.sensor[i].unit));
         }
 
+        // PPP Modem
+        config.ppp_enable = doc["pppEn"];
+        strlcpy(config.ppp_apn, doc["pppAPN"] | "", sizeof(config.ppp_apn));
+        strlcpy(config.ppp_pin, doc["pppPin"] | "", sizeof(config.ppp_pin));
+        config.ppp_rst_gpio = doc["pppRST"];
+        config.ppp_rst_active = doc["pppRSTAct"];
+        config.ppp_rst_delay = doc["pppRSTDelay"];
+        config.ppp_tx_gpio = doc["pppTX"];
+        config.ppp_rx_gpio = doc["pppRX"];
+        config.ppp_rts_gpio = doc["pppRTS"];
+        config.ppp_dtr_gpio = doc["pppDTR"];
+        config.ppp_cts_gpio = doc["pppCTS"];
+        config.ppp_ri_gpio = doc["pppRI"];
+        config.ppp_pwr_gpio = doc["pppPWR"];
+        config.ppp_pwr_active = doc["pppPWRAct"];
+        config.ppp_serial = doc["pppSerial"];
+        config.ppp_serial_baudrate = doc["pppSerialBaudrate"];
+        config.ppp_model = doc["pppModel"];
+        config.ppp_flow_ctrl = doc["pppFlowCtrl"];
+        config.ppp_gnss = doc["pppGNSS"];
+
+        config.en_mqtt = doc["mqttEnable"];
+        strlcpy(config.mqtt_host, doc["mqttHost"] | "", sizeof(config.mqtt_host));
+        strlcpy(config.mqtt_topic, doc["mqttTopic"] | "", sizeof(config.mqtt_topic));
+        strlcpy(config.mqtt_subscribe, doc["mqttSub"] | "", sizeof(config.mqtt_subscribe));
+        config.mqtt_port = doc["mqttPort"];
+
+        config.trk_mice_type = doc["trkMicEType"];
+        config.trk_tlm_interval = doc["trkTlmInv"];
+        config.digi_tlm_interval = doc["digiTlmInv"];
+        config.igate_tlm_interval = doc["igateTlmInv"];
+        strlcpy(config.host_name, doc["hostName"] | "", sizeof(config.host_name));
+
         // Close the file (Curiously, File's destructor doesn't close the file)
-        //f.close();
+        // f.close();
         return true;
-    }else{
-        log_d("Can't load %s file.",filename);
+    }
+    else
+    {
+        log_d("Can't load %s file.", filename);
     }
     return false;
 }

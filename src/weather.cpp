@@ -19,6 +19,9 @@ extern TinyGPSPlus gps;
 
 WeatherData weather;
 
+float wgArray[5];
+uint8_t wgIdx=0;
+
 float mslAltitude=0;
 
 bool weatherUpdate = false;
@@ -208,7 +211,16 @@ int getRawWx(char *strData)
             getSensor(senType, &weather.windspeed, i);
             break;
         case WX_WIND_GUST:
-            getSensor(senType, &weather.windgust, i);
+            float windspeed;
+            getSensor(senType, &windspeed, i);
+            if(wgIdx>=(sizeof(wgArray)/4)) wgIdx=0;
+            wgArray[wgIdx++]=windspeed;
+            weather.windgust=0.0F;
+            for(int i;i<(sizeof(wgArray)/4);i++)
+            {
+                if(wgArray[i]>weather.windgust) weather.windgust=wgArray[i];
+            }
+            //getSensor(senType, &weather.windgust, i);
             break;
         case WX_TEMP:
             getSensor(senType, &weather.temperature, i);
@@ -278,7 +290,7 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_WIND_DIR)
     {
-        if (weather.visable & WX_WIND_DIR)
+        if (weather.visable & WX_WIND_DIR & (weather.winddirection<361))
             sprintf(strtmp, "%03u/", weather.winddirection);
         else
             sprintf(strtmp, ".../");
@@ -313,7 +325,7 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_TEMP)
     {
-        if (weather.visable & WX_TEMP)
+        if ((weather.visable & WX_TEMP) && (weather.temperature<537.0F))
         {
             unsigned int tempF = (unsigned int)round((weather.temperature * 9 / 5) + 32);
             sprintf(strtmp, "t%03u", tempF);
@@ -386,7 +398,7 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_HUMIDITY)
     {
-        if (weather.visable & WX_HUMIDITY)
+        if ((weather.visable & WX_HUMIDITY) && (weather.humidity<100.0F))
             sprintf(strtmp, "h%02u", (unsigned int)round(weather.humidity));
         else
             sprintf(strtmp, "h..");
@@ -526,7 +538,7 @@ int getRawWx(char *strData)
     {
         if (weather.visable & WX_TVOC)
         {
-            sprintf(strtmp, "T%04u", (unsigned int)weather.tvoc);
+            sprintf(strtmp, "o%04u", (unsigned int)weather.tvoc);
             strcat(strData, strtmp);
         }
     }
@@ -549,6 +561,30 @@ int getRawWx(char *strData)
         }
     }
 
+    if (config.wx_flage & WX_TEMP)
+    {
+        if (weather.visable & WX_TEMP)
+        {
+            double tmp=(weather.temperature * 9.0F / 5.0F) + 32.0F;
+            tmp *= 50.0F;
+            unsigned int tempF = (unsigned int)round(tmp);
+            if(tempF < 0){
+                sprintf(strtmp, "T-%03u", tempF);
+            }else{
+                sprintf(strtmp, "T%04u", tempF);
+            }
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_HUMIDITY)
+    {
+        if (weather.visable & WX_HUMIDITY){
+            sprintf(strtmp, "H%03u", (unsigned int)round(weather.humidity*10.0F));
+            strcat(strData, strtmp);
+        }
+    }
+
     // sprintf(strtmp, " BAT:%0.2fV/%dmA", weather.vbat, (int)(weather.ibat * 1000));
     // strcat(strData, strtmp);
     //  sprintf(strtmp,"/%0.1fmA",weather.ibat*1000);
@@ -559,5 +595,366 @@ int getRawWx(char *strData)
 
     i = strlen(strData);
     return i;
-    // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...d...D...x....n...
+    // c...s...g...t...r...p...P...h..b.....L...S..m...M...w...W....v...d...D...x....n...T....H...
+}
+
+int getWxJson(char *strData)
+{
+    unsigned int i;
+    char strtmp[300], obj[30];
+
+    memset(&obj[0], 0, sizeof(obj));
+
+    weather.visable = 0;
+
+    uint32_t senType = 1;
+    for (i = 0; i < WX_SENSOR_NUM; i++)
+    {
+        
+        //log_d("Type:%d",senType);
+        switch (senType)
+        {
+        case WX_WIND_DIR:
+            getSensor(senType, &weather.winddirection, i);
+            break;
+        case WX_WIND_SPD:
+            getSensor(senType, &weather.windspeed, i);
+            break;
+        case WX_WIND_GUST:
+            getSensor(senType, &weather.windgust, i);
+            break;
+        case WX_TEMP:
+            getSensor(senType, &weather.temperature, i);
+            break;
+        case WX_RAIN:
+            getSensor(senType, &weather.rain, i);
+            break;
+        case WX_RAIN24HR:
+            getSensor(senType, &weather.rain24hr, i);
+            break;
+        case WX_RAIN_GMT:
+            getSensor(senType, &weather.rainmidnight, i);
+            break;
+        case WX_HUMIDITY:
+            getSensor(senType, &weather.humidity, i);
+            break;
+        case WX_BARO:
+            getSensor(senType, &weather.barometric, i);
+            break;
+        case WX_LUMINOSITY:
+            getSensor(senType, &weather.solar, i);
+            break;
+        case WX_SNOW:
+            getSensor(senType, &weather.snow, i);
+            break;
+        case WX_SOIL_TEMP:
+            getSensor(senType, &weather.soil_temp, i);
+            break;
+        case WX_SOIL_MOISTURE:
+            getSensor(senType, &weather.soil_moisture, i);
+            break;
+        case WX_WATER_TEMP:
+            getSensor(senType, &weather.water_temp, i);
+            break;
+        case WX_WATER_TDS:
+            getSensor(senType, &weather.water_tds, i);
+            break;
+        case WX_WATER_LEVEL:
+            getSensor(senType, &weather.water_level, i);
+            break;
+        case WX_PM25:
+            getSensor(senType, &weather.pm25, i);
+            break;
+        case WX_PM100:
+            getSensor(senType, &weather.pm100, i);
+            break;
+        case WX_CO2:
+            getSensor(senType, &weather.co2, i);
+            break;
+        case WX_CH2O:
+            getSensor(senType, &weather.ch2o, i);
+            break;
+        case WX_TVOC:
+            getSensor(senType, &weather.tvoc, i);
+            break;
+        case WX_UV:
+            getSensor(senType, (uint16_t*)&weather.uv, i);
+            break;
+        case WX_SOUND:
+            getSensor(senType, &weather.sound, i);
+            break;
+        case WX_VBAT:
+            getSensor(senType, &weather.vbat, i);
+            break;
+        case WX_IBAT:
+            getSensor(senType, &weather.ibat, i);
+            break;
+        case WX_VSOLAR:
+            getSensor(senType, &weather.vsolar, i);
+            break;
+        }
+        senType <<= 1;
+    }
+
+    config.wx_flage = 0xFFFFFFFF;
+
+    time_t timeStamp;
+    time(&timeStamp);
+    sprintf(strData,"{\"timeStamp\":\"%i\"",timeStamp);
+
+    if (config.wx_flage & WX_WIND_DIR)
+    {
+        if (weather.visable & WX_WIND_DIR){
+            sprintf(strtmp, ",\"windCourse\":\"%d\"", weather.winddirection);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_WIND_SPD)
+    {
+        if (weather.visable & WX_WIND_SPD){
+            sprintf(strtmp, ",\"windSpeed\":\"%.1f\"", weather.windspeed * 0.621);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if ((weather.visable & WX_WIND_SPD) && (weather.visable & WX_WIND_GUST))
+    {
+        sprintf(strtmp, ",\"windGust\":\"%.1f\"", weather.windgust * 0.621);
+        strcat(strData, strtmp);
+    }
+
+    if (config.wx_flage & WX_TEMP)
+    {
+        if (weather.visable & WX_TEMP)
+        {
+            //unsigned int tempF = (unsigned int)round((weather.temperature * 9 / 5) + 32);
+            sprintf(strtmp, ",\"Temperature\":\"%.2f\"", weather.temperature);
+            strcat(strData, strtmp);
+        }
+    }
+
+    unsigned int rain = (unsigned int)round((weather.rain * 100.0F) / 25.6F);
+    unsigned int rain24 = (unsigned int)round((weather.rain24hr * 100.0F) / 25.6F);
+    unsigned int rainGMT = (unsigned int)round((weather.rainmidnight * 100.0F) / 25.6F);
+    time_t now;
+    time(&now);
+    struct tm *info = gmtime(&now);
+    if (info->tm_min == 0)
+    {
+        rain = 0;
+        weather.rain = 0;
+    }
+    if (info->tm_hour == 0 && info->tm_min == 0)
+    {
+        rain24 = 0;
+        weather.rain24hr = 0;
+    }
+
+    if (config.wx_flage & WX_RAIN)
+    {
+        if (weather.visable & WX_RAIN){
+            sprintf(strtmp, ",\"Rain\":\"%d\"", weather.rain);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_RAIN24HR)
+    {
+        if (weather.visable & WX_RAIN24HR){
+            sprintf(strtmp, ",\"Rain24h\":\"%.1f\"", weather.rain24hr);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_RAIN_GMT)
+    {
+        if (weather.visable & WX_RAIN_GMT){
+            sprintf(strtmp, ",\"RainGMT\":\"%.1f\"", weather.rainmidnight );
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_HUMIDITY)
+    {
+        if (weather.visable & WX_HUMIDITY){
+            sprintf(strtmp, ",\"Humidity\":\"%.1f\"",weather.humidity);
+            strcat(strData, strtmp);
+        }
+    }
+    
+
+    if (config.wx_flage & WX_BARO)
+    {
+        if (weather.visable & WX_BARO){
+            //* @param pressure - The current pressure in Pascals (Pa).
+            //* @param altitude - The altitude in meters (m) above sea level.
+            // Calculate the MSL pressure using the barometric formula
+            float pressure = weather.barometric * 100.0;
+            float mslPressure = pressure / pow(1 - (mslAltitude / 44330.0), 5.255);
+            sprintf(strtmp, ",\"Barometric\":\"%.2f\"", mslPressure/100.0F);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_LUMINOSITY)
+    {
+        if (weather.visable & WX_LUMINOSITY)
+        {
+            sprintf(strtmp, ",\"solarRad\":\"%u\"", (unsigned int)weather.solar);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_VBAT)
+    {
+        if (weather.visable & WX_VBAT)
+        {
+            sprintf(strtmp, ",\"Voltage\":\"%.2f\"", weather.vbat);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_IBAT)
+    {
+        if (weather.visable & WX_IBAT)
+        {
+            sprintf(strtmp, ",\"Current\":\"%.3f\"", weather.ibat);
+            strcat(strData, strtmp);
+        }
+    }
+
+    if (config.wx_flage & WX_VSOLAR)
+    {
+        if (weather.visable & WX_VSOLAR)
+        {
+            sprintf(strtmp, ",\"VSolar\":\"%.2f\"", weather.vsolar);
+            strcat(strData, strtmp);
+        }
+    }
+
+    // if (config.wx_flage & WX_SNOW)
+    // {
+    //     if (weather.visable & WX_SNOW)
+    //     {
+    //         sprintf(strtmp, "S%03u", (unsigned int)(weather.snow));
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_SOIL_TEMP)
+    // {
+    //     if (weather.visable & WX_SOIL_TEMP)
+    //     {
+    //         sprintf(strtmp, "m%03u", (int)round((weather.soil_temp * 9 / 5) + 32));
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_SOIL_MOISTURE)
+    // {
+    //     if (weather.visable & WX_SOIL_MOISTURE)
+    //     {
+    //         sprintf(strtmp, "M%03u", (unsigned int)round(weather.soil_moisture * 10));
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_WATER_TEMP)
+    // {
+    //     if (weather.visable & WX_WATER_TEMP)
+    //     {
+    //         sprintf(strtmp, "w%03u", (int)round((weather.water_temp * 9 / 5) + 32));
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_WATER_TDS)
+    // {
+    //     if (weather.visable & WX_WATER_TDS)
+    //     {
+    //         sprintf(strtmp, "W%03u", (int)weather.water_tds);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_WATER_LEVEL)
+    // {
+    //     if (weather.visable & WX_WATER_LEVEL)
+    //     {
+    //         sprintf(strtmp, "v%03u", (int)weather.water_level);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_PM25)
+    // {
+
+    //     if (weather.visable & WX_PM25)
+    //     {
+    //         sprintf(strtmp, "d%03u", (int)weather.pm25);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_PM100)
+    // {
+    //     if (weather.visable & WX_PM100)
+    //     {
+    //         sprintf(strtmp, "D%03u", (int)weather.pm100);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_CO2)
+    // {
+    //     if (weather.visable & WX_CO2)
+    //     {
+    //         if (weather.co2 < 10000)
+    //             sprintf(strtmp, "x%04u", (unsigned int)weather.co2);
+    //         else
+    //             sprintf(strtmp, "X%04u", (unsigned int)weather.co2/10);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_CH2O)
+    // {
+    //     if (weather.visable & WX_CH2O)
+    //     {
+    //         sprintf(strtmp, "F%04u", (unsigned int)weather.ch2o);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_TVOC)
+    // {
+    //     if (weather.visable & WX_TVOC)
+    //     {
+    //         sprintf(strtmp, "o%04u", (unsigned int)weather.tvoc);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_UV)
+    // {
+    //     if (weather.visable & WX_UV)
+    //     {
+    //         sprintf(strtmp, "u%02u", (unsigned int)weather.uv);
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    // if (config.wx_flage & WX_SOUND)
+    // {
+    //     if (weather.visable & WX_SOUND)
+    //     {
+    //         sprintf(strtmp, "n%03u", (unsigned int)round(weather.sound));
+    //         strcat(strData, strtmp);
+    //     }
+    // }
+
+    strcat(strData,"}");
+    i = strlen(strData);
+    return i;
 }

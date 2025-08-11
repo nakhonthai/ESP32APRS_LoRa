@@ -2132,7 +2132,7 @@ int ParseAPRS::parse_aprs_wave(struct pbuf_t *pb, char const *input, unsigned in
 int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int const input_len)
 {
 	int flage = 0;
-	static char wind_dir[4], wind_speed[4], wind_gust[4], temperature[4], rain[4], rain24[4], rainMn[4], humidity[3], barometric[6], luminosity[4], uv[3];
+	char wind_dir[4], wind_speed[4], wind_gust[4], temperature[4],temperature2[5], rain[4], rain24[4], rainMn[4], humidity[3],humidity2[4], barometric[6], luminosity[4], uv[3];
 	char snow[3], soil_temp[4], soil_hum[4], water_temp[4], water_tds[5], water_level[4], pm25[4], pm100[4], co2[5], ch2o[5], tvoc[5];
 	bool luminosityAbove = false;
 	bool co2Above = false;
@@ -2141,6 +2141,9 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	int len, retval = 1;
 	char *rest = NULL, *tmp_str;
 	unsigned int rest_len, tmp_us;
+
+	humidity2[0]='.';
+	temperature2[0]='.';
 
 	/* Check that we have something to look at. */
 	if (!pb || !input || !input_len)
@@ -2153,6 +2156,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	memset(wind_speed, 0, 4);
 	memset(luminosity, 0, 4);
 	memset(uv, 0, 3);
+	memset(&pb->wx_report, 0, sizeof(pb->wx_report));
 
 	/* Look for wind and temperature. Remaining bytes are copied to report var. */
 	rest = (char *)input;
@@ -2223,6 +2227,19 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		}
 	}
 
+	if ((rest_len>4) && (tmp_str = strchr(rest, 'T')))
+	{
+		if (strlen(tmp_str) > 4)
+		{
+			memcpy(temperature2, tmp_str + 1, 4);
+			temperature2[4] = 0;
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 5, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
 	if ((rest_len>3) && (tmp_str = strchr(rest, 'r')))
 	{
 		if (strlen(tmp_str) > 3)
@@ -2267,18 +2284,35 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		{
 			memcpy(humidity, tmp_str + 1, 2);
 			humidity[2] = 0;
+			//log_d("Humidity: %s\n", humidity);
 			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
 			rest = tmp_str;
 			rest_len = tmp_us;
 			flage++;
 		}
 	}
+
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'H')))
+	{
+		if (strlen(tmp_str) > 3)
+		{
+			memcpy(humidity2, tmp_str + 1, 3);
+			humidity2[3] = 0;
+			//log_d("Humidity2: %s\n", humidity2);
+			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
+			flage++;
+		}
+	}
+
 	if ((rest_len>5) && (tmp_str = strchr(rest, 'b')))
 	{
 		if (strlen(tmp_str) > 5)
 		{
 			memcpy(barometric, tmp_str + 1, 5);
 			barometric[5] = 0;
+			log_d("Barometric: %s\n", barometric);
 			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 6, &tmp_us);
 			rest = tmp_str;
 			rest_len = tmp_us;
@@ -2464,7 +2498,8 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 			flage++;
 		}
 	}
-	if ((rest_len>3) && (tmp_str = strchr(rest, 'T')))
+
+	if ((rest_len>3) && (tmp_str = strchr(rest, 'o')))
 	{
 		if (strlen(tmp_str) > 4)
 		{
@@ -2496,7 +2531,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	if (is_number(wind_gust))
 	{
 		pb->wx_report.flags |= W_WG;
-		pb->wx_report.wind_gust = atof(wind_gust) * MPH_TO_MS;
+		pb->wx_report.wind_gust = atof(wind_gust) * MPH_TO_KMH;
 	}
 	if (is_number(wind_dir))
 	{
@@ -2506,9 +2541,13 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	if (is_number(wind_speed))
 	{
 		pb->wx_report.flags |= W_WS;
-		pb->wx_report.wind_speed = atof(wind_speed) * MPH_TO_MS;
+		pb->wx_report.wind_speed = atof(wind_speed) * MPH_TO_KMH;
 	}
-	if (is_number(temperature))
+	if (is_number(temperature2))
+	{
+		pb->wx_report.flags |= W_TEMP;
+		pb->wx_report.temp = FAHRENHEIT_TO_CELCIUS(atof(temperature2)/50.0F);
+	}else if (is_number(temperature))
 	{
 		pb->wx_report.flags |= W_TEMP;
 		pb->wx_report.temp = FAHRENHEIT_TO_CELCIUS(atof(temperature));
@@ -2531,17 +2570,23 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	}
 
 	/* Humidity. */
-	if (is_number(humidity))
+	if (is_number(humidity2))
 	{
 		pb->wx_report.flags |= W_HUM;
-		pb->wx_report.humidity = atoi(humidity);
+		pb->wx_report.humidity = atof(humidity2)/10.0F; // tenths of percent to percent
+		log_d("Humidity: %0.1f\n", pb->wx_report.humidity);
+	}else if (is_number(humidity))
+	{
+		pb->wx_report.flags |= W_HUM;
+		pb->wx_report.humidity = atof(humidity);
+		log_d("Humidity: %0.1f\n", pb->wx_report.humidity);
 	}
 
 	/* Pressure. */
 	if (is_number(barometric))
 	{
 		pb->wx_report.flags |= W_BAR;
-		pb->wx_report.pressure = atoi(barometric) / 10.0; // tenths of mbars to mbars
+		pb->wx_report.pressure = atof(barometric) / 10.0F; // tenths of mbars to mbars
 	}
 
 	/* Luminosity. */

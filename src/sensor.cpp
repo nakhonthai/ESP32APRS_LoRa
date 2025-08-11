@@ -16,7 +16,9 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_Si7021.h>
 #include <Adafruit_CCS811.h>
+#include <Adafruit_INA219.h>
 #include <SHTSensor.h>
+#include <MCP342x.h>
 #include <ModbusMaster.h>
 #include <TinyGPS++.h>
 #include <soc/gpio_struct.h>
@@ -42,7 +44,9 @@ Adafruit_BME280 *bme=NULL;    // I2C
 Adafruit_BMP280 *bmp280=NULL; // I2C
 Adafruit_Si7021 *Si7021=NULL;
 Adafruit_CCS811 *ccs=NULL;
+Adafruit_INA219 *ina219=NULL;
 SHTSensor *sht=NULL; // Supported sensors:SHTC1, SHTC3, SHTW1, SHTW2, SHT3x-DIS (I2C), SHT2x, SHT85, SHT3x-ARP, SHT4x
+MCP342x *mcp342x=NULL; // Supported MCP3421, MCP3422, MCP3424, MCP3425, MCP3426, MCP3427
 //OneWire *oneWire=NULL;
 //DallasTemperature *ds1820;
 
@@ -517,6 +521,41 @@ bool getSHT_I2C(SHTSensor &node, uint8_t port)
     return false;
 }
 
+bool getMCP342x_I2C(MCP342x &node, int idx)
+{
+    uint8_t port = config.sensor[idx].address;
+    long value = 0;
+    MCP342x::Channel channel = MCP342x::channel1;
+    MCP342x::Config status;
+    if(port == 0){
+        channel = MCP342x::channel1; // Channel 1
+    }
+    else if(port == 1){
+        channel = MCP342x::channel2; // Channel 2
+    }
+    else if(port == 2){
+        channel = MCP342x::channel3; // Channel 3
+    }
+    else if(port == 3){
+        channel = MCP342x::channel4; // Channel 4
+    }
+    else{
+        log_e("MCP342x Invalid idx %d ,port %d",idx, port);
+        return false;   
+    }
+    uint8_t err = node.convertAndRead(channel, MCP342x::oneShot,
+        MCP342x::resolution18, MCP342x::gain1,
+        1000000, value, status);
+    //log_d("MCP342x idx: %i port: %i value: %d",idx,port, value);
+    if (!err)
+    {
+        if(!config.sensor[idx].enable) return false;
+        sensorUpdate(idx, (double)value); //update sensor value
+        return true;
+    }
+    return false;
+}
+
 bool getCCS_I2C(Adafruit_CCS811 &node, uint8_t port)
 {
     if (!node.readData())
@@ -532,6 +571,31 @@ bool getCCS_I2C(Adafruit_CCS811 &node, uint8_t port)
             else if (config.sensor[i].type == SENSOR_TVOC && config.sensor[i].port == port)
             {
                 sensorUpdate(i, (double)node.getTVOC()); // TVOC
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+bool getINA219_I2C(Adafruit_INA219 &node, uint8_t port)
+{
+    if (node.success())
+    {
+        for (int i = 0; i < SENSOR_NUMBER; i++)
+        {
+            if(!config.sensor[i].enable) continue;
+            if (config.sensor[i].type == SENSOR_VOLTAGE && config.sensor[i].port == port)
+            {
+                sensorUpdate(i, node.getBusVoltage_V()); // Voltage
+            }
+            else if (config.sensor[i].type == SENSOR_CURRENT && config.sensor[i].port == port)
+            {
+                sensorUpdate(i, node.getCurrent_mA()); // Current
+            }
+            else if (config.sensor[i].type == SENSOR_POWER && config.sensor[i].port == port)
+            {
+                sensorUpdate(i, node.getPower_mW()); // Power
             }
         }
         return true;
@@ -1048,6 +1112,38 @@ bool getSensor(int cfgIdx)
             }
         }
         break;
+        case PORT_INA219_I2C0:
+        if (config.i2c_enable)
+        {
+            if (ina219->success())
+            {
+                if (getINA219_I2C(*ina219, port))
+                    return true;
+            }
+            else
+            {
+                ina219->begin(&Wire);
+                log_d("INA219 Restart boot");
+            }
+        }        
+        break;
+        #if SOC_I2C_NUM > 1
+        case PORT_INA219_I2C1:
+        if (config.i2c1_enable)
+        {
+            if (ina219->success())
+            {
+                if (getINA219_I2C(*ina219, port))
+                    return true;
+            }
+            else
+            {
+                ina219->begin(&Wire1);
+                log_d("INA219 Restart boot");
+            }
+        }        
+        break;   
+        #endif     
     case PORT_SAT_NUM:
         if (config.gnss_enable)
         {
@@ -1076,6 +1172,7 @@ bool getSensor(int cfgIdx)
                 return true;
         }
         break;
+        #if SOC_I2C_NUM > 1
     case PORT_SHT_I2C1:
         if (config.i2c_enable)
         {
@@ -1083,6 +1180,25 @@ bool getSensor(int cfgIdx)
                 return true;
         }
         break;
+        #endif
+    case PORT_MCP342x_I2C0:
+        if (config.i2c_enable)
+        {
+            if (getMCP342x_I2C(*mcp342x, cfgIdx))
+                return true;
+        }
+        break;
+
+        // #if SOC_I2C_NUM > 1
+        // case PORT_MCP342x_I2C1:
+        // if (config.i2c1_enable)
+        // {
+
+        //     if (getMCP342x_I2C(*mcp342x, port))
+        //         return true;
+        // }
+        // break;  
+        // #endif
     case PORT_BATTERY:
         getBAT(0);
         break;
@@ -1190,6 +1306,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C0 port");
             }
             break;
+            #if SOC_I2C_NUM > 1
         case PORT_BME280_I2C1:
             if (config.i2c1_enable)
             {
@@ -1211,6 +1328,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C1 port");
             }
             break;
+            #endif
         case PORT_BMP280_I2C0:
             if (config.i2c_enable)
             {
@@ -1232,6 +1350,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C0 port");
             }
             break;
+            #if SOC_I2C_NUM > 1
         case PORT_BMP280_I2C1:
             if (config.i2c1_enable)
             {
@@ -1253,6 +1372,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C1 port");
             }
             break;
+            #endif
         case PORT_SI7021_I2C0:
             if (config.i2c_enable)
             {
@@ -1269,6 +1389,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C0 port");
             }
             break;
+            #if SOC_I2C_NUM > 1
         case PORT_SI7021_I2C1:
             if (config.i2c1_enable)
             {
@@ -1285,6 +1406,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C1 port");
             }
             break;
+            #endif
         case PORT_CCS811_I2C0:
             if (config.i2c_enable)
             {
@@ -1314,6 +1436,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C0 port");
             }
             break;
+            #if SOC_I2C_NUM > 1
         case PORT_CCS811_I2C1:
             if (config.i2c1_enable)
             {
@@ -1334,6 +1457,58 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C1 port");
             }
             break;
+            #endif
+            case PORT_INA219_I2C0:
+            if (config.i2c_enable)
+            {
+                int i2c_timeout = 0;
+                while (i2c_busy)
+                {
+                    delay(10);
+                    if (++i2c_timeout > 50)
+                        break;
+                }
+                i2c_busy = true;
+                if (ina219 != NULL)
+                    break;
+                ina219 = new Adafruit_INA219();
+                if (ina219->begin(&Wire))
+                {
+                    ina219->setCalibration_32V_2A();
+                }
+                else
+                {
+                    log_d("Could not find a valid INA219 sensor, check wiring, address, sensor ID!");
+                }
+                i2c_busy = false;
+            }
+            else
+            {
+                log_d("Not enable I2C0 port");
+            }            
+            break;
+            #if SOC_I2C_NUM > 1
+        case PORT_INA219_I2C1:
+            if (config.i2c1_enable)
+            {
+                if (ina219 != NULL)
+                    break;
+                ina219 = new Adafruit_INA219();
+                if (ina219->begin(&Wire1))
+                {
+                    ina219->setCalibration_32V_2A();
+                }
+                else
+                {
+                    log_d("Could not find a valid INA219 sensor, check wiring, address, sensor ID!");
+                }
+            }
+            else
+            {
+                log_d("Not enable I2C1 port");
+            }            
+            break;
+            #endif
         case PORT_SHT_I2C0:
             if (config.i2c_enable)
             {
@@ -1348,6 +1523,7 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C0 port");
             }
             break;
+            #if SOC_I2C_NUM > 1
         case PORT_SHT_I2C1:
             if (config.i2c1_enable)
             {
@@ -1362,6 +1538,47 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C1 port");
             }
             break;
+            #endif
+        case PORT_MCP342x_I2C0:
+            if (config.i2c_enable)
+            {
+                mcp342x = new MCP342x(0x68); // 0x68=104,0x69=105
+                  // Reset devices
+                MCP342x::generalCallReset();
+                delay(1); // MC342x needs 300us to settle, wait 1ms
+                // Check device present
+                Wire.requestFrom(0x68, (uint8_t)1);
+                if (!Wire.available())
+                {
+                    log_d("Could not find a valid MCP342x sensor, check wiring, address 0x68, sensor ID!");
+                }
+            }
+            else
+            {
+                log_d("Not enable I2C0 port");
+            }
+            break;
+        //     #if SOC_I2C_NUM > 1
+        // case PORT_MCP342x_I2C1:
+        //     if (config.i2c1_enable)
+        //     {
+        //         mcp342x = new MCP342x(0x68); // 0x68=104,0x69=105
+        //           // Reset devices
+        //         MCP342x::generalCallReset();
+        //         delay(1); // MC342x needs 300us to settle, wait 1ms
+        //         // Check device present
+        //         Wire1.requestFrom(0x68, (uint8_t)1);
+        //         if (!Wire1.available()) {
+        //         {
+        //             log_d("Could not find a valid MCP342x sensor, check wiring, address 0x68, sensor ID!");
+        //         }
+        //     }
+        //     else
+        //     {
+        //         log_d("Not enable I2C1 port");
+        //     }
+        //     break;
+        //     #endif
         case PORT_DS1820:
             // if(oneWire!=NULL)
             // {
@@ -1408,10 +1625,12 @@ void taskSensor(void *pvParameters)
         // ccs->begin(90, &Wire); // 0x5A=90
         i2c_busy = false;
     }
+    #if SOC_I2C_NUM > 1
     if (config.i2c1_enable)
     {
         Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
     }
+    #endif
 
     if(config.onewire_enable)
     {

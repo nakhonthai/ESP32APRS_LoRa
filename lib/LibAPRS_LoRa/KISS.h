@@ -18,7 +18,7 @@
 #define CMD_SETHARDWARE 0x06
 #define CMD_RETURN 0xFF
 
-void kiss_csma(AX25Ctx *ctx, uint8_t *buf, size_t len);
+//void kiss_csma(AX25Ctx *ctx, uint8_t *buf, size_t len);
 int kiss_wrapper(uint8_t *pkg);
 void kiss_serial(uint8_t sbyte);
 

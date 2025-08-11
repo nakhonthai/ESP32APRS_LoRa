@@ -548,11 +548,11 @@ void ax25_decode(AX25Ctx *ctx)
 
     DECODE_CALL(buf, msg.dst.call);
     msg.dst.ssid = (*buf++ >> 1) & 0x0F;
-    msg.dst.call[6] = 0;
+    memset(msg.dst.call, 0, sizeof(msg.dst.call));
 
     DECODE_CALL(buf, msg.src.call);
     msg.src.ssid = (*buf >> 1) & 0x0F;
-    msg.src.call[6] = 0;
+    memset(msg.src.call, 0, sizeof(msg.src.call));
 
     for (msg.rpt_count = 0; !(*buf++ & 0x01) && (msg.rpt_count < countof(msg.rpt_list)); msg.rpt_count++)
     {
@@ -577,7 +577,7 @@ void ax25_decode(AX25Ctx *ctx)
     memset(msg.info, 0, sizeof(msg.info));
     msg.len = ctx->frame_len - 2 - (buf - ctx->buf);
     if(msg.len>0)
-        strncpy((char*)msg.info, (const char*)buf, msg.len);
+        memcpy(msg.info, buf, msg.len);
     else
         msg.len=0;
     // msg.info[msg.len]=0;

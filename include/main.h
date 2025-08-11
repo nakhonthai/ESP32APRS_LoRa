@@ -11,31 +11,28 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.5"
-#define VERSION_BUILD 'a'
+#define VERSION "0.6"
+#define VERSION_BUILD ' '
 
 #include <Arduino.h>
-//#include "ModbusMaster.h"
-//#include <SD.h>
-//#include <FS.h>
-//#include <SPIFFS.h>
+// #include "ModbusMaster.h"
+// #include <SD.h>
+// #include <FS.h>
+// #include <SPIFFS.h>
 
 #include <AX25.h>
 #include "weather.h"
-//#include "EEPROM.h"
+// #include "EEPROM.h"
 
 #include "HardwareSerial.h"
 
 #include "config.h"
-#if defined(TTGO_T_Beam_S3_SUPREME_V3)  || defined(HELTEC_V3_GPS) || defined(HELTEC_HTIT_TRACKER) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE)
-#else
-#include "soc/rtc_wdt.h"
-#endif
+// #if defined(TTGO_T_Beam_S3_SUPREME_V3)  || defined(HELTEC_V3_GPS) || defined(HELTEC_HTIT_TRACKER) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HT_CT62)|| defined(NAWS4)
+// #else
+// #include "soc/rtc_wdt.h"
+// #endif
 
 #define WX
-//#define OLED
-//  #define SDCARD
-//  #define BLUETOOTH
 
 #define WIFI_OFF_FIX 0
 #define WIFI_AP_FIX 1
@@ -58,8 +55,12 @@
 #define PKGTXSIZE 100
 #else
 #define TLMLISTSIZE 5
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#define PKGLISTSIZE 10
+#else
 #define PKGLISTSIZE 20
-#define PKGTXSIZE 3
+#endif
+#define PKGTXSIZE 5
 #endif
 
 #define LOG_NONE 0
@@ -92,8 +93,7 @@
 #define RF_SR_2WVS 7   // SUNRISE SR120V,SR_2WVS VHF band 136~174 MHz
 #define RF_SR_2WUS 8   // SUNRISE SR120U,SR_2WUS UHF band 400~470 MHz
 
-#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-
+#define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 
 #define TXCH_TCP 0
 #define TXCH_RF 1
@@ -107,23 +107,23 @@
 #endif
 
 // APRS data type identifiers
-#define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_NO_MSG         "!"
-#define RADIOLIB_APRS_DATA_TYPE_GPS_RAW                         "$"
-#define RADIOLIB_APRS_DATA_TYPE_ITEM                            ")"
-#define RADIOLIB_APRS_DATA_TYPE_TEST                            ","
-#define RADIOLIB_APRS_DATA_TYPE_POSITION_TIME_NO_MSG            "/"
-#define RADIOLIB_APRS_DATA_TYPE_MSG                             ":"
-#define RADIOLIB_APRS_DATA_TYPE_OBJECT                          ";"
-#define RADIOLIB_APRS_DATA_TYPE_STATION_CAPABILITES             "<"
-#define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_MSG            "="
-#define RADIOLIB_APRS_DATA_TYPE_STATUS                          ">"
-#define RADIOLIB_APRS_DATA_TYPE_QUERY                           "?"
-#define RADIOLIB_APRS_DATA_TYPE_POSITION_TIME_MSG               "@"
-#define RADIOLIB_APRS_DATA_TYPE_TELEMETRY                       "T"
-#define RADIOLIB_APRS_DATA_TYPE_MAIDENHEAD_BEACON               "["
-#define RADIOLIB_APRS_DATA_TYPE_WEATHER_REPORT                  "_"
-#define RADIOLIB_APRS_DATA_TYPE_USER_DEFINED                    "{"
-#define RADIOLIB_APRS_DATA_TYPE_THIRD_PARTY                     "}"
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_NO_MSG "!"
+#define RADIOLIB_APRS_DATA_TYPE_GPS_RAW "$"
+#define RADIOLIB_APRS_DATA_TYPE_ITEM ")"
+#define RADIOLIB_APRS_DATA_TYPE_TEST ","
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_TIME_NO_MSG "/"
+#define RADIOLIB_APRS_DATA_TYPE_MSG ":"
+#define RADIOLIB_APRS_DATA_TYPE_OBJECT ";"
+#define RADIOLIB_APRS_DATA_TYPE_STATION_CAPABILITES "<"
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_NO_TIME_MSG "="
+#define RADIOLIB_APRS_DATA_TYPE_STATUS ">"
+#define RADIOLIB_APRS_DATA_TYPE_QUERY "?"
+#define RADIOLIB_APRS_DATA_TYPE_POSITION_TIME_MSG "@"
+#define RADIOLIB_APRS_DATA_TYPE_TELEMETRY "T"
+#define RADIOLIB_APRS_DATA_TYPE_MAIDENHEAD_BEACON "["
+#define RADIOLIB_APRS_DATA_TYPE_WEATHER_REPORT "_"
+#define RADIOLIB_APRS_DATA_TYPE_USER_DEFINED "{"
+#define RADIOLIB_APRS_DATA_TYPE_THIRD_PARTY "}"
 
 /*!
   \defgroup mic_e_message_types Mic-E message types.
@@ -131,78 +131,78 @@
 */
 
 /*! \brief Mic-E "Off duty" message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_OFF_DUTY                       0b00000111
+#define RADIOLIB_APRS_MIC_E_TYPE_OFF_DUTY 0b00000111
 
 /*! \brief Mic-E "En route" message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_EN_ROUTE                       0b00000110
+#define RADIOLIB_APRS_MIC_E_TYPE_EN_ROUTE 0b00000110
 
 /*! \brief Mic-E "In service" message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_IN_SERVICE                     0b00000101
+#define RADIOLIB_APRS_MIC_E_TYPE_IN_SERVICE 0b00000101
 
 /*! \brief Mic-E "Returning" message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_RETURNING                      0b00000100
+#define RADIOLIB_APRS_MIC_E_TYPE_RETURNING 0b00000100
 
 /*! \brief Mic-E "Commited" message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_COMMITTED                      0b00000011
+#define RADIOLIB_APRS_MIC_E_TYPE_COMMITTED 0b00000011
 
 /*! \brief Mic-E special message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_SPECIAL                        0b00000010
+#define RADIOLIB_APRS_MIC_E_TYPE_SPECIAL 0b00000010
 
 /*! \brief Mic-E priority message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_PRIORITY                       0b00000001
+#define RADIOLIB_APRS_MIC_E_TYPE_PRIORITY 0b00000001
 
 /*! \brief Mic-E emergency message. */
-#define RADIOLIB_APRS_MIC_E_TYPE_EMERGENCY                      0b00000000
+#define RADIOLIB_APRS_MIC_E_TYPE_EMERGENCY 0b00000000
 
 /*!
   \}
 */
 
 // magic offset applied to encode extra bits in the Mic-E destination field
-#define RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET                     25
+#define RADIOLIB_APRS_MIC_E_DEST_BIT_OFFSET 25
 
 // Mic-E data types
-#define RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT                    '`'
-#define RADIOLIB_APRS_MIC_E_GPS_DATA_OLD                        '\''
+#define RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT '`'
+#define RADIOLIB_APRS_MIC_E_GPS_DATA_OLD '\''
 
 // Mic-E telemetry flags
-#define RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_2                     '`'
-#define RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_5                     '\''
+#define RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_2 '`'
+#define RADIOLIB_APRS_MIC_E_TELEMETRY_LEN_5 '\''
 
 // alias for unused altitude in Mic-E
-#define RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED                     -1000000
+#define RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED -1000000
 
-    /*!
-      \brief Transmit position using Mic-E encoding.
-      \param lat Geographical latitude, positive for north, negative for south.
-      \param lon Geographical longitude, positive for east, negative for west.
-      \param heading Heading in degrees.
-      \param speed Speed in knots.
-      \param type Mic-E message type - see \ref mic_e_message_types.
-      \param telem Pointer to telemetry array (either 2 or 5 bytes long). NULL when telemetry is not used.
-      \param telemLen Telemetry length, 2 or 5. 0 when telemetry is not used.
-      \param grid Maidenhead grid locator. NULL when not used.
-      \param status Status message to send. NULL when not used.
-      \param alt Altitude to send. RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED when not used.
-    */
-    int16_t sendMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t* telem = NULL, size_t telemLen = 0, char* grid = NULL, char* status = NULL, int32_t alt = RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED);
-
+/*!
+  \brief Transmit position using Mic-E encoding.
+  \param lat Geographical latitude, positive for north, negative for south.
+  \param lon Geographical longitude, positive for east, negative for west.
+  \param heading Heading in degrees.
+  \param speed Speed in knots.
+  \param type Mic-E message type - see \ref mic_e_message_types.
+  \param telem Pointer to telemetry array (either 2 or 5 bytes long). NULL when telemetry is not used.
+  \param telemLen Telemetry length, 2 or 5. 0 when telemetry is not used.
+  \param grid Maidenhead grid locator. NULL when not used.
+  \param status Status message to send. NULL when not used.
+  \param alt Altitude to send. RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED when not used.
+*/
+int16_t sendMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t *telem = NULL, size_t telemLen = 0, char *grid = NULL, char *status = NULL, int32_t alt = RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED);
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #if defined(MBEDTLS_MD5_ALT)
 #include "md/esp_md.h"
 
-#define mbedtls_md5_init                        esp_md5_init
-#define mbedtls_md5_update_ret                      esp_md5_update
-#define mbedtls_md5_finish_ret                      esp_md5_finish
-#define mbedtls_md5_starts_ret                      esp_md5_starts
+#define mbedtls_md5_init esp_md5_init
+#define mbedtls_md5_update_ret esp_md5_update
+#define mbedtls_md5_finish_ret esp_md5_finish
+#define mbedtls_md5_starts_ret esp_md5_starts
 
-#define mbedtls_md5_free                        esp_md5_free
-#define mbedtls_md5_clone                       esp_md5_clone
-#define mbedtls_internal_md5_process            esp_md5_process
+#define mbedtls_md5_free esp_md5_free
+#define mbedtls_md5_clone esp_md5_clone
+#define mbedtls_internal_md5_process esp_md5_process
 
 #endif /* MBEDTLS_MD5_ALT */
 
@@ -210,7 +210,7 @@ extern "C" {
 }
 #endif
 
-#define ets_printf	log_d 
+#define ets_printf log_d
 
 typedef struct igateTLM_struct
 {
@@ -240,7 +240,7 @@ typedef struct
 	float freqErr;
 	char *raw;
 	size_t length;
-	//char raw[256];
+	// char raw[256];
 } pkgListType;
 
 typedef struct statisticStruct
@@ -300,16 +300,17 @@ typedef struct Telemetry_struct
 typedef struct txQueue_struct
 {
 	bool Active;
+	bool IsCB;
 	uint8_t Channel;
 	long timeStamp;
 	int Delay;
 	size_t length;
-	char Info[250];
+	char Info[300];
 } txQueueType;
 
-#define RF_CHANNEL	(1<<0)
-#define INET_CHANNEL	(1<<1)
-#define TNC_CHANNEL	(1<<2)
+#define RF_CHANNEL (1 << 0)
+#define INET_CHANNEL (1 << 1)
+#define TNC_CHANNEL (1 << 2)
 
 typedef struct txDispStruct
 {
@@ -317,6 +318,20 @@ typedef struct txDispStruct
 	char name[12];
 	char info[50];
 } txDisp;
+
+typedef struct pppStruct
+{
+	char manufacturer[20];
+	char model[20];
+	char imei[16];
+	char oper[20];
+	char imsi[16];
+	uint32_t ip;
+	uint32_t dns;
+	uint32_t gateway;
+	uint32_t netmask;
+	int rssi;
+} pppType;
 
 #if defined OLED || defined ST7735_160x80
 const unsigned char LOGO[] PROGMEM =
@@ -360,26 +375,27 @@ const float ctcss[] = {0, 67, 71.9, 74.4, 77, 79.7, 82.5, 85.4, 88.5, 91.5, 94.8
 const float wifiPwr[12][2] = {{-4, -1}, {8, 2}, {20, 5}, {28, 7}, {34, 8.5}, {44, 11}, {52, 13}, {60, 15}, {68, 17}, {74, 18.5}, {76, 19}, {78, 19.5}};
 const char RF_TYPE[14][7] = {"NONE", "SX1231", "SX1233", "SX1261", "SX1262", "SX1268", "SX1272", "SX1273", "SX1276", "SX1278", "SX1279", "SX1280", "SX1281", "SX1282"};
 const unsigned long baudrate[] = {2400, 4800, 9600, 19200, 2880, 38400, 57600, 76800, 115200, 230400, 460800, 576000, 921600};
-const char RF_MODE[5][11] = {"NONE", "LoRa", "GFSK_G3RUH","AIS","(G)FSK"};
+const char RF_MODE[5][11] = {"NONE", "LoRa", "GFSK_G3RUH", "AIS", "(G)FSK"};
 const char GNSS_PORT[5][6] = {"NONE", "UART0", "UART1", "UART2", "TCP"};
 const char TNC_PORT[4][6] = {"NONE", "UART0", "UART1", "UART2"};
 const char TNC_MODE[4][6] = {"NONE", "KISS", "TNC2", "YAESU"};
-const char WX_PORT[7][11] = {"NONE", "UART0_CSV", "UART1_CSV", "UART2_CSV", "MODBUS","SENSOR","TCP/UDP"};
+const char WX_PORT[7][11] = {"NONE", "UART0_CSV", "UART1_CSV", "UART2_CSV", "MODBUS", "SENSOR", "TCP/UDP"};
 const char MODEM_TYPE[2][10] = {"AFSK_300", "AFSK_1200"};
-const char PWR_MODE[3][10] = {"MODE A", "MODE B","MODE C"};
+const char PWR_MODE[3][10] = {"MODE A", "MODE B", "MODE C"};
 const char ACTIVATE[8][10] = {"OFF", "TRACKER", "IGATE", "DIGI", "WX", "TELEMETRY", "QUERY", "STATUS"};
-//const char SENSOR_PORT[12][15] = {"UART0_CSV", "UART1_CSV", "ADC", "I2C_0","I2C_1","CNT_0","CNT_1","MODBUS","M701_Modbus","M702_Modbus","BME280_I2C0","BME280_I2C1"};
-const char WX_SENSOR[23][19]={"Wind Course","Wind Speed","Wind Gust","Temperature","Rain 1hr","Rain 24hr","Rain Midnight","Humidity","Barometric","Luminosity","Snow","Soil Temperature","Soil Humidity","Water Temperature","Water TDS","Water Level","PM 2.5","PM 10","Co2","CH2O","TVOC","UV","SOUND"};
-const float BR1[]={1.2,2.4,4.8,9.6,12.5,19.2,25,38.4,50,57.6,76.8,100,115.2,150.0,153.6,200,250,300};
-const float BW1[]={2.6,3.1,3.9,5.2,6.3,7.8,10.4,12.5,15.6,20.8,25,31.3,41.7,50,62.5,83.3,100,125,166.7,200,250};
-const float BR2[]={4.8,5.8,7.3,9.7,11.7,14.6,19.5,23.4,29.3,39.0,46.9,58.6,78.2,93.8,117.3,156.2,187.2,234.3,312.0,373.6,467.0};
-const float BW2[]={4.8,5.8,7.3,9.7,11.7,14.6,19.5,23.4,29.3,39.0,46.9,58.6,78.2,93.8,117.3,156.2,187.2,232.3,312.0,373.6,467.0};
-const float LORA_BW[]={7.8,10.4,15.6,20.8,31.25,41.7,62.5,125,250,500};
-const char SHAPING[5][7]={"NONE","BT=0.3","BT=0.5","BT=0.7","BT=1.0"};
-const char ENCODING[3][11]={"NRZ","MANCHESTER","WHITENING"};
+// const char SENSOR_PORT[12][15] = {"UART0_CSV", "UART1_CSV", "ADC", "I2C_0","I2C_1","CNT_0","CNT_1","MODBUS","M701_Modbus","M702_Modbus","BME280_I2C0","BME280_I2C1"};
+const char WX_SENSOR[26][19] = {"Wind Course", "Wind Speed", "Wind Gust", "Temperature", "Rain 1hr", "Rain 24hr", "Rain Midnight", "Humidity", "Barometric", "Luminosity", "Snow", "Soil Temperature", "Soil Humidity", "Water Temperature", "Water TDS", "Water Level", "PM 2.5", "PM 10", "Co2", "CH2O", "TVOC", "UV", "SOUND", "VBAT", "IBAT", "VSOLAR"};
+const char MIC_E_MSG[8][10] = {"Emergency", "Priority", "Special", "Committed", "Returning", "InService", "En Route", "Off Duty"};
+const float BR1[] = {1.2, 2.4, 4.8, 9.6, 12.5, 19.2, 25, 38.4, 50, 57.6, 76.8, 100, 115.2, 150.0, 153.6, 200, 250, 300};
+const float BW1[] = {2.6, 3.1, 3.9, 5.2, 6.3, 7.8, 10.4, 12.5, 15.6, 20.8, 25, 31.3, 41.7, 50, 62.5, 83.3, 100, 125, 166.7, 200, 250};
+const float BR2[] = {4.8, 5.8, 7.3, 9.7, 11.7, 14.6, 19.5, 23.4, 29.3, 39.0, 46.9, 58.6, 78.2, 93.8, 117.3, 156.2, 187.2, 234.3, 312.0, 373.6, 467.0};
+const float BW2[] = {4.8, 5.8, 7.3, 9.7, 11.7, 14.6, 19.5, 23.4, 29.3, 39.0, 46.9, 58.6, 78.2, 93.8, 117.3, 156.2, 187.2, 232.3, 312.0, 373.6, 467.0};
+const float LORA_BW[] = {7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125, 250, 500};
+const char SHAPING[5][7] = {"NONE", "BT=0.3", "BT=0.5", "BT=0.7", "BT=1.0"};
+const char ENCODING[3][11] = {"NRZ", "MANCHESTER", "WHITENING"};
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
-//void saveEEPROM();
+// void saveEEPROM();
 void defaultConfig();
 String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);
@@ -388,31 +404,31 @@ void taskGPS(void *pvParameters);
 void taskAPRS(void *pvParameters);
 void taskAPRSPoll(void *pvParameters);
 void taskNetwork(void *pvParameters);
-void taskTNC(void *pvParameters);
+//void taskTNC(void *pvParameters);
 void sort(pkgListType a[], int size);
 void sortPkgDesc(pkgListType a[], int size);
-int processPacket(String &tnc2);
+//int processPacket(String &tnc2);
 int digiProcess(AX25Msg &Packet);
 void printTime();
-int popTNC2Raw(int &ret);
-int pushTNC2Raw(int raw);
-int pkgListUpdate(char *call, char *raw, uint16_t type);
-int pkgList_Find(char *call,char *object, uint16_t type);
+//int popTNC2Raw(int &ret);
+// int pushTNC2Raw(int raw);
+// int pkgListUpdate(char *call, char *raw, uint16_t type);
+int pkgList_Find(char *call, char *object, uint16_t type);
 int pkgList_Find(char *call, uint16_t type);
 int pkgList_Find(char *call);
 pkgListType getPkgList(int idx);
-String myBeacon(String Path);
+// String myBeacon(String Path);
 int tlmList_Find(char *call);
 int tlmListOld();
 TelemetryType getTlmList(int idx);
-void powerSave();
-void powerWakeup();
-bool powerStatus();
+// void powerSave();
+// void powerWakeup();
+// bool powerStatus();
 int packet2Raw(String &tnc2, AX25Msg &Packet);
-bool waitResponse(String &data, String rsp = "\r\n", uint32_t timeout = 1000);
-String sendIsAckMsg(String toCallSign, char *msgId);
-bool pkgTxPush(const char *info, size_t len, int dly,uint8_t Ch);
-bool pkgTxUpdate(const char *info, int delay);
+//bool waitResponse(String &data, String rsp = "\r\n", uint32_t timeout = 1000);
+//String sendIsAckMsg(String toCallSign, char *msgId);
+bool pkgTxPush(const char *info, size_t len, int dly, uint8_t Ch);
+//bool pkgTxUpdate(const char *info, int delay);
 void dispWindow(String line, uint8_t mode, bool filter);
 void dispTxWindow(txDisp txs);
 void systemDisp();
@@ -427,6 +443,6 @@ void gpsDisp();
 void radioDisp();
 void wifiDisp();
 void sensorDisp();
-void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b);
+void LED_Status(uint8_t r, uint8_t g, uint8_t b);
 
 #endif

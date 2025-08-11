@@ -13,8 +13,8 @@ typedef struct FIFOBuffer
 {
   uint16_t *begin;
   uint16_t *end;
-  uint16_t * volatile head;
-  uint16_t * volatile tail;
+  uint16_t *head;
+  uint16_t *tail;
 } FIFOBuffer;
 
 inline bool fifo_isempty(const FIFOBuffer *f) {

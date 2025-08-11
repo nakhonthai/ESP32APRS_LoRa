@@ -2,6 +2,9 @@
     "files.associations": {
         "esp_spi_flash.h": "c",
         "spi_flash.h": "c",
-        "*.tpp": "cpp"
+        "*.tpp": "cpp",
+        "cstdint": "cpp",
+        "cstdlib": "cpp",
+        "ostream": "cpp"
     }
 }

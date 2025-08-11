@@ -17,18 +17,17 @@
 #define COMMENT_SIZE 25
 #define STATUS_SIZE 50
 
-#define WX_SENSOR_NUM 23
+#define WX_SENSOR_NUM 26
 
 #define ACTIVATE_OFF 0				// Packet is disable all packet
-#define ACTIVATE_TRACKER (1 << 0)		// packet is an object
+#define ACTIVATE_TRACKER (1 << 0)	// packet is an object
 #define ACTIVATE_IGATE (1 << 1)		// packet is an item
 #define ACTIVATE_DIGI (1 << 2)		// packet is a message
-#define ACTIVATE_WX (1 << 3)			// packet is WX data
-#define ACTIVATE_TELEMETRY (1 << 4)	// packet is telemetry
+#define ACTIVATE_WX (1 << 3)		// packet is WX data
+#define ACTIVATE_TELEMETRY (1 << 4) // packet is telemetry
 #define ACTIVATE_QUERY (1 << 5)		// packet is a query
-#define ACTIVATE_STATUS (1 << 6)		// packet is status
+#define ACTIVATE_STATUS (1 << 6)	// packet is status
 #define ACTIVATE_WIFI (1 << 7)		// packet is wifi
-
 
 // #include <FS.h>
 // #include <SD.h>
@@ -38,36 +37,35 @@
 
 // #include "HardwareSerial.h"
 // #include "EEPROM.h"
-#define RF_SX1231	1
-#define RF_SX1233	2
-#define RF_SX1261	3
-#define RF_SX1262	4
-#define RF_SX1268	5
-#define RF_SX1272	6
-#define RF_SX1273	7
-#define RF_SX1276	8
-#define RF_SX1278	9
-#define RF_SX1279	10
-#define RF_SX1280	11
-#define RF_SX1281	12
-#define RF_SX1282	13
+#define RF_SX1231 1
+#define RF_SX1233 2
+#define RF_SX1261 3
+#define RF_SX1262 4
+#define RF_SX1268 5
+#define RF_SX1272 6
+#define RF_SX1273 7
+#define RF_SX1276 8
+#define RF_SX1278 9
+#define RF_SX1279 10
+#define RF_SX1280 11
+#define RF_SX1281 12
+#define RF_SX1282 13
 
-#define RF_SX123x	21
-#define RF_SX126x	22
-#define RF_SX127x	23
-#define RF_SX128x	24
+#define RF_SX123x 21
+#define RF_SX126x 22
+#define RF_SX127x 23
+#define RF_SX128x 24
 
-#define RF_MODE_OFF		0
-#define RF_MODE_LoRa 	1
-#define RF_MODE_G3RUH 	2
-#define RF_MODE_AIS 	3
-#define RF_MODE_GFSK	4
-#define RF_MODE_DPRS	5
+#define RF_MODE_OFF 0
+#define RF_MODE_LoRa 1
+#define RF_MODE_G3RUH 2
+#define RF_MODE_AIS 3
+#define RF_MODE_GFSK 4
+#define RF_MODE_DPRS 5
 
-#define MODE_A	0
-#define MODE_B	1
-#define MODE_C	2
-
+#define MODE_A 0
+#define MODE_B 1
+#define MODE_C 2
 
 typedef struct wifi_struct
 {
@@ -103,11 +101,11 @@ typedef struct Config_Struct
 	char bt_name[20];
 	uint32_t bt_pin;
 	uint8_t bt_power;
-	#if !defined(CONFIG_IDF_TARGET_ESP32)
+#if !defined(CONFIG_IDF_TARGET_ESP32)
 	char bt_uuid[37];
 	char bt_uuid_rx[37];
 	char bt_uuid_tx[37];
-	#endif
+#endif
 
 	//--RF Module
 	bool rf_en;
@@ -115,8 +113,8 @@ typedef struct Config_Struct
 	uint8_t rf_mode;
 	float rf_freq;
 	int16_t rf_freq_offset; //+-30,000Hz
-	float rf_bw; //Band Width for LoRa/GFSK
-	float rf_br; //Baud Rate for GFSK
+	float rf_bw;			// Band Width for LoRa/GFSK
+	float rf_br;			// Baud Rate for GFSK
 	uint8_t rf_sf;
 	uint8_t rf_cr;
 	uint8_t rf_sync;
@@ -126,7 +124,25 @@ typedef struct Config_Struct
 	bool rf_ax25;
 	uint8_t rf_shaping;
 	uint8_t rf_encoding;
-	
+
+#ifdef NAWS4
+	bool rf1_en;
+	uint8_t rf1_type;
+	uint8_t rf1_mode;
+	float rf1_freq;
+	int16_t rf1_freq_offset; //+-30,000Hz
+	float rf1_bw;			 // Band Width for LoRa/GFSK
+	float rf1_br;			 // Baud Rate for GFSK
+	uint8_t rf1_sf;
+	uint8_t rf1_cr;
+	uint8_t rf1_sync;
+	int8_t rf1_power;
+	uint8_t rf1_preamable;
+	uint8_t rf1_lna;
+	bool rf1_ax25;
+	uint8_t rf1_shaping;
+	uint8_t rf1_encoding;
+#endif
 
 	// IGATE
 	bool igate_en;
@@ -173,8 +189,8 @@ typedef struct Config_Struct
 	uint16_t digiFilter;
 	//--Position
 	bool digi_bcn;
-	//bool digi_compress = false;
-	//bool digi_altitude = false;
+	// bool digi_compress = false;
+	// bool digi_altitude = false;
 	bool digi_gps;
 	float digi_lat;
 	float digi_lon;
@@ -186,7 +202,7 @@ typedef struct Config_Struct
 	uint16_t digi_sts_interval;
 	char digi_status[STATUS_SIZE];
 
-// TRACKER
+	// TRACKER
 	bool trk_en;
 	bool trk_loc2rf;
 	bool trk_loc2inet;
@@ -235,8 +251,8 @@ typedef struct Config_Struct
 	float wx_lon;
 	float wx_alt;
 	uint16_t wx_interval;
-	//int8_t wx_channel = 0;
-	//uint8_t wx_type[32]; //Sensor number 32
+	// int8_t wx_channel = 0;
+	// uint8_t wx_type[32]; //Sensor number 32
 	uint32_t wx_flage;
 	char wx_object[10];
 	char wx_comment[COMMENT_SIZE];
@@ -253,7 +269,7 @@ typedef struct Config_Struct
 	char tlm0_PARM[13][10];
 	char tlm0_UNIT[13][8];
 	float tlm0_EQNS[5][3];
-	uint8_t tlm0_BITS_Active;	
+	uint8_t tlm0_BITS_Active;
 	char tlm0_comment[COMMENT_SIZE];
 	uint8_t tml0_data_channel[13];
 
@@ -269,7 +285,7 @@ typedef struct Config_Struct
 	char tlm1_PARM[13][10];
 	char tlm1_UNIT[13][8];
 	float tlm1_EQNS[5][3];
-	uint8_t tlm1_BITS_Active;	
+	uint8_t tlm1_BITS_Active;
 	char tlm1_comment[COMMENT_SIZE];
 	uint8_t tml1_data_channel[13];
 
@@ -317,12 +333,12 @@ typedef struct Config_Struct
 	// GNSS
 	bool gnss_enable;
 	int8_t gnss_pps_gpio = -1;
-	int8_t gnss_channel = 0;	
+	int8_t gnss_channel = 0;
 	uint16_t gnss_tcp_port;
 	char gnss_tcp_host[20];
 	char gnss_at_command[30];
 
-	int8_t rf_tx_gpio = -1; //LORA ANTENNA TX ENABLE
+	int8_t rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
 	int8_t rf_rx_gpio = -1;
 	int8_t rf_dio1_gpio = 3;
 	int8_t rf_reset_gpio = 5;
@@ -335,17 +351,36 @@ typedef struct Config_Struct
 	bool rf_tx_active = 1;
 	bool rf_rx_active = 1;
 	bool rf_reset_active = 0;
-	bool rf_nss_active = 0;	
+	bool rf_nss_active = 0;
+
+#ifdef NAWS4
+	int8_t rf1_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+	int8_t rf1_rx_gpio = -1;
+	int8_t rf1_dio1_gpio = 3;
+	int8_t rf1_reset_gpio = 5;
+	int8_t rf1_dio0_gpio = 4;
+	int8_t rf1_dio2_gpio = -1;
+	int8_t rf1_nss_gpio = 8;
+	int8_t rf1_sclk_gpio = 10;
+	int8_t rf1_miso_gpio = 6;
+	int8_t rf1_mosi_gpio = 7;
+	bool rf1_tx_active = 1;
+	bool rf1_rx_active = 1;
+	bool rf1_reset_active = 0;
+	bool rf1_nss_active = 0;
+#endif
 
 	bool i2c_enable;
 	int8_t i2c_sda_pin = -1;
 	int8_t i2c_sck_pin = -1;
 	int8_t i2c_rst_pin = -1;
 	uint32_t i2c_freq = 400000;
+	// #if SOC_I2C_NUM > 1
 	bool i2c1_enable;
 	int8_t i2c1_sda_pin = -1;
 	int8_t i2c1_sck_pin = -1;
 	uint32_t i2c1_freq = 100000;
+	// #endif
 
 	bool onewire_enable = false;
 	int8_t onewire_gpio = -1;
@@ -361,6 +396,13 @@ typedef struct Config_Struct
 	int8_t uart1_tx_gpio = -1;
 	int8_t uart1_rx_gpio = -1;
 	int8_t uart1_rts_gpio = -1;
+
+	// #if SOC_UART_NUM > 2
+	bool uart2_enable = false;
+	unsigned long uart2_baudrate;
+	int8_t uart2_tx_gpio = -1;
+	int8_t uart2_rx_gpio = -1;
+	// #endif
 
 	bool modbus_enable = false;
 	uint8_t modbus_address = 0;
@@ -382,18 +424,18 @@ typedef struct Config_Struct
 	// Sleep mode
 	bool pwr_en;
 	uint8_t pwr_mode;
-	uint16_t pwr_sleep_interval; //sec
-	uint16_t pwr_stanby_delay; //sec
+	uint16_t pwr_sleep_interval; // sec
+	uint16_t pwr_stanby_delay;	 // sec
 	uint8_t pwr_sleep_activate;
-	int8_t pwr_gpio=-1;
+	int8_t pwr_gpio = -1;
 	bool pwr_active = 1;
 	bool disp_flip;
 	uint8_t disp_brightness;
 
-	uint16_t log=0;
+	uint16_t log = 0;
 
 	SensorInfo sensor[SENSOR_NUMBER];
-	
+
 	bool trk_tlm_avg[5];
 	uint8_t trk_tlm_sensor[5];
 	uint8_t trk_tlm_precision[5];
@@ -421,6 +463,40 @@ typedef struct Config_Struct
 	bool wx_sensor_enable[WX_SENSOR_NUM];
 	bool wx_sensor_avg[WX_SENSOR_NUM];
 	uint8_t wx_sensor_ch[WX_SENSOR_NUM];
+
+	bool ppp_enable = false;
+	char ppp_apn[32];
+	char ppp_pin[8];
+	int8_t ppp_rst_gpio = -1;
+	int8_t ppp_tx_gpio = -1;
+	int8_t ppp_rx_gpio = -1;
+	int8_t ppp_rts_gpio = -1;
+	int8_t ppp_cts_gpio = -1;
+	int8_t ppp_dtr_gpio = -1;
+	int8_t ppp_ri_gpio = -1;
+	bool ppp_rst_active = 0;
+	uint16_t ppp_rst_delay = 1000;
+	int8_t ppp_pwr_gpio = -1;
+	bool ppp_pwr_active = 0;
+	uint8_t ppp_serial = 1;
+	unsigned long ppp_serial_baudrate = 115200;
+	uint8_t ppp_model = 0;
+	uint8_t ppp_flow_ctrl = 0;
+	bool ppp_gnss = false;
+
+	// MQTT Config
+	bool en_mqtt;
+	char mqtt_host[63];
+	char mqtt_topic[63];
+	char mqtt_subscribe[63];
+	uint16_t mqtt_port;
+
+	uint8_t trk_mice_type;
+	uint8_t trk_tlm_interval;
+	uint8_t digi_tlm_interval;
+	uint8_t igate_tlm_interval;
+	uint8_t wx_tlm_interval;
+	char host_name[32];
 
 } Configuration;
 

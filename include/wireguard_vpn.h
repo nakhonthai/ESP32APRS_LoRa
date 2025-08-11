@@ -46,6 +46,8 @@ bool wireguard_active();
 void wireguard_remove();
 void wireguard_setup();
 
+bool wireguard_up();
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

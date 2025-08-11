@@ -6,8 +6,12 @@
 #include <WiFiClient.h>
 
 // PhysicalLayer *lora; // TODO: Remove this
+#include "RadioHal.hpp"
 
 ICACHE_RAM_ATTR IRadioHal *radioHal;
+#ifdef NAWS4
+ICACHE_RAM_ATTR IRadioHal *radioHal1;
+#endif
 
 extern float rssi;
 extern float snr;
@@ -98,6 +102,22 @@ uint8_t *txBufPtr;
 size_t txBuf_len;
 int remLength;
 bool flagAddFifo = false;
+
+#ifdef NAWS4
+bool received1 = false;
+bool eInterrupt1 = true;
+bool noisyInterrupt1 = false;
+uint8_t *rx1Buff = NULL;
+int rx1BuffLen = 0;
+bool flagGetFifo1 = false;
+bool flagAddFifo1 = false;
+uint8_t *txBufPtr1;
+size_t txBuf_len1;
+int remLength1;
+unsigned long rxTimeout1 = 0;
+bool fifoLock1 = false;
+bool fifoTxLock1 = false;
+#endif
 
 bool fifoLock = false;
 bool fifoTxLock = false;
@@ -192,15 +212,15 @@ void startRx()
         uint8_t syncWord[] = {0xd9};
         radioHal->setSyncWord(syncWord, sizeof(syncWord));
         rxTimeout = millis() + 60000;
-        //if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+        // if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
         //{
 
-            //rxTimeout = millis() + 10000;
-            //     radioHal->setFifoFullAction(fifoGet);
-            //     radioHal->fixedPacketLengthMode(0);
-            // }else if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
-            // {
-            //     radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+        // rxTimeout = millis() + 10000;
+        //      radioHal->setFifoFullAction(fifoGet);
+        //      radioHal->fixedPacketLengthMode(0);
+        //  }else if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+        //  {
+        //      radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
         //}
     }
     else
@@ -246,6 +266,103 @@ void radioRecvStatus()
     }
     afskSync = true;
 }
+
+#ifdef NAWS4
+ICACHE_RAM_ATTR void fifoAdd1(void)
+{
+    if (ax25_stateTx && remLength > 0)
+        flagAddFifo1 = true;
+}
+
+ICACHE_RAM_ATTR void fifoGet1(void)
+{
+    if (!ax25_stateTx)
+    {
+        flagGetFifo1 = true;
+        // log_d("RX: %u",millis());
+    }
+}
+
+ICACHE_RAM_ATTR void setFlag1()
+{
+    // log_d("Interrupt DIO0 milis=%u", millis());
+    if (received1 || !eInterrupt1)
+        noisyInterrupt1 = true;
+
+    if (!eInterrupt1)
+        return;
+
+    received = true;
+}
+
+ICACHE_RAM_ATTR void enableInterrupt1()
+{
+    eInterrupt1 = true;
+}
+
+ICACHE_RAM_ATTR void disableInterrupt1()
+{
+    eInterrupt1 = false;
+}
+
+void radioSleep1()
+{
+    radioHal1->sleep();
+}
+
+void startRx1()
+{
+    received1 = false;
+    flagGetFifo = false;
+
+    if (rx1Buff == NULL)
+    {
+        rx1Buff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+        memset(rx1Buff, 0, MAX_RFBUFF);
+        rx1BuffLen = 0;
+    }
+    else
+    {
+        memset(rxBuff, 0, MAX_RFBUFF);
+        rx1BuffLen = 0;
+    }
+
+    if (config.rf1_mode == RF_MODE_G3RUH)
+    {
+        uint8_t syncWord[] = {0xd9};
+        radioHal->setSyncWord(syncWord, sizeof(syncWord));
+        rxTimeout1 = millis() + 60000;
+    }
+    else
+    {
+        rxTimeout1 = millis() + 900000;
+    }
+
+    enableInterrupt();
+    // put module back to listen mode
+    radioHal1->startReceive();
+}
+
+void radioRecvStatus1()
+{
+    if (config.rf1_mode == RF_MODE_LoRa)
+    {
+        rssi = radioHal1->getRSSI(true, false);
+        snr = radioHal1->getSNR();
+        freqErr = radioHal1->getFrequencyError();
+        // print RSSI (Received Signal Strength Indicator)
+        log_d("[LoRa1] RSSI:%.0f dBm\tSNR:%.0f dBm\tFreqErr:%.0f Hz", rssi, snr, freqErr);
+    }
+    else
+    {
+        rssi = radioHal1->getRSSI(false, true);
+        if (rssi > fskRSSI)
+            fskRSSI = rssi;
+        // log_d("[GFSK] RSSI:%.0f dBm", rssi);
+    }
+    afskSync = true;
+}
+#endif
 
 // void APRS_sendTNC2Pkt(String raw)
 void APRS_sendTNC2Pkt(uint8_t *raw, size_t length)
@@ -318,24 +435,18 @@ int APRS_getTNC2(String info)
     return sz;
 }
 
-void APRS_setFreq(float freq)
-{
-    // radioHal->setFrequency(freq);
-    // radioHal->startReceive();
-}
-
 bool APRS_init(Configuration *cfg)
 {
     bool ret = true;
     int state = -1;
-    if (config.rf_en == false)
-        return false;
+    // if (config.rf_en == false)
+    //     return false;
 
-    if (config.rf_type == 0)
-        return true;
+    // if (config.rf_type == 0)
+    //     return true;
 
-    if (config.rf_type < 0 || config.rf_type > 13)
-        return false;
+    // if (config.rf_type < 0 || config.rf_type > 13)
+    //     return false;
 
     // SX127x
     // setDio0Action->getIRQ  (PayloadReady,PacketSent)
@@ -344,223 +455,449 @@ bool APRS_init(Configuration *cfg)
     // SX126x,SX128x
     // setDio0Action->setDio1Action->getIRQ
     spi.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio, config.rf_nss_gpio);
-    log_d("[SX12xx] Initializing .. ");
-    if (cfg->rf_type == RF_SX1278)
+    if (config.rf_en)
     {
-        log_d("Init chip SX1278");
-        radioHal = new RadioHal<SX1278>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1272)
-    {
-        log_d("Init chip SX1272");
-        radioHal = new RadioHal<SX1272>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1273)
-    {
-        log_d("Init chip SX1273");
-        radioHal = new RadioHal<SX1273>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1276)
-    {
-        log_d("Init chip SX1276");
-        radioHal = new RadioHal<SX1276>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1279)
-    {
-        log_d("Init chip SX1279");
-        radioHal = new RadioHal<SX1279>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1268)
-    {
-        log_d("Init chip SX1268");
-        radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1261)
-    {
-        log_d("Init chip SX1262");
-        radioHal = new RadioHal<SX1261>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1262)
-    {
-        log_d("Init chip SX1262");
-        radioHal = new RadioHal<SX1262>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1280)
-    {
-        log_d("Init chip SX1280");
-        radioHal = new RadioHal<SX1280>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1281)
-    {
-        log_d("Init chip SX1281");
-        radioHal = new RadioHal<SX1281>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    else if (cfg->rf_type == RF_SX1282)
-    {
-        log_d("Init chip SX1282");
-        radioHal = new RadioHal<SX1282>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-    // else if (cfg->rf_type == RF_SX1231)
-    // {
-    //     log_d("Init chip SX1231");
-    //     radioHal = new RadioHal<SX1231>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    // }
-    // else if (cfg->rf_type == RF_SX1233)
-    // {
-    //     log_d("Init chip SX1233");
-    //     radioHal = new RadioHal<SX1233>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    // }
-    else
-    {
-        log_d("Init chip Unknow default SX1268");
-        radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-    }
-
-    if (radioHal == NULL)
-        return false;
-
-    if (cfg->rf_rx_gpio != -1 && config.rf_tx_gpio != -1)
-    {
-        radioHal->setRfSwitchPins(config.rf_rx_gpio, config.rf_tx_gpio);
-        log_d("setRfSwitchPins(RxEn->GPIO %d, TxEn->GPIO %d)", config.rf_rx_gpio, config.rf_tx_gpio);
-    }
-
-    log_d("[%d] Begin... ", config.rf_type);
-    if ((cfg->rf_type == RF_SX1231) || (cfg->rf_type == RF_SX1233) || (config.rf_mode == RF_MODE_G3RUH) || (config.rf_mode == RF_MODE_AIS) || (config.rf_mode == RF_MODE_GFSK))
-    {
-        // state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_baudrate, config.rf_bw, config.rf_bw, config.rf_power, config.rf_preamable, 0, 1.6);
-        state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_br, config.rf_br * 0.25f, config.rf_bw, config.rf_power, config.rf_preamable, false, 1.6);
-        if (state == RADIOLIB_ERR_NONE)
+        log_d("[SX12xx] Initializing .. ");
+        if (cfg->rf_type == RF_SX1278)
         {
-            ret = true;
-            log_d("FSK begin success!");
+            log_d("Init chip SX1278");
+            radioHal = new RadioHal<SX1278>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1272)
+        {
+            log_d("Init chip SX1272");
+            radioHal = new RadioHal<SX1272>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1273)
+        {
+            log_d("Init chip SX1273");
+            radioHal = new RadioHal<SX1273>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1276)
+        {
+            log_d("Init chip SX1276");
+            radioHal = new RadioHal<SX1276>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1279)
+        {
+            log_d("Init chip SX1279");
+            radioHal = new RadioHal<SX1279>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1268)
+        {
+            log_d("Init chip SX1268");
+            radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1261)
+        {
+            log_d("Init chip SX1262");
+            radioHal = new RadioHal<SX1261>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1262)
+        {
+            log_d("Init chip SX1262");
+            radioHal = new RadioHal<SX1262>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1280)
+        {
+            log_d("Init chip SX1280");
+            radioHal = new RadioHal<SX1280>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1281)
+        {
+            log_d("Init chip SX1281");
+            radioHal = new RadioHal<SX1281>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf_type == RF_SX1282)
+        {
+            log_d("Init chip SX1282");
+            radioHal = new RadioHal<SX1282>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        // else if (cfg->rf_type == RF_SX1231)
+        // {
+        //     log_d("Init chip SX1231");
+        //     radioHal = new RadioHal<SX1231>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        // }
+        // else if (cfg->rf_type == RF_SX1233)
+        // {
+        //     log_d("Init chip SX1233");
+        //     radioHal = new RadioHal<SX1233>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        // }
+        else
+        {
+            log_d("Init chip Unknow default SX1268");
+            radioHal = new RadioHal<SX1268>(new Module(config.rf_nss_gpio, config.rf_dio1_gpio, config.rf_reset_gpio, config.rf_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+
+        if (radioHal == NULL)
+            return false;
+
+        if (cfg->rf_rx_gpio != -1 && config.rf_tx_gpio != -1)
+        {
+            radioHal->setRfSwitchPins(config.rf_rx_gpio, config.rf_tx_gpio);
+            log_d("setRfSwitchPins(RxEn->GPIO %d, TxEn->GPIO %d)", config.rf_rx_gpio, config.rf_tx_gpio);
+        }
+
+        log_d("[%d] Begin... ", config.rf_type);
+        if ((cfg->rf_type == RF_SX1231) || (cfg->rf_type == RF_SX1233) || (config.rf_mode == RF_MODE_G3RUH) || (config.rf_mode == RF_MODE_AIS) || (config.rf_mode == RF_MODE_GFSK))
+        {
+            // state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_baudrate, config.rf_bw, config.rf_bw, config.rf_power, config.rf_preamable, 0, 1.6);
+            state = radioHal->beginFSK(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_br, config.rf_br * 0.25f, config.rf_bw, config.rf_power, config.rf_preamable, false, 1.6);
+            if (state == RADIOLIB_ERR_NONE)
+            {
+                ret = true;
+                log_d("FSK begin success!");
+            }
+            else
+            {
+                ret = false;
+                log_d("failed, code %d", state);
+            }
         }
         else
         {
-            ret = false;
-            log_d("failed, code %d", state);
+            state = radioHal->begin(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_bw, config.rf_sf, config.rf_cr, config.rf_sync, config.rf_power, config.rf_preamable, 1, 1.6);
+            if (state == RADIOLIB_ERR_NONE)
+            {
+                ret = true;
+                log_d("[LoRa] Init success!");
+            }
+            else
+            {
+                ret = false;
+                log_d("[LoRa] Init failed, code %d", state);
+            }
         }
-    }
-    else
-    {
-        state = radioHal->begin(config.rf_freq + (config.rf_freq_offset / 1000000.0), config.rf_bw, config.rf_sf, config.rf_cr, config.rf_sync, config.rf_power, config.rf_preamable, 1, 1.6);
-        if (state == RADIOLIB_ERR_NONE)
-        {
-            ret = true;
-            log_d("[LoRa] Init success!");
-        }
-        else
-        {
-            ret = false;
-            log_d("[LoRa] Init failed, code %d", state);
-        }
-    }
 
-    if (config.rf_mode == RF_MODE_G3RUH || config.rf_mode == RF_MODE_GFSK)
-    {
-        if (config.rf_mode == RF_MODE_G3RUH)
+        if (config.rf_mode == RF_MODE_G3RUH || config.rf_mode == RF_MODE_GFSK)
         {
-            uint8_t syncWord[] = {0xd9};
-            radioHal->setSyncWord(syncWord, sizeof(syncWord));
+            if (config.rf_mode == RF_MODE_G3RUH)
+            {
+                uint8_t syncWord[] = {0xd9};
+                radioHal->setSyncWord(syncWord, sizeof(syncWord));
+                radioHal->setCRC(0);
+                log_d("Set syncWord GFSK(G3RUH) success!");
+                if (state != RADIOLIB_ERR_NONE)
+                {
+                    ret = false;
+                    log_d("Unable to set configuration, code %i", state);
+                }
+            }
+            else
+            {
+                uint8_t syncWordRX[] = {0x84, 0xB5, 0x12, 0xAD};
+                radioHal->setSyncWord(syncWordRX, 4);
+            }
+            state = radioHal->setDataShaping(config.rf_shaping);
+            state = radioHal->setEncoding(config.rf_encoding);
+            if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+            {
+
+                if (rxBuff == NULL)
+                {
+                    rxBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    memset(rxBuff, 0, MAX_RFBUFF);
+                    rxBuffLen = 0;
+                }
+                if (config.rf_dio1_gpio > -1)
+                { // Use DIO1 pin connected for fifo interrupt
+                    if (fifoTaskHandle == NULL)
+                    {
+                        xTaskCreatePinnedToCore(
+                            taskADDFifo,     /* Function to implement the task */
+                            "taskADDFifo",   /* Name of the task */
+                            2048,            /* Stack size in words */
+                            NULL,            /* Task input parameter */
+                            5,               /* Priority of the task */
+                            &fifoTaskHandle, /* Task handle. */
+                            0);              /* Core where the task should run */
+                    }
+                    radioHal->setFifoFullAction(fifoGet);
+                    radioHal->fixedPacketLengthMode(0);
+                }
+                else
+                {
+                    radioHal->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+                    radioHal->setDio0Action(setFlag);
+                }
+            }
+            else if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+            {
+                if (fifoTaskHandle != NULL)
+                    vTaskDelete(fifoTaskHandle);
+                radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+                radioHal->setDio0Action(setFlag);
+            }
+        }
+        else if (config.rf_mode == RF_MODE_AIS)
+        {
+            if (fifoTaskHandle != NULL)
+                vTaskDelete(fifoTaskHandle);
+            // uint8_t syncWord[] = {0xcc, 0xcc, 0xcc, 0xfe}; // Flag HDLC 0x7EAAAAAA, 33,cc,99,
+            uint8_t syncWord[] = {0xcc, 0xcc};
+            radioHal->setSyncWord(syncWord, 2);
             radioHal->setCRC(0);
-            log_d("Set syncWord GFSK(G3RUH) success!");
+            log_d("Set syncWord FSK AIS success!");
             if (state != RADIOLIB_ERR_NONE)
             {
                 ret = false;
                 log_d("Unable to set configuration, code %i", state);
             }
+            state = radioHal->setDataShaping(config.rf_shaping);
+            state = radioHal->setEncoding(config.rf_encoding);
+            if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+                radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+            else
+                radioHal->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+
+            radioHal->setDio0Action(setFlag);
         }
         else
         {
-            uint8_t syncWordRX[] = {0x84, 0xB5, 0x12, 0xAD};
-            radioHal->setSyncWord(syncWordRX, 4);
+            radioHal->setDio0Action(setFlag);
         }
-        state = radioHal->setDataShaping(config.rf_shaping);
-        state = radioHal->setEncoding(config.rf_encoding);
+
         if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
         {
+            radioHal->setCurrentLimit(140);
+        }
+        else
+        {
+            radioHal->setCurrentLimit(120);
+        }
 
-            if (rxBuff == NULL)
+        radioHal->setOutputPower(config.rf_power);
+
+        startRx();
+
+        if (config.igate_en || config.digi_en)
+        {
+            radioHal->setRxBoostedGainMode(true);
+        }
+    }
+
+#ifdef NAWS4
+    if (config.rf1_en)
+    {
+        log_d("[SX12xx] Module 2 Initializing .. ");
+        if (cfg->rf1_type == RF_SX1278)
+        {
+            log_d("Init chip SX1278");
+            radioHal1 = new RadioHal<SX1278>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1272)
+        {
+            log_d("Init chip SX1272");
+            radioHal1 = new RadioHal<SX1272>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1273)
+        {
+            log_d("Init chip SX1273");
+            radioHal1 = new RadioHal<SX1273>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1276)
+        {
+            log_d("Init chip SX1276");
+            radioHal1 = new RadioHal<SX1276>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1279)
+        {
+            log_d("Init chip SX1279");
+            radioHal1 = new RadioHal<SX1279>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1268)
+        {
+            log_d("Init chip SX1268");
+            radioHal1 = new RadioHal<SX1268>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1261)
+        {
+            log_d("Init chip SX1262");
+            radioHal1 = new RadioHal<SX1261>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1262)
+        {
+            log_d("Init chip SX1262");
+            radioHal1 = new RadioHal<SX1262>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1280)
+        {
+            log_d("Init chip SX1280");
+            radioHal1 = new RadioHal<SX1280>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1281)
+        {
+            log_d("Init chip SX1281");
+            radioHal1 = new RadioHal<SX1281>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        else if (cfg->rf1_type == RF_SX1282)
+        {
+            log_d("Init chip SX1282");
+            radioHal1 = new RadioHal<SX1282>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+        // else if (cfg->rf1_type == RF_SX1231)
+        // {
+        //     log_d("Init chip SX1231");
+        //     radioHal1 = new RadioHal<SX1231>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        // }
+        // else if (cfg->rf1_type == RF_SX1233)
+        // {
+        //     log_d("Init chip SX1233");
+        //     radioHal1 = new RadioHal<SX1233>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        // }
+        else
+        {
+            log_d("Init chip Unknow default SX1268");
+            radioHal1 = new RadioHal<SX1268>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        }
+
+        if (radioHal1 == NULL)
+            return false;
+
+        if (cfg->rf1_rx_gpio != -1 && config.rf1_tx_gpio != -1)
+        {
+            radioHal1->setRfSwitchPins(config.rf1_rx_gpio, config.rf1_tx_gpio);
+            log_d("setRfSwitchPins(RxEn->GPIO %d, TxEn->GPIO %d)", config.rf1_rx_gpio, config.rf1_tx_gpio);
+        }
+
+        log_d("[%d] Begin... ", config.rf1_type);
+        if ((cfg->rf1_type == RF_SX1231) || (cfg->rf1_type == RF_SX1233) || (config.rf1_mode == RF_MODE_G3RUH) || (config.rf1_mode == RF_MODE_AIS) || (config.rf1_mode == RF_MODE_GFSK))
+        {
+            // state = radioHal1->beginFSK(config.rf1_freq + (config.rf1_freq_offset / 1000000.0), config.rf_baudrate, config.rf1_bw, config.rf1_bw, config.rf1_power, config.rf1_preamable, 0, 1.6);
+            state = radioHal1->beginFSK(config.rf1_freq + (config.rf1_freq_offset / 1000000.0), config.rf1_br, config.rf1_br * 0.25f, config.rf1_bw, config.rf1_power, config.rf1_preamable, false, 1.6);
+            if (state == RADIOLIB_ERR_NONE)
             {
-                rxBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
-                memset(rxBuff, 0, MAX_RFBUFF);
-                rxBuffLen = 0;
-            }
-            if (config.rf_dio1_gpio > -1)
-            { // Use DIO1 pin connected for fifo interrupt
-                if (fifoTaskHandle == NULL)
-                {
-                    xTaskCreatePinnedToCore(
-                        taskADDFifo,     /* Function to implement the task */
-                        "taskADDFifo",   /* Name of the task */
-                        2048,            /* Stack size in words */
-                        NULL,            /* Task input parameter */
-                        5,               /* Priority of the task */
-                        &fifoTaskHandle, /* Task handle. */
-                        0);              /* Core where the task should run */
-                }
-                radioHal->setFifoFullAction(fifoGet);
-                radioHal->fixedPacketLengthMode(0);
+                ret = true;
+                log_d("FSK begin success!");
             }
             else
             {
-                radioHal->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
-                radioHal->setDio0Action(setFlag);
+                ret = false;
+                log_d("failed, code %d", state);
             }
         }
-        else if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+        else
+        {
+            state = radioHal1->begin(config.rf1_freq + (config.rf1_freq_offset / 1000000.0), config.rf1_bw, config.rf_sf, config.rf_cr, config.rf_sync, config.rf1_power, config.rf1_preamable, 1, 1.6);
+            if (state == RADIOLIB_ERR_NONE)
+            {
+                ret = true;
+                log_d("[LoRa 2] Init success!");
+            }
+            else
+            {
+                ret = false;
+                log_d("[LoRa 2] Init failed, code %d", state);
+            }
+        }
+
+        if (config.rf1_mode == RF_MODE_G3RUH || config.rf1_mode == RF_MODE_GFSK)
+        {
+            if (config.rf1_mode == RF_MODE_G3RUH)
+            {
+                uint8_t syncWord[] = {0xd9};
+                radioHal1->setSyncWord(syncWord, sizeof(syncWord));
+                radioHal1->setCRC(0);
+                log_d("Set syncWord GFSK(G3RUH) success!");
+                if (state != RADIOLIB_ERR_NONE)
+                {
+                    ret = false;
+                    log_d("Unable to set configuration, code %i", state);
+                }
+            }
+            else
+            {
+                uint8_t syncWordRX[] = {0x84, 0xB5, 0x12, 0xAD};
+                radioHal1->setSyncWord(syncWordRX, 4);
+            }
+            state = radioHal1->setDataShaping(config.rf1_shaping);
+            state = radioHal1->setEncoding(config.rf1_encoding);
+            if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
+            {
+
+                if (rxBuff == NULL)
+                {
+                    rxBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    memset(rxBuff, 0, MAX_RFBUFF);
+                    rxBuffLen = 0;
+                }
+                if (config.rf1_dio1_gpio > -1)
+                { // Use DIO1 pin connected for fifo interrupt
+                    if (fifoTaskHandle == NULL)
+                    {
+                        xTaskCreatePinnedToCore(
+                            taskADDFifo,     /* Function to implement the task */
+                            "taskADDFifo",   /* Name of the task */
+                            2048,            /* Stack size in words */
+                            NULL,            /* Task input parameter */
+                            5,               /* Priority of the task */
+                            &fifoTaskHandle, /* Task handle. */
+                            0);              /* Core where the task should run */
+                    }
+                    radioHal1->setFifoFullAction(fifoGet);
+                    radioHal1->fixedPacketLengthMode(0);
+                }
+                else
+                {
+                    radioHal1->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+                    radioHal1->setDio0Action(setFlag);
+                }
+            }
+            else if (config.rf1_type == RF_SX1261 || config.rf1_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
+            {
+                if (fifoTaskHandle != NULL)
+                    vTaskDelete(fifoTaskHandle);
+                radioHal1->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+                radioHal1->setDio0Action(setFlag);
+            }
+        }
+        else if (config.rf1_mode == RF_MODE_AIS)
         {
             if (fifoTaskHandle != NULL)
                 vTaskDelete(fifoTaskHandle);
-            radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
-            radioHal->setDio0Action(setFlag);
+            // uint8_t syncWord[] = {0xcc, 0xcc, 0xcc, 0xfe}; // Flag HDLC 0x7EAAAAAA, 33,cc,99,
+            uint8_t syncWord[] = {0xcc, 0xcc};
+            radioHal1->setSyncWord(syncWord, 2);
+            radioHal1->setCRC(0);
+            log_d("Set syncWord FSK AIS success!");
+            if (state != RADIOLIB_ERR_NONE)
+            {
+                ret = false;
+                log_d("Unable to set configuration, code %i", state);
+            }
+            state = radioHal1->setDataShaping(config.rf1_shaping);
+            state = radioHal1->setEncoding(config.rf1_encoding);
+            if (config.rf1_type == RF_SX1261 || config.rf1_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
+                radioHal1->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+            else
+                radioHal1->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+
+            radioHal1->setDio0Action(setFlag);
         }
-    }
-    else if (config.rf_mode == RF_MODE_AIS)
-    {
-        if (fifoTaskHandle != NULL)
-            vTaskDelete(fifoTaskHandle);
-        // uint8_t syncWord[] = {0xcc, 0xcc, 0xcc, 0xfe}; // Flag HDLC 0x7EAAAAAA, 33,cc,99,
-        uint8_t syncWord[] = {0xcc, 0xcc};
-        radioHal->setSyncWord(syncWord, 2);
-        radioHal->setCRC(0);
-        log_d("Set syncWord FSK AIS success!");
-        if (state != RADIOLIB_ERR_NONE)
-        {
-            ret = false;
-            log_d("Unable to set configuration, code %i", state);
-        }
-        state = radioHal->setDataShaping(config.rf_shaping);
-        state = radioHal->setEncoding(config.rf_encoding);
-        if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
-            radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
         else
-            radioHal->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+        {
+            radioHal1->setDio0Action(setFlag);
+        }
 
-        radioHal->setDio0Action(setFlag);
-    }
-    else
-    {
-        radioHal->setDio0Action(setFlag);
-    }
+        if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
+        {
+            radioHal1->setCurrentLimit(140);
+        }
+        else
+        {
+            radioHal1->setCurrentLimit(120);
+        }
 
-    if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
-    {
-        radioHal->setCurrentLimit(140);
-    }
-    else
-    {
-        radioHal->setCurrentLimit(120);
-    }
+        radioHal1->setOutputPower(config.rf1_power);
 
-    radioHal->setOutputPower(config.rf_power);
+        startRx1();
 
-    startRx();
-
-    if(config.igate_en || config.digi_en)
-    {
-        radioHal->setRxBoostedGainMode(true);
+        if (config.igate_en || config.digi_en)
+        {
+            radioHal1->setRxBoostedGainMode(true);
+        }
     }
+#endif
 
     ax25_init(&AX25, aprs_msg_callback);
     return ret;
@@ -799,8 +1136,8 @@ bool APRS_poll(void)
     }
     // check if the flag is set
     if (received)
-    {    
-        rxTimeout = millis() + 900000;   
+    {
+        rxTimeout = millis() + 900000;
         // disable the interrupt service routine while
         // processing the data
         disableInterrupt();
@@ -1060,7 +1397,7 @@ bool APRS_poll(void)
             // else
             // {
             //     radioHal->setCurrentLimit(140);
-            // }            
+            // }
 
             int byteArrLen = 300;
             uint8_t *byteArr = (uint8_t *)calloc(byteArrLen, sizeof(uint8_t));
@@ -1211,7 +1548,7 @@ bool APRS_poll(void)
                     }
                 }
                 else
-                {                    
+                {
                     radioHal->transmit(byteArr, i);
                 }
                 free(byteArr);
@@ -1232,388 +1569,388 @@ bool APRS_poll(void)
     return ret;
 }
 
-void APRS_setCallsign(char *call, int ssid)
-{
-    memset(CALL, 0, 7);
-    int i = 0;
-    while (i < 6 && call[i] != 0)
-    {
-        CALL[i] = call[i];
-        i++;
-    }
-    CALL_SSID = ssid;
-}
+// void APRS_setCallsign(char *call, int ssid)
+// {
+//     memset(CALL, 0, 7);
+//     int i = 0;
+//     while (i < 6 && call[i] != 0)
+//     {
+//         CALL[i] = call[i];
+//         i++;
+//     }
+//     CALL_SSID = ssid;
+// }
 
-void APRS_setDestination(char *call, int ssid)
-{
-    memset(DST, 0, 7);
-    int i = 0;
-    while (i < 6 && call[i] != 0)
-    {
-        DST[i] = call[i];
-        i++;
-    }
-    DST_SSID = ssid;
-}
+// void APRS_setDestination(char *call, int ssid)
+// {
+//     memset(DST, 0, 7);
+//     int i = 0;
+//     while (i < 6 && call[i] != 0)
+//     {
+//         DST[i] = call[i];
+//         i++;
+//     }
+//     DST_SSID = ssid;
+// }
 
-void APRS_setPath1(char *call, int ssid)
-{
-    memset(PATH1, 0, 7);
-    int i = 0;
-    while (i < 6 && call[i] != 0)
-    {
-        PATH1[i] = call[i];
-        i++;
-    }
-    PATH1_SSID = ssid;
-}
+// void APRS_setPath1(char *call, int ssid)
+// {
+//     memset(PATH1, 0, 7);
+//     int i = 0;
+//     while (i < 6 && call[i] != 0)
+//     {
+//         PATH1[i] = call[i];
+//         i++;
+//     }
+//     PATH1_SSID = ssid;
+// }
 
-void APRS_setPath2(char *call, int ssid)
-{
-    memset(PATH2, 0, 7);
-    int i = 0;
-    while (i < 6 && call[i] != 0)
-    {
-        PATH2[i] = call[i];
-        i++;
-    }
-    PATH2_SSID = ssid;
-}
+// void APRS_setPath2(char *call, int ssid)
+// {
+//     memset(PATH2, 0, 7);
+//     int i = 0;
+//     while (i < 6 && call[i] != 0)
+//     {
+//         PATH2[i] = call[i];
+//         i++;
+//     }
+//     PATH2_SSID = ssid;
+// }
 
-void APRS_setMessageDestination(char *call, int ssid)
-{
-    memset(message_recip, 0, 7);
-    int i = 0;
-    while (i < 6 && call[i] != 0)
-    {
-        message_recip[i] = call[i];
-        i++;
-    }
-    message_recip_ssid = ssid;
-}
+// void APRS_setMessageDestination(char *call, int ssid)
+// {
+//     memset(message_recip, 0, 7);
+//     int i = 0;
+//     while (i < 6 && call[i] != 0)
+//     {
+//         message_recip[i] = call[i];
+//         i++;
+//     }
+//     message_recip_ssid = ssid;
+// }
 
-void APRS_setPreamble(unsigned long pre)
-{
-    custom_preamble = pre;
-}
+// void APRS_setPreamble(unsigned long pre)
+// {
+//     custom_preamble = pre;
+// }
 
-void APRS_setTail(unsigned long tail)
-{
-    custom_tail = tail;
-}
+// void APRS_setTail(unsigned long tail)
+// {
+//     custom_tail = tail;
+// }
 
-void APRS_useAlternateSymbolTable(bool use)
-{
-    if (use)
-    {
-        symbolTable = '\\';
-    }
-    else
-    {
-        symbolTable = '/';
-    }
-}
+// void APRS_useAlternateSymbolTable(bool use)
+// {
+//     if (use)
+//     {
+//         symbolTable = '\\';
+//     }
+//     else
+//     {
+//         symbolTable = '/';
+//     }
+// }
 
-void APRS_setSymbol(char sym)
-{
-    symbol = sym;
-}
+// void APRS_setSymbol(char sym)
+// {
+//     symbol = sym;
+// }
 
-void APRS_setLat(char *lat)
-{
-    memset(latitude, 0, 9);
-    int i = 0;
-    while (i < 8 && lat[i] != 0)
-    {
-        latitude[i] = lat[i];
-        i++;
-    }
-}
+// void APRS_setLat(char *lat)
+// {
+//     memset(latitude, 0, 9);
+//     int i = 0;
+//     while (i < 8 && lat[i] != 0)
+//     {
+//         latitude[i] = lat[i];
+//         i++;
+//     }
+// }
 
-void APRS_setLon(char *lon)
-{
-    memset(longtitude, 0, 10);
-    int i = 0;
-    while (i < 9 && lon[i] != 0)
-    {
-        longtitude[i] = lon[i];
-        i++;
-    }
-}
+// void APRS_setLon(char *lon)
+// {
+//     memset(longtitude, 0, 10);
+//     int i = 0;
+//     while (i < 9 && lon[i] != 0)
+//     {
+//         longtitude[i] = lon[i];
+//         i++;
+//     }
+// }
 
-void APRS_setPower(int s)
-{
-    if (s >= 0 && s < 10)
-    {
-        power = s;
-    }
-}
+// void APRS_setPower(int s)
+// {
+//     if (s >= 0 && s < 10)
+//     {
+//         power = s;
+//     }
+// }
 
-void APRS_setHeight(int s)
-{
-    if (s >= 0 && s < 10)
-    {
-        height = s;
-    }
-}
+// void APRS_setHeight(int s)
+// {
+//     if (s >= 0 && s < 10)
+//     {
+//         height = s;
+//     }
+// }
 
-void APRS_setGain(int s)
-{
-    if (s >= 0 && s < 10)
-    {
-        gain = s;
-    }
-}
+// void APRS_setGain(int s)
+// {
+//     if (s >= 0 && s < 10)
+//     {
+//         gain = s;
+//     }
+// }
 
-void APRS_setDirectivity(int s)
-{
-    if (s >= 0 && s < 10)
-    {
-        directivity = s;
-    }
-}
+// void APRS_setDirectivity(int s)
+// {
+//     if (s >= 0 && s < 10)
+//     {
+//         directivity = s;
+//     }
+// }
 
-void APRS_printSettings()
-{
-    Serial.println(F("LibAPRS Settings:"));
-    Serial.print(F("Callsign:     "));
-    Serial.print(CALL);
-    Serial.print(F("-"));
-    Serial.println(CALL_SSID);
-    Serial.print(F("Destination:  "));
-    Serial.print(DST);
-    Serial.print(F("-"));
-    Serial.println(DST_SSID);
-    Serial.print(F("Path1:        "));
-    Serial.print(PATH1);
-    Serial.print(F("-"));
-    Serial.println(PATH1_SSID);
-    Serial.print(F("Path2:        "));
-    Serial.print(PATH2);
-    Serial.print(F("-"));
-    Serial.println(PATH2_SSID);
-    Serial.print(F("Message dst:  "));
-    if (message_recip[0] == 0)
-    {
-        Serial.println(F("N/A"));
-    }
-    else
-    {
-        Serial.print(message_recip);
-        Serial.print(F("-"));
-        Serial.println(message_recip_ssid);
-    }
-    Serial.print(F("TX Preamble:  "));
-    Serial.println(custom_preamble);
-    Serial.print(F("TX Tail:      "));
-    Serial.println(custom_tail);
-    Serial.print(F("Symbol table: "));
-    if (symbolTable == '/')
-    {
-        Serial.println(F("Normal"));
-    }
-    else
-    {
-        Serial.println(F("Alternate"));
-    }
-    Serial.print(F("Symbol:       "));
-    Serial.println(symbol);
-    Serial.print(F("Power:        "));
-    if (power < 10)
-    {
-        Serial.println(power);
-    }
-    else
-    {
-        Serial.println(F("N/A"));
-    }
-    Serial.print(F("Height:       "));
-    if (height < 10)
-    {
-        Serial.println(height);
-    }
-    else
-    {
-        Serial.println(F("N/A"));
-    }
-    Serial.print(F("Gain:         "));
-    if (gain < 10)
-    {
-        Serial.println(gain);
-    }
-    else
-    {
-        Serial.println(F("N/A"));
-    }
-    Serial.print(F("Directivity:  "));
-    if (directivity < 10)
-    {
-        Serial.println(directivity);
-    }
-    else
-    {
-        Serial.println(F("N/A"));
-    }
-    Serial.print(F("Latitude:     "));
-    if (latitude[0] != 0)
-    {
-        Serial.println(latitude);
-    }
-    else
-    {
-        Serial.println(F("N/A"));
-    }
-    Serial.print(F("Longtitude:   "));
-    if (longtitude[0] != 0)
-    {
-        Serial.println(longtitude);
-    }
-    else
-    {
-        Serial.println(F("N/A"));
-    }
-}
+// void APRS_printSettings()
+// {
+//     Serial.println(F("LibAPRS Settings:"));
+//     Serial.print(F("Callsign:     "));
+//     Serial.print(CALL);
+//     Serial.print(F("-"));
+//     Serial.println(CALL_SSID);
+//     Serial.print(F("Destination:  "));
+//     Serial.print(DST);
+//     Serial.print(F("-"));
+//     Serial.println(DST_SSID);
+//     Serial.print(F("Path1:        "));
+//     Serial.print(PATH1);
+//     Serial.print(F("-"));
+//     Serial.println(PATH1_SSID);
+//     Serial.print(F("Path2:        "));
+//     Serial.print(PATH2);
+//     Serial.print(F("-"));
+//     Serial.println(PATH2_SSID);
+//     Serial.print(F("Message dst:  "));
+//     if (message_recip[0] == 0)
+//     {
+//         Serial.println(F("N/A"));
+//     }
+//     else
+//     {
+//         Serial.print(message_recip);
+//         Serial.print(F("-"));
+//         Serial.println(message_recip_ssid);
+//     }
+//     Serial.print(F("TX Preamble:  "));
+//     Serial.println(custom_preamble);
+//     Serial.print(F("TX Tail:      "));
+//     Serial.println(custom_tail);
+//     Serial.print(F("Symbol table: "));
+//     if (symbolTable == '/')
+//     {
+//         Serial.println(F("Normal"));
+//     }
+//     else
+//     {
+//         Serial.println(F("Alternate"));
+//     }
+//     Serial.print(F("Symbol:       "));
+//     Serial.println(symbol);
+//     Serial.print(F("Power:        "));
+//     if (power < 10)
+//     {
+//         Serial.println(power);
+//     }
+//     else
+//     {
+//         Serial.println(F("N/A"));
+//     }
+//     Serial.print(F("Height:       "));
+//     if (height < 10)
+//     {
+//         Serial.println(height);
+//     }
+//     else
+//     {
+//         Serial.println(F("N/A"));
+//     }
+//     Serial.print(F("Gain:         "));
+//     if (gain < 10)
+//     {
+//         Serial.println(gain);
+//     }
+//     else
+//     {
+//         Serial.println(F("N/A"));
+//     }
+//     Serial.print(F("Directivity:  "));
+//     if (directivity < 10)
+//     {
+//         Serial.println(directivity);
+//     }
+//     else
+//     {
+//         Serial.println(F("N/A"));
+//     }
+//     Serial.print(F("Latitude:     "));
+//     if (latitude[0] != 0)
+//     {
+//         Serial.println(latitude);
+//     }
+//     else
+//     {
+//         Serial.println(F("N/A"));
+//     }
+//     Serial.print(F("Longtitude:   "));
+//     if (longtitude[0] != 0)
+//     {
+//         Serial.println(longtitude);
+//     }
+//     else
+//     {
+//         Serial.println(F("N/A"));
+//     }
+// }
 
-void APRS_sendPkt(void *_buffer, size_t length)
-{
+// void APRS_sendPkt(void *_buffer, size_t length)
+// {
 
-    uint8_t *buffer = (uint8_t *)_buffer;
+//     uint8_t *buffer = (uint8_t *)_buffer;
 
-    memcpy(dst.call, DST, 6);
-    dst.ssid = DST_SSID;
+//     memcpy(dst.call, DST, 6);
+//     dst.ssid = DST_SSID;
 
-    memcpy(src.call, CALL, 6);
-    src.ssid = CALL_SSID;
+//     memcpy(src.call, CALL, 6);
+//     src.ssid = CALL_SSID;
 
-    memcpy(path1.call, PATH1, 6);
-    path1.ssid = PATH1_SSID;
+//     memcpy(path1.call, PATH1, 6);
+//     path1.ssid = PATH1_SSID;
 
-    memcpy(path2.call, PATH2, 6);
-    path2.ssid = PATH2_SSID;
+//     memcpy(path2.call, PATH2, 6);
+//     path2.ssid = PATH2_SSID;
 
-    path[0] = dst;
-    path[1] = src;
-    path[2] = path1;
-    path[3] = path2;
+//     path[0] = dst;
+//     path[1] = src;
+//     path[2] = path1;
+//     path[3] = path2;
 
-    ax25_sendVia(&AX25, path, countof(path), buffer, length);
-}
+//     ax25_sendVia(&AX25, path, countof(path), buffer, length);
+// }
 
-// Dynamic RAM usage of this function is 30 bytes
-void APRS_sendLoc(void *_buffer, size_t length)
-{
-    size_t payloadLength = 20 + length;
-    bool usePHG = false;
-    if (power < 10 && height < 10 && gain < 10 && directivity < 9)
-    {
-        usePHG = true;
-        payloadLength += 7;
-    }
-    uint8_t *packet = (uint8_t *)calloc(payloadLength, sizeof(uint8_t));
-    uint8_t *ptr = packet;
-    packet[0] = '=';
-    packet[9] = symbolTable;
-    packet[19] = symbol;
-    ptr++;
-    memcpy(ptr, latitude, 8);
-    ptr += 9;
-    memcpy(ptr, longtitude, 9);
-    ptr += 10;
-    if (usePHG)
-    {
-        packet[20] = 'P';
-        packet[21] = 'H';
-        packet[22] = 'G';
-        packet[23] = power + 48;
-        packet[24] = height + 48;
-        packet[25] = gain + 48;
-        packet[26] = directivity + 48;
-        ptr += 7;
-    }
-    if (length > 0)
-    {
-        uint8_t *buffer = (uint8_t *)_buffer;
-        memcpy(ptr, buffer, length);
-    }
+// // Dynamic RAM usage of this function is 30 bytes
+// void APRS_sendLoc(void *_buffer, size_t length)
+// {
+//     size_t payloadLength = 20 + length;
+//     bool usePHG = false;
+//     if (power < 10 && height < 10 && gain < 10 && directivity < 9)
+//     {
+//         usePHG = true;
+//         payloadLength += 7;
+//     }
+//     uint8_t *packet = (uint8_t *)calloc(payloadLength, sizeof(uint8_t));
+//     uint8_t *ptr = packet;
+//     packet[0] = '=';
+//     packet[9] = symbolTable;
+//     packet[19] = symbol;
+//     ptr++;
+//     memcpy(ptr, latitude, 8);
+//     ptr += 9;
+//     memcpy(ptr, longtitude, 9);
+//     ptr += 10;
+//     if (usePHG)
+//     {
+//         packet[20] = 'P';
+//         packet[21] = 'H';
+//         packet[22] = 'G';
+//         packet[23] = power + 48;
+//         packet[24] = height + 48;
+//         packet[25] = gain + 48;
+//         packet[26] = directivity + 48;
+//         ptr += 7;
+//     }
+//     if (length > 0)
+//     {
+//         uint8_t *buffer = (uint8_t *)_buffer;
+//         memcpy(ptr, buffer, length);
+//     }
 
-    APRS_sendPkt(packet, payloadLength);
-    free(packet);
-}
+//     APRS_sendPkt(packet, payloadLength);
+//     free(packet);
+// }
 
-// Dynamic RAM usage of this function is 18 bytes
-void APRS_sendMsg(void *_buffer, size_t length)
-{
-    if (length > 67)
-        length = 67;
-    size_t payloadLength = 11 + length + 4;
+// // Dynamic RAM usage of this function is 18 bytes
+// void APRS_sendMsg(void *_buffer, size_t length)
+// {
+//     if (length > 67)
+//         length = 67;
+//     size_t payloadLength = 11 + length + 4;
 
-    uint8_t *packet = (uint8_t *)calloc(payloadLength, sizeof(uint8_t));
-    uint8_t *ptr = packet;
-    packet[0] = ':';
-    int callSize = 6;
-    int count = 0;
-    while (callSize--)
-    {
-        if (message_recip[count] != 0)
-        {
-            packet[1 + count] = message_recip[count];
-            count++;
-        }
-    }
-    if (message_recip_ssid != -1)
-    {
-        packet[1 + count] = '-';
-        count++;
-        if (message_recip_ssid < 10)
-        {
-            packet[1 + count] = message_recip_ssid + 48;
-            count++;
-        }
-        else
-        {
-            packet[1 + count] = 49;
-            count++;
-            packet[1 + count] = message_recip_ssid - 10 + 48;
-            count++;
-        }
-    }
-    while (count < 9)
-    {
-        packet[1 + count] = ' ';
-        count++;
-    }
-    packet[1 + count] = ':';
-    ptr += 11;
-    if (length > 0)
-    {
-        uint8_t *buffer = (uint8_t *)_buffer;
-        memcpy(ptr, buffer, length);
-        memcpy(lastMessage, buffer, length);
-        lastMessageLen = length;
-    }
+//     uint8_t *packet = (uint8_t *)calloc(payloadLength, sizeof(uint8_t));
+//     uint8_t *ptr = packet;
+//     packet[0] = ':';
+//     int callSize = 6;
+//     int count = 0;
+//     while (callSize--)
+//     {
+//         if (message_recip[count] != 0)
+//         {
+//             packet[1 + count] = message_recip[count];
+//             count++;
+//         }
+//     }
+//     if (message_recip_ssid != -1)
+//     {
+//         packet[1 + count] = '-';
+//         count++;
+//         if (message_recip_ssid < 10)
+//         {
+//             packet[1 + count] = message_recip_ssid + 48;
+//             count++;
+//         }
+//         else
+//         {
+//             packet[1 + count] = 49;
+//             count++;
+//             packet[1 + count] = message_recip_ssid - 10 + 48;
+//             count++;
+//         }
+//     }
+//     while (count < 9)
+//     {
+//         packet[1 + count] = ' ';
+//         count++;
+//     }
+//     packet[1 + count] = ':';
+//     ptr += 11;
+//     if (length > 0)
+//     {
+//         uint8_t *buffer = (uint8_t *)_buffer;
+//         memcpy(ptr, buffer, length);
+//         memcpy(lastMessage, buffer, length);
+//         lastMessageLen = length;
+//     }
 
-    message_seq++;
-    if (message_seq > 999)
-        message_seq = 0;
+//     message_seq++;
+//     if (message_seq > 999)
+//         message_seq = 0;
 
-    packet[11 + length] = '{';
-    int n = message_seq % 10;
-    int d = ((message_seq % 100) - n) / 10;
-    int h = (message_seq - d - n) / 100;
+//     packet[11 + length] = '{';
+//     int n = message_seq % 10;
+//     int d = ((message_seq % 100) - n) / 10;
+//     int h = (message_seq - d - n) / 100;
 
-    packet[12 + length] = h + 48;
-    packet[13 + length] = d + 48;
-    packet[14 + length] = n + 48;
+//     packet[12 + length] = h + 48;
+//     packet[13 + length] = d + 48;
+//     packet[14 + length] = n + 48;
 
-    APRS_sendPkt(packet, payloadLength);
-    free(packet);
-}
+//     APRS_sendPkt(packet, payloadLength);
+//     free(packet);
+// }
 
-void APRS_msgRetry()
-{
-    message_seq--;
-    APRS_sendMsg(lastMessage, lastMessageLen);
-}
+// void APRS_msgRetry()
+// {
+//     message_seq--;
+//     APRS_sendMsg(lastMessage, lastMessageLen);
+// }
 
 int freeMemory()
 {

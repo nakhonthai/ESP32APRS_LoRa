@@ -19,6 +19,7 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <WiFiClient.h>
+#include <NetworkUdp.h>
 #include "cppQueue.h"
 #include "digirepeater.h"
 #include "igate.h"
@@ -31,22 +32,18 @@
 #include <TinyGPS++.h>
 #include <pbuf.h>
 #include <parse_aprs.h>
-#include <Fonts/FreeSansBold9pt7b.h>
-#include <Fonts/FreeSerifItalic9pt7b.h>
-#include "Font/Seven_Segment24pt7b.h"
 
 #include "wireguard_vpn.h"
 
 #include <WiFiClientSecure.h>
 
 #include <SoftwareSerial.h>
-// SoftwareSerial ss(-1, -1);
 
 #include <ModbusMaster.h>
 
 // #include <EEPROM.h>
 
-#include "IP5306_I2C.h"
+// #include "IP5306_I2C.h"
 
 #include "sensor.h"
 
@@ -56,15 +53,123 @@
 
 #include <time.h>
 
-//#if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
+#ifdef MQTT
+#include <PubSubClient.h>
+#endif
 
-// #include <PPPoS.h>
+WiFiClient aprsClient;
+NetworkUDP aprsUDP;
+
+#ifdef APRS_LORA_HT
+// #include "AiEsp32RotaryEncoder.h"
+#define ROTARY_ENCODER_A_PIN 1
+#define ROTARY_ENCODER_B_PIN 2
+#define ROTARY_ENCODER_BUTTON_PIN 0
+
+// #define ROTARY_ENCODER_STEPS 4
+// AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, -1, ROTARY_ENCODER_STEPS);
+const int8_t KNOBDIR[] = {
+    0, -1, 1, 0,
+    1, 0, 0, -1,
+    -1, 0, 0, 1,
+    0, 1, -1, 0};
+
+volatile int8_t _oldState;
+
+volatile long _position;        // Internal position (4 times _positionExt)
+volatile long _positionExt;     // External position
+volatile long _positionExtPrev; // External position (used only for direction checking)
+
+portMUX_TYPE muxKey = portMUX_INITIALIZER_UNLOCKED;
+unsigned long keyPeriadTime;
+int encoder0Pos = 0;
+int encoder0PosPrev = 0;
+int posNow = 0;
+void IRAM_ATTR doEncoder()
+{
+    portENTER_CRITICAL_ISR(&muxKey);
+    int sig1 = digitalRead(ROTARY_ENCODER_A_PIN);
+    int sig2 = digitalRead(ROTARY_ENCODER_B_PIN);
+    int8_t thisState = sig1 | (sig2 << 1);
+
+    if (_oldState != thisState)
+    {
+        _position += KNOBDIR[thisState | (_oldState << 2)];
+        _oldState = thisState;
+        // Serial.printf("Key:%d\n", _position >> 2);
+        _positionExt = _position >> 2;
+        if (_positionExtPrev != _positionExt)
+        {
+            if (_positionExtPrev > _positionExt)
+            {
+                encoder0Pos--;
+            }
+            else if (_positionExtPrev < _positionExt)
+            {
+                encoder0Pos++;
+            }
+            _positionExtPrev = _positionExt;
+            // Serial.printf("Key:%d\n", _positionExt);
+        }
+    }
+    portEXIT_CRITICAL_ISR(&muxKey);
+}
+#endif
+
+#include <PPP.h>
+#define PPP_MODEM_APN "internet"
+#define PPP_MODEM_PIN "0000" // or NULL
+
+// WaveShare SIM7600 HW Flow Control
+// #define PPP_MODEM_RST       25
+// #define PPP_MODEM_RST_LOW   false  //active HIGH
+// #define PPP_MODEM_RST_DELAY 200
+// #define PPP_MODEM_TX        21
+// #define PPP_MODEM_RX        22
+// #define PPP_MODEM_RTS       26
+// #define PPP_MODEM_CTS       27
+// #define PPP_MODEM_FC        ESP_MODEM_FLOW_CONTROL_HW
+// #define PPP_MODEM_MODEL     PPP_MODEM_SIM7600
+
+#ifdef NAWS4
+#define PPP_MODEM_RST_DELAY 500
+#define PPP_MODEM_RST 39
+#define PPP_MODEM_RST_LOW true // active LOW
+#define PPP_MODEM_TX 41
+#define PPP_MODEM_RX 42
+#define PPP_MODEM_RTS -1
+#define PPP_MODEM_CTS -1
+#define PPP_MODEM_FC ESP_MODEM_FLOW_CONTROL_NONE
+#define PPP_MODEM_MODEL PPP_MODEM_SIM7000
+#else
+// SIM800 basic module with just TX,RX and RST
+#define PPP_MODEM_RST_DELAY 500
+#define PPP_MODEM_RST 13
+#define PPP_MODEM_RST_LOW true // active LOW
+#define PPP_MODEM_TX 12
+#define PPP_MODEM_RX 11
+#define PPP_MODEM_RTS -1
+#define PPP_MODEM_CTS -1
+#define PPP_MODEM_FC ESP_MODEM_FLOW_CONTROL_NONE
+#define PPP_MODEM_MODEL PPP_MODEM_SIM800
+#endif
+
+// #if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
+
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
 #include <XPowersLib.h>
 #define PMU_I2C_SDA (42)
 #define PMU_I2C_SCL (41)
 #define PMU_IRQ (40)
 XPowersAXP2101 PMU;
+#endif
+
+#ifdef NAWS4
+#include <XPowersLib.h>
+#define PMU_I2C_SDA (13)
+#define PMU_I2C_SCL (14)
+#define PMU_IRQ (-1)
+XPowersAXP152 PMU;
 #endif
 
 #ifdef TTGO_T_Beam_V1_2
@@ -77,8 +182,7 @@ XPowersAXP2101 PMU;
 
 // #define EEPROM_SIZE 4096
 
-
-#if APRS_LORA_DONGLE
+#ifdef APRS_LORA_DONGLE
 #define PIXELS_PIN 45
 #elif BV5DJ_BOARD
 #define PIXELS_PIN 12
@@ -104,7 +208,18 @@ XPowersAXP2101 PMU;
 #define LED_RX -1
 #endif
 
-#if APRS_LORA_DONGLE
+#ifdef STRIP_PIN
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, STRIP_PIN, NEO_GRB + NEO_KHZ800);
+// portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
+void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+{
+    // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
+    strip.setPixelColor(0, strip.Color(r, g, b));
+    strip.show();
+    // portEXIT_CRITICAL_ISR(&ledMux);
+}
+#elif defined(APRS_LORA_DONGLE)
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
 // portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
@@ -120,7 +235,7 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(2, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
 
 // portMUX_TYPE ledMux = portMUX_INITIALIZER_UNLOCKED;
-void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+void LED_Status(uint8_t r, uint8_t g, uint8_t b)
 {
     // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
     strip.setPixelColor(0, strip.Color(r, g, b));
@@ -128,7 +243,7 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
     // portEXIT_CRITICAL_ISR(&ledMux);
 }
 #else
-void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
+void LED_Status(uint8_t r, uint8_t g, uint8_t b)
 {
     // portENTER_CRITICAL_ISR(&ledMux);          // ISR start
     if (LED_TX > -1)
@@ -152,13 +267,17 @@ void IRAM_ATTR LED_Status(uint8_t r, uint8_t g, uint8_t b)
 bool i2c_busy = false;
 #include <Wire.h>
 
+#include <Fonts/FreeSansBold9pt7b.h>
+#include <Fonts/FreeSerifItalic9pt7b.h>
+#include "Font/Seven_Segment24pt7b.h"
+
 #ifdef OLED
 #include <Adafruit_GFX.h>
 #include <Adafruit_I2CDevice.h>
 
 #if defined(SSD1306_72x40)
 #define SCREEN_WIDTH 72  // OLED display width, in pixels
-#define SCREEN_HEIGHT 40 // OLED display height, in pixels 
+#define SCREEN_HEIGHT 40 // OLED display height, in pixels
 #else
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -198,8 +317,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include "Adafruit_miniTFTWing.h"
 
-#define SCREEN_WIDTH 160 
-#define SCREEN_HEIGHT 80 
+#define SCREEN_WIDTH 160
+#define SCREEN_HEIGHT 80
 
 // SPIClass hspi;
 Adafruit_miniTFTWing ss;
@@ -255,11 +374,12 @@ ModbusMaster modbus;
 #define PPP_USER ""
 #define PPP_PASS ""
 
-#ifdef __XTENSA__
-#define BOOT_PIN 0
-#else
-#define BOOT_PIN 9
-#endif
+// #ifdef __XTENSA__
+// #define BOOT_PIN 0
+// #else
+// #define BOOT_PIN 9
+// #endif
+
 #ifdef BV5DJ_BOARD
 #define BUTTON_LEFT 27
 #define BUTTON_RIGHT 32
@@ -278,8 +398,6 @@ const char *str_status[] = {
     "CONNECT_FAILED",
     "CONNECTION_LOST",
     "DISCONNECTED"};
-
-// PPPoS ppp;
 
 WiFiMulti wifiMulti;
 
@@ -304,9 +422,6 @@ AX25Msg incomingPacket;
 bool lastPkg = false;
 bool afskSync = false;
 String lastPkgRaw = "";
-// float dBV = 0;
-// float dBm = 0;
-// int mVrms = 0;
 float rssi = 0;
 float snr = 0;
 float freqErr = 0;
@@ -378,248 +493,18 @@ unsigned long timerSerial, timerSerial_old;
 
 unsigned long timeLEDoff = 500, timeLEDon = 10;
 
-SoftwareSerial SerialRF;
-
 bool firstGpsTime = true;
 time_t startTime = 0;
 
+#ifdef BLUETOOTH
 #if !defined(CONFIG_IDF_TARGET_ESP32)
+#include <NuSerial.hpp>
 #include <NimBLEDevice.h>
-#include <NimBLEServer.h>
-NimBLEServer *pServer = NULL;
-NimBLECharacteristic *pTxCharacteristic,**pGATTCharacteristic;
-bool BTdeviceConnected = false;
-bool BToldDeviceConnected = false;
-uint8_t BTtxValue = 0;
-/**  None of these are required as they will be handled by the library with defaults. **
- **                       Remove as you see fit for your needs                        */
-class ServerCallbacks : public NimBLEServerCallbacks
-{
-  void onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo) override
-  {
-    log_d("Client connect address: %s\n", connInfo.getAddress().toString().c_str());
-
-    /**
-     *  We can use the connection handle here to ask for different connection parameters.
-     *  Args: connection handle, min connection interval, max connection interval
-     *  latency, supervision timeout.
-     *  Units; Min/Max Intervals: 1.25 millisecond increments.
-     *  Latency: number of intervals allowed to skip.
-     *  Timeout: 10 millisecond increments.
-     */
-    BTdeviceConnected = true;
-    pServer->updateConnParams(connInfo.getConnHandle(), 48, 96, 1, 360);
-  }
-
-  void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override
-  {
-    log_d("Client disconnected - start advertising\n");
-    NimBLEDevice::startAdvertising();
-    BTdeviceConnected = false;
-  }
-
-  void onMTUChange(uint16_t MTU, NimBLEConnInfo &connInfo) override
-  {
-    log_d("MTU updated: %u for connection ID: %u\n", MTU, connInfo.getConnHandle());
-  }
-
-  /********************* Security handled here *********************/
-  uint32_t onPassKeyDisplay() override
-  {
-    log_d("Server Passkey Display\n");
-    /**
-     * This should return a random 6 digit number for security
-     *  or make your own static passkey as done here.
-     */
-    return 123456;
-  }
-
-  void onConfirmPassKey(NimBLEConnInfo &connInfo, uint32_t pass_key) override
-  {
-    log_d("The passkey YES/NO number: %" PRIu32 "\n", pass_key);
-    /** Inject false if passkeys don't match. */
-    NimBLEDevice::injectConfirmPasskey(connInfo, true);
-  }
-
-  void onAuthenticationComplete(NimBLEConnInfo &connInfo) override
-  {
-    /** Check that encryption was successful, if not we disconnect the client */
-    if (!connInfo.isEncrypted())
-    {
-      NimBLEDevice::getServer()->disconnect(connInfo.getConnHandle());
-      log_d("Encrypt connection failed - disconnecting client\n");
-      return;
-    }
-
-    log_d("Secured connection to: %s\n", connInfo.getAddress().toString().c_str());
-  }
-} serverCallbacks;
-
-/** Handler class for characteristic actions */
-class CharacteristicCallbacks : public NimBLECharacteristicCallbacks
-{
-  /**
-   *  The value returned in code is the NimBLE host return code.
-   */
-  void onStatus(NimBLECharacteristic *pCharacteristic, int code) override
-  {
-    log_d("Notification/Indication return code: %d, %s\n", code, NimBLEUtils::returnCodeToString(code));
-  }
-
-  /** Peer subscribed to notifications/indications */
-  void onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) override
-  {
-    std::string str = "Client ID: ";
-    str += connInfo.getConnHandle();
-    str += " Address: ";
-    str += connInfo.getAddress().toString();
-    if (subValue == 0)
-    {
-      str += " Unsubscribed to ";
-    }
-    else if (subValue == 1)
-    {
-      str += " Subscribed to notifications for ";
-    }
-    else if (subValue == 2)
-    {
-      str += " Subscribed to indications for ";
-    }
-    else if (subValue == 3)
-    {
-      str += " Subscribed to notifications and indications for ";
-    }
-    str += std::string(pCharacteristic->getUUID());
-    log_d("%s\n", str.c_str());
-  }
-} chrCallbacks;
-
-/** Handler class for descriptor actions */
-class DescriptorCallbacks : public NimBLEDescriptorCallbacks
-{
-  void onWrite(NimBLEDescriptor *pDescriptor, NimBLEConnInfo &connInfo) override
-  {
-    std::string dscVal = pDescriptor->getValue();
-    log_d("Descriptor written value: %s\n", dscVal.c_str());
-  }
-
-  void onRead(NimBLEDescriptor *pDescriptor, NimBLEConnInfo &connInfo) override
-  {
-    log_d("%s Descriptor read\n", pDescriptor->getUUID().toString().c_str());
-  }
-} dscCallbacks;
-
-class MyServerCallbacks : public NimBLEServerCallbacks
-{
-  void onConnect(NimBLEServer *pServer)
-  {
-    BTdeviceConnected = true;
-    log_d("BLE Connected");
-  };
-
-  void onDisconnect(NimBLEServer *pServer)
-  {
-    BTdeviceConnected = false;
-    log_d("BLE Disconnect");
-  }
-};
-
-class MyCallbacks : public NimBLECharacteristicCallbacks
-{
-  void onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override
-  {
-    log_d("%s : onRead(), value: %s\n",
-          pCharacteristic->getUUID().toString().c_str(),
-          pCharacteristic->getValue().c_str());
-  }
-  // void onWrite(NimBLECharacteristic *pCharacteristic)
-  //{
-  void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override
-  {
-    log_d("%s : onWrite(), Length: %d\n",
-          pCharacteristic->getUUID().toString().c_str(),
-          pCharacteristic->getLength());    
-
-    if (pCharacteristic->getLength() > 0)
-    {
-      // Serial.println("*********");
-      // Serial.print("Received Value: ");
-      // char raw[500];
-      // int i = 0;
-      // memset(raw, 0, sizeof(raw));
-      // for (i = 0; i < rxValue.length(); i++)
-      // {
-      //   if (i > sizeof(raw))
-      //     break;
-      //   raw[i] = (char)rxValue[i];
-      //   if (raw[i] == 0)
-      //     break;
-      // }
-      if (config.bt_mode == 1)
-      { // TNC2RAW MODE
-        String rxValue = pCharacteristic->getValue();
-        uint8_t SendMode = TNC_CHANNEL;
-        if (config.igate_loc2rf)
-          SendMode |= RF_CHANNEL;
-        if (config.igate_loc2inet)
-          SendMode |= INET_CHANNEL;
-        pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
-      }
-      else if (config.bt_mode == 2)
-      {
-        // KISS MODE   
-        for(int i=0;i<pCharacteristic->getLength();i++)
-          kiss_serial((uint8_t)pCharacteristic->getValue().c_str()[i]);
-        //char raw[500];   
-         
-        // int len = kiss_serial((uint8_t *)raw,(uint8_t *)pCharacteristic->getValue().c_str(),pCharacteristic->getLength());
-        // log_d("Parse KISS len=%d",len);
-        // if(len>0){          
-        //   // AX25Msg pkg;
-        //   // String tnc2;
-        //   // ax25_decode(raw, len, mV, &pkg);
-        //   // packet2Raw(tnc2, pkg);
-        //   // uint8_t SendMode = TNC_CHANNEL;
-        //   // SendMode |= RF_CHANNEL;
-        //   // pkgTxPush(tnc2.c_str(), tnc2.length(), 1, SendMode);
-        //   APRS_sendRawPkt((uint8_t *)raw, len);
-        // }
-      }
-    }
-  }
-};
 #else
 #include "BluetoothSerial.h"
 BluetoothSerial SerialBT;
-void Bluetooth()
-{
-    if (SerialBT.available())
-    {
-        char raw[500];
-        int i = 0;
-        memset(raw, 0, sizeof(raw));
-        i = SerialBT.readBytes((uint8_t *)&raw, 500);
-
-        if (config.bt_mode == 1)
-        { // TNC2RAW MODE
-            pkgTxPush(raw, strlen(raw), 1);
-        }
-        else if (config.bt_mode == 2)
-        {
-            // KISS MODE
-            for (int n = 0; n < i; n++)
-                kiss_serial((uint8_t)raw[n]);
-        }
-    }
-}
 #endif
-
-// Set your Static IP address for wifi AP
-IPAddress local_IP(192, 168, 4, 1);
-IPAddress gateway(192, 168, 4, 254);
-IPAddress subnet(255, 255, 255, 0);
-
-IPAddress vpn_IP(192, 168, 44, 195);
+#endif // !defined(CONFIG_IDF_TARGET_ESP32)
 
 int pkgTNC_count = 0;
 
@@ -636,99 +521,140 @@ typedef struct
     unsigned long timeStamp; // The time the event occured
 } pcnt_evt_t;
 
-/* Decode what PCNT's unit originated an interrupt
- * and pass this information together with the event type
- * and timestamp to the main program using a queue.
- */
-// static void IRAM_ATTR pcnt_intr_handler(void *arg)
-// {
-//     unsigned long currentMillis = millis(); // Time at instant ISR was called
-//     uint32_t intr_status = PCNT.int_st.val;
-//     int i = 0;
-//     pcnt_evt_t evt;
-//     portBASE_TYPE HPTaskAwoken = pdFALSE;
+#ifdef NAWS4
+bool setupPower()
+{
+    Wire.beginTransmission(0x30);
+    byte error = Wire.endTransmission();
+    if (error != 0)
+    {
+        pinMode(3, OUTPUT);
+        log_d("AXP152 Power OFF");
+        digitalWrite(3, LOW);
+        delay(7000);
+        digitalWrite(3, HIGH);
+        delay(1000);
+        log_d("AXP152 Power ON");
+        digitalWrite(3, LOW);
+        delay(1000);
+        digitalWrite(3, HIGH);
+    }
+    //     log_d("Scanning...");
+    //     byte error, address;
+    //     int nDevices = 0;
+    //     Wire.begin(PMU_I2C_SDA, PMU_I2C_SCL,100000);
+    // for (address = 1; address < 127; address++) {
+    // Wire.beginTransmission(address);
+    // error = Wire.endTransmission();
 
-//     for (i = 0; i < PCNT_UNIT_MAX; i++)
-//     {
-//         if (intr_status & (BIT(i)))
-//         {
-//             evt.unit = i;
-//             /* Save the PCNT event type that caused an interrupt
-//                to pass it to the main program */
-//             evt.status = PCNT.status_unit[i].val;
-//             evt.timeStamp = currentMillis;
-//             PCNT.int_clr.val = BIT(i);
-//             xQueueSendFromISR(pcnt_evt_queue, &evt, &HPTaskAwoken);
-//             if (HPTaskAwoken == pdTRUE)
-//             {
-//                 portYIELD_FROM_ISR();
-//             }
-//         }
-//     }
-// }
+    // if (error == 0) {
+    //     log_d("I2C device found at address 0x");
+    // //if (address < 16) Serial.print("0");
+    // switch(address) {
+    //     case 0x30:
+    //         log_d("30 (AXP152 PMU)");
+    //         break;
+    //     case 0x40:
+    //         log_d("40 (INA219 Power Monitor)");
+    //         break;
+    //     case 0x68:
+    //         log_d("68 (MCP3424 ADC)");
+    //         break;
+    //     default:
+    //         log_d("Found=%02X", address);
+    //         break;
+    // }
+    // nDevices++;
+    // } else if (error == 4) {
+    //     log_d("Unknown error at address 0x");
+    // if (address < 16) Serial.print("0");
+    // log_d("Found=%0X", address);
+    // }
+    // }
+    // delay(1000);
+    // Initialize the PMU with I2C communication
+    // AXP152_SLAVE_ADDRESS is the I2C address for the AXP152 PMU
+    // PMU_I2C_SDA and PMU_I2C_SCL are the GPIO pins used for I2C communication
+    bool result = PMU.begin(Wire, AXP152_SLAVE_ADDRESS, PMU_I2C_SDA, PMU_I2C_SCL);
+    if (result == false)
+    {
+        // while (1)
+        //{
+        log_d("PMU is not online...");
+        // delay(500);
+        // }
+        return false;
+    }
+    else
+    {
+        delay(1000);
+        log_d("PMU is online");
+        PMU.disablePwrOk();               // Disable PWR_OK pin, not used
+        PMU.setSysPowerDownVoltage(2600); // Set VSYS off voltage as 2800mV, Adjustment range 2600mV ~ 3300mV
+        PMU.setPowerKeyPressOnTime(0b10010101);
+        delay(500);
+        PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
+        delay(500);
+        PMU.setDC3Voltage(3400); // Set DC3 voltage to 3300mV ,VRF_V
+        delay(500);
+        PMU.setDC4Voltage(3400); // Set DC4 voltage to VRF_U
+        delay(500);
+        PMU.setALDO1Voltage(3000); // Set ALDO1 voltage to 3300mV
+        delay(500);
+        PMU.setALDO2Voltage(2000); // Set ALDO2 voltage to
+        delay(500);
+        PMU.setDLDO1Voltage(3300);           // Set DLDO1 voltage to 3300mV
+        PMU.setDLDO2Voltage(3300);           // Set DLDO2 voltage to 3300mV
+        PMU.writeRegister(0x90, 0b00000000); // GPIO0
+        PMU.writeRegister(0x91, 0b00000011); // GPIO1
+        PMU.writeRegister(0x92, 0b00000011); // GPIO2
+        PMU.writeRegister(0x93, 0b00001000); // GPIO3
+        PMU.writeRegister(0x81, 0);
+        PMU.writeRegister(0x36, 0b00001000); // PEK parameter
+        delay(500);
+        PMU.writeRegister(0x28, 0xFF);
+        delay(500);
+        // PMU.writeRegister(0x15, 0b10000001); // Set LDO0 voltage to 5000mV/1500mA
+        PMU.writeRegister(0x15, 0b00000001); // Set LDO0 voltage to 5000mV/1500mA
+        delay(500);
+        PMU.writeRegister(0x12, 0xBF);
 
-/* Initialize PCNT functions for one channel:
- *  - configure and initialize PCNT with pos-edge counting
- *  - set up the input filter
- *  - set up the counter events to watch
- * Variables:
- * UNIT - Pulse Counter #, INPUT_SIG - Signal Input Pin, INPUT_CTRL - Control Input Pin,
- * Channel - Unit input channel, H_LIM - High Limit, L_LIM - Low Limit,
- * THRESH1 - configurable limit 1, THRESH0 - configurable limit 2,
- */
-// void pcnt_init_channel(pcnt_unit_t PCNT_UNIT, int PCNT_INPUT_SIG_IO, bool ACTIVE = false, int PCNT_INPUT_CTRL_IO = PCNT_PIN_NOT_USED, pcnt_channel_t PCNT_CHANNEL = PCNT_CHANNEL_0, int PCNT_H_LIM_VAL = 65535, int PCNT_L_LIM_VAL = 0, int PCNT_THRESH1_VAL = 50, int PCNT_THRESH0_VAL = -50)
-// {
-//     /* Prepare configuration for the PCNT unit */
-//     pcnt_config_t pcnt_config;
-//     // Set PCNT input signal and control GPIOs
-//     pcnt_config.pulse_gpio_num = PCNT_INPUT_SIG_IO;
-//     pcnt_config.ctrl_gpio_num = PCNT_INPUT_CTRL_IO;
-//     pcnt_config.channel = PCNT_CHANNEL;
-//     pcnt_config.unit = PCNT_UNIT;
-//     // What to do on the positive / negative edge of pulse input?
-//     if (ACTIVE)
-//     {
-//         pcnt_config.pos_mode = PCNT_COUNT_INC; // Count up on the positive edge
-//         pcnt_config.neg_mode = PCNT_COUNT_DIS; // Keep the counter value on the negative edge
-//     }
-//     else
-//     {
-//         pcnt_config.neg_mode = PCNT_COUNT_INC; // Count up on the positive edge
-//         pcnt_config.pos_mode = PCNT_COUNT_DIS; // Keep the counter value on the negative edge
-//     }
-//     // What to do when control input is low or high?
-//     pcnt_config.lctrl_mode = PCNT_MODE_REVERSE; // Reverse counting direction if low
-//     pcnt_config.hctrl_mode = PCNT_MODE_KEEP;    // Keep the primary counter mode if high
-//     // Set the maximum and minimum limit values to watch
-//     pcnt_config.counter_h_lim = PCNT_H_LIM_VAL;
-//     pcnt_config.counter_l_lim = PCNT_L_LIM_VAL;
+        // PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
+        // PMU.enableDC1();         // Enable DC1
+        // PMU.setDC2Voltage(3300); // Set DC2 voltage to 3300mV
+        // PMU.enableDC2();         // Enable DC2
+        //  PMU.setDC3Voltage(3300); // Set DC3 voltage to 3300mV
+        //  PMU.enableDC3();         // Enable DC3
+        //  PMU.setDC4Voltage(3300); // Set DC4 voltage to 3300mV
+        //  PMU.enableDC4();         // Enable DC4
+        //  PMU.setALDO1Voltage(3300); // Set ALDO1 voltage to 3300mV
+        //  PMU.enableALDO1();         // Enable ALDO1
+        //  PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to
+        //  PMU.enableALDO2();         // Enable ALDO2
+        //  PMU.setDLDO1Voltage(3300); // Set DLDO1 voltage to 3300mV
+        //  PMU.enableDLDO1();         // Enable DLDO1
+        //  PMU.setDLDO2Voltage(3300); // Set DLDO2 voltage to 3300mV
+        //  PMU.enableDLDO2();         // Enable DLDO2
 
-//     /* Initialize PCNT unit */
-//     pcnt_unit_config(&pcnt_config);
-//     /* Configure and enable the input filter */
-//     // pcnt_set_filter_value(PCNT_UNIT, 100);
-//     // pcnt_filter_enable(PCNT_UNIT);
-
-//     /* Set threshold 0 and 1 values and enable events to watch */
-//     // pcnt_set_event_value(PCNT_UNIT, PCNT_EVT_THRES_1, PCNT_THRESH1_VAL);
-//     // pcnt_event_enable(PCNT_UNIT, PCNT_EVT_THRES_1);
-//     // pcnt_set_event_value(PCNT_UNIT, PCNT_EVT_THRES_0, PCNT_THRESH0_VAL);
-//     // pcnt_event_enable(PCNT_UNIT, PCNT_EVT_THRES_0);
-//     /* Enable events on zero, maximum and minimum limit values */
-//     pcnt_event_enable(PCNT_UNIT, PCNT_EVT_ZERO);
-//     pcnt_event_enable(PCNT_UNIT, PCNT_EVT_H_LIM);
-
-//     /* Initialize PCNT's counter */
-//     pcnt_counter_pause(PCNT_UNIT);
-//     pcnt_counter_clear(PCNT_UNIT);
-//     /* Register ISR handler and enable interrupts for PCNT unit */
-//     // pcnt_isr_register(pcnt_intr_handler, NULL, 0, &user_isr_handle);
-//     // pcnt_intr_enable(PCNT_UNIT);
-
-//     /* Everything is set up, now go to counting */
-//     pcnt_counter_resume(PCNT_UNIT);
-//     // pcnt_counter_resume(PCNT_UNIT_1);
-// }
+        delay(200);
+        log_d("DCDC=======================================================================");
+        log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
+        // log_d("DC2  : %s   Voltage:%u mV \n", PMU.isEnableDC2() ? "+" : "-", PMU.getDC2Voltage());
+        log_d("DC3  : %s   Voltage:%u mV \n", PMU.isEnableDC3() ? "+" : "-", PMU.getDC3Voltage());
+        log_d("DC4  : %s   Voltage:%u mV \n", PMU.isEnableDC4() ? "+" : "-", PMU.getDC4Voltage());
+        log_d("ALDO=======================================================================");
+        log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
+        log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
+        // log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableLDO0 ? "+" : "-", PMU.getLDO0Voltage());
+        log_d("BLDO=======================================================================");
+        log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableDLDO1() ? "+" : "-", PMU.getDLDO1Voltage());
+        log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableDLDO2() ? "+" : "-", PMU.getDLDO2Voltage());
+        log_d("===========================================================================");
+        return true;
+    }
+    return false;
+}
+#endif
 
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
 void setupPower()
@@ -1049,21 +975,21 @@ void setupPower()
     PMU.disableDLDO1();
     PMU.disableDLDO2();
 
-    log_d("DCDC=======================================================================");
-    log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
-    log_d("DC2  : %s   Voltage:%u mV \n", PMU.isEnableDC2() ? "+" : "-", PMU.getDC2Voltage());
-    log_d("DC3  : %s   Voltage:%u mV \n", PMU.isEnableDC3() ? "+" : "-", PMU.getDC3Voltage());
-    log_d("DC4  : %s   Voltage:%u mV \n", PMU.isEnableDC4() ? "+" : "-", PMU.getDC4Voltage());
-    log_d("DC5  : %s   Voltage:%u mV \n", PMU.isEnableDC5() ? "+" : "-", PMU.getDC5Voltage());
-    log_d("ALDO=======================================================================");
-    log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
-    log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
-    log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableALDO3() ? "+" : "-", PMU.getALDO3Voltage());
-    log_d("ALDO4: %s   Voltage:%u mV\n", PMU.isEnableALDO4() ? "+" : "-", PMU.getALDO4Voltage());
-    log_d("BLDO=======================================================================");
-    log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableBLDO1() ? "+" : "-", PMU.getBLDO1Voltage());
-    log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableBLDO2() ? "+" : "-", PMU.getBLDO2Voltage());
-    log_d("===========================================================================");
+    // log_d("DCDC=======================================================================");
+    // log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
+    // log_d("DC2  : %s   Voltage:%u mV \n", PMU.isEnableDC2() ? "+" : "-", PMU.getDC2Voltage());
+    // log_d("DC3  : %s   Voltage:%u mV \n", PMU.isEnableDC3() ? "+" : "-", PMU.getDC3Voltage());
+    // log_d("DC4  : %s   Voltage:%u mV \n", PMU.isEnableDC4() ? "+" : "-", PMU.getDC4Voltage());
+    // log_d("DC5  : %s   Voltage:%u mV \n", PMU.isEnableDC5() ? "+" : "-", PMU.getDC5Voltage());
+    // log_d("ALDO=======================================================================");
+    // log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
+    // log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
+    // log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableALDO3() ? "+" : "-", PMU.getALDO3Voltage());
+    // log_d("ALDO4: %s   Voltage:%u mV\n", PMU.isEnableALDO4() ? "+" : "-", PMU.getALDO4Voltage());
+    // log_d("BLDO=======================================================================");
+    // log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableBLDO1() ? "+" : "-", PMU.getBLDO1Voltage());
+    // log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableBLDO2() ? "+" : "-", PMU.getBLDO2Voltage());
+    // log_d("===========================================================================");
 
     // Set the time of pressing the button to turn off
     PMU.setPowerKeyPressOffTime(XPOWERS_POWEROFF_4S);
@@ -1181,7 +1107,7 @@ void setupPower()
 void PowerOn()
 {
 #ifdef ST7735_LED_K_Pin
-    ledcWrite(0, (uint32_t)config.disp_brightness);
+    ledcWrite(ST7735_LED_K_Pin, (uint32_t)config.disp_brightness);
 #endif
     // Power ON
     if (config.pwr_active)
@@ -1199,7 +1125,7 @@ void PowerOn()
 void PowerOff()
 {
 #ifdef ST7735_LED_K_Pin
-    ledcWrite(0, 0);
+    ledcWrite(ST7735_LED_K_Pin, 0);
 #endif
     // Power OFF
     if (config.pwr_active)
@@ -1350,48 +1276,48 @@ void telemetry_base91(char *cdata, char *output, size_t outputsize)
 /// Radians to degrees.
 #define RAD2DEG(x) (x * (180 / PI))
 
-double direction(double lon0, double lat0, double lon1, double lat1)
-{
-    double direction;
+// double direction(double lon0, double lat0, double lon1, double lat1)
+// {
+//     double direction;
 
-    /* Convert degrees into radians. */
-    lon0 = DEG2RAD(lon0);
-    lat0 = DEG2RAD(lat0);
-    lon1 = DEG2RAD(lon1);
-    lat1 = DEG2RAD(lat1);
+//     /* Convert degrees into radians. */
+//     lon0 = DEG2RAD(lon0);
+//     lat0 = DEG2RAD(lat0);
+//     lon1 = DEG2RAD(lon1);
+//     lat1 = DEG2RAD(lat1);
 
-    /* Direction from Aviation Formulary V1.42 by Ed Williams by way of
-     * http://mathforum.org/library/drmath/view/55417.html */
-    direction = atan2(sin(lon1 - lon0) * cos(lat1), cos(lat0) * sin(lat1) - sin(lat0) * cos(lat1) * cos(lon1 - lon0));
-    if (direction < 0)
-    {
-        /* Make direction positive. */
-        direction += 2 * PI;
-    }
+//     /* Direction from Aviation Formulary V1.42 by Ed Williams by way of
+//      * http://mathforum.org/library/drmath/view/55417.html */
+//     direction = atan2(sin(lon1 - lon0) * cos(lat1), cos(lat0) * sin(lat1) - sin(lat0) * cos(lat1) * cos(lon1 - lon0));
+//     if (direction < 0)
+//     {
+//         /* Make direction positive. */
+//         direction += 2 * PI;
+//     }
 
-    return RAD2DEG(direction);
-}
+//     return RAD2DEG(direction);
+// }
 
-double distance(double lon0, double lat0, double lon1, double lat1)
-{
-    double dlon;
-    double dlat;
-    double a, c;
-    /* Convert degrees into radians. */
-    lon0 = DEG2RAD(lon0);
-    lat0 = DEG2RAD(lat0);
-    lon1 = DEG2RAD(lon1);
-    lat1 = DEG2RAD(lat1);
+// double distance(double lon0, double lat0, double lon1, double lat1)
+// {
+//     double dlon;
+//     double dlat;
+//     double a, c;
+//     /* Convert degrees into radians. */
+//     lon0 = DEG2RAD(lon0);
+//     lat0 = DEG2RAD(lat0);
+//     lon1 = DEG2RAD(lon1);
+//     lat1 = DEG2RAD(lat1);
 
-    /* Use the haversine formula for distance calculation
-     * http://mathforum.org/library/drmath/view/51879.html */
-    dlon = lon1 - lon0;
-    dlat = lat1 - lat0;
-    a = pow(sin(dlat / 2), 2) + cos(lat0) * cos(lat1) * pow(sin(dlon / 2), 2);
-    c = 2 * atan2(sqrt(a), sqrt(1 - a));
+//     /* Use the haversine formula for distance calculation
+//      * http://mathforum.org/library/drmath/view/51879.html */
+//     dlon = lon1 - lon0;
+//     dlat = lat1 - lat0;
+//     a = pow(sin(dlat / 2), 2) + cos(lat0) * cos(lat1) * pow(sin(dlon / 2), 2);
+//     c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
-    return c * 6366.71; /* in kilometers */
-}
+//     return c * 6366.71; /* in kilometers */
+// }
 
 String deg2lat(double deg)
 {
@@ -1414,7 +1340,7 @@ String deg2lat(double deg)
     return String(dmm);
 }
 
-void deg2lat(char *dmm,double deg)
+void deg2lat(char *dmm, double deg)
 {
     char sign;
     if (deg > 0.0F)
@@ -1453,7 +1379,7 @@ String deg2lon(double deg)
     return String(dmm);
 }
 
-void deg2lon(char *dmm,double deg)
+void deg2lon(char *dmm, double deg)
 {
     char sign;
     if (deg > 0.0F)
@@ -1531,7 +1457,7 @@ String getValue(String data, char separator, int index)
 
 boolean isValidNumber(String str)
 {
-    for (byte i = 0; i < str.length(); i++)
+    for (int i = 0; i < str.length(); i++)
     {
         if (isDigit(str.charAt(i)))
             return true;
@@ -1552,6 +1478,7 @@ uint8_t checkSum(uint8_t *ptr, size_t count)
     return lrc;
 }
 
+#ifdef LOG_FILE
 void logTracker(double lat, double lon, double speed, double course)
 {
     char data[200];
@@ -1572,7 +1499,7 @@ void logTracker(double lat, double lon, double speed, double course)
             setTime(nowTime);
             time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
             timeval tv = {rtc, 0};
-            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
         }
     }
@@ -1599,7 +1526,7 @@ void logTracker(double lat, double lon, double speed, double course)
     {
 
         dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
-        course = direction(LastLng, LastLat, nowLng, nowLat);
+        course = aprsParse.direction(LastLng, LastLat, nowLng, nowLat);
         if (dist > 50.0F)
             dist = 0;
         if (tdiff > 10 && (nowTime > lastTimeStamp))
@@ -1713,7 +1640,7 @@ void logIGate(double lat, double lon, double speed, double course)
             setTime(nowTime);
             time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
             timeval tv = {rtc, 0};
-            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
         }
     }
@@ -1740,7 +1667,7 @@ void logIGate(double lat, double lon, double speed, double course)
     {
 
         dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
-        course = direction(LastLng, LastLat, nowLng, nowLat);
+        course = aprsParse.direction(LastLng, LastLat, nowLng, nowLat);
         if (dist > 50.0F)
             dist = 0;
         if (tdiff > 10 && (nowTime > lastTimeStamp))
@@ -1845,7 +1772,7 @@ void logDigi(double lat, double lon, double speed, double course)
             setTime(nowTime);
             time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
             timeval tv = {rtc, 0};
-            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
         }
     }
@@ -1872,7 +1799,7 @@ void logDigi(double lat, double lon, double speed, double course)
     {
 
         dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
-        course = direction(LastLng, LastLat, nowLng, nowLat);
+        course = aprsParse.direction(LastLng, LastLat, nowLng, nowLat);
         if (dist > 50.0F)
             dist = 0;
         if (tdiff > 10 && (nowTime > lastTimeStamp))
@@ -1977,7 +1904,7 @@ void logWeather(double lat, double lon, double speed, double course)
             setTime(nowTime);
             time_t rtc = nowTime - (time_t)(config.timeZone * (float)SECS_PER_HOUR);
             timeval tv = {rtc, 0};
-            timezone tz = {(time_t)(config.timeZone * (float)SECS_PER_HOUR), 0};
+            timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
         }
     }
@@ -2004,7 +1931,7 @@ void logWeather(double lat, double lon, double speed, double course)
     {
 
         dist = gps.distanceBetween(LastLng, LastLat, nowLng, nowLat);
-        course = direction(LastLng, LastLat, nowLng, nowLat);
+        course = aprsParse.direction(LastLng, LastLat, nowLng, nowLat);
         if (dist > 50.0F)
             dist = 0;
         if (tdiff > 10 && (nowTime > lastTimeStamp))
@@ -2094,6 +2021,7 @@ void logWeather(double lat, double lon, double speed, double course)
 #endif
     }
 }
+#endif // LOG_FILE
 
 // void saveEEPROM()
 // {
@@ -2139,14 +2067,13 @@ void defaultConfig()
     config.bt_mode = 1; // 0-None,1-TNC2RAW,2-KISS
     config.bt_power = 3;
     sprintf(config.bt_name, "ESP32APRS_LoRa");
-    config.bt_pin = 123456;
-    #if !defined(CONFIG_IDF_TARGET_ESP32)
-    //Bluetooth BLE
+    config.bt_pin = 0;
+#if !defined(CONFIG_IDF_TARGET_ESP32)
+    // Bluetooth BLE
     sprintf(config.bt_uuid, "00000001-ba2a-46c9-ae49-01b0961f68bb");
     sprintf(config.bt_uuid_rx, "00000002-ba2a-46c9-ae49-01b0961f68bb");
     sprintf(config.bt_uuid_tx, "00000003-ba2a-46c9-ae49-01b0961f68bb");
-    #endif
-
+#endif
 
     //--RF Module
     config.rf_en = false;
@@ -2164,8 +2091,45 @@ void defaultConfig()
     config.rf_ax25 = true;
     config.rf_br = 9.7;
     config.rf_dio2_gpio = -1;
+    config.rf_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
+    config.rf_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+
+#ifdef NAWS4
+    config.rf_en = true;
+    config.rf_type = RF_SX1278;
+    config.rf_freq = 433.775;
+    config.rf_freq_offset = 2500; //+-30,000Hz
+    config.rf_bw = 125.0;
+    config.rf_sf = 12;
+    config.rf_cr = 5;
+    config.rf_sync = 0x12;
+    config.rf_power = 20;
+    config.rf_preamable = 8;
+    config.rf_lna = 1;
+    config.rf_mode = 1;
+    config.rf_ax25 = true;
+    config.rf_br = 9.7;
     config.rf_shaping = RADIOLIB_SHAPING_0_5;
     config.rf_encoding = RADIOLIB_ENCODING_NRZ;
+
+    config.rf1_en = true;
+    config.rf1_type = RF_SX1278;
+    config.rf1_freq = 144.410;
+    config.rf1_freq_offset = 1300;
+    config.rf1_bw = 10.4F;
+    config.rf1_sf = 8;
+    config.rf1_cr = 5;
+    config.rf1_power = 20;
+    config.rf1_sync = 0x12;
+    config.rf1_power = 20;
+    config.rf1_preamable = 8;
+    config.rf1_lna = 1;
+    config.rf1_mode = 1;
+    config.rf1_ax25 = true;
+    config.rf1_br = 9.7;
+    config.rf1_shaping = RADIOLIB_SHAPING_0_5;
+    config.rf1_encoding = RADIOLIB_ENCODING_NRZ;
+#endif
 
     // IGATE
     config.igate_bcn = false;
@@ -2195,7 +2159,7 @@ void defaultConfig()
     memset(config.igate_phg, 0, sizeof(config.igate_phg));
     config.igate_path = 8;
     sprintf(config.igate_comment, "");
-    sprintf(config.igate_status, "IGATE MODE");
+    sprintf(config.igate_status, "https://github.com/nakhonthai/ESP32APRS_LoRa");
     config.igate_sts_interval = 1800;
 
     // DIGI REPEATER
@@ -2219,7 +2183,7 @@ void defaultConfig()
     sprintf(config.digi_symbol, "L#");
     memset(config.digi_phg, 0, sizeof(config.digi_phg));
     sprintf(config.digi_comment, "");
-    sprintf(config.digi_status, "DIGI MODE");
+    sprintf(config.digi_status, "https://github.com/nakhonthai/ESP32APRS_LoRa");
     config.digi_sts_interval = 1800;
 
     // Tracker
@@ -2259,7 +2223,7 @@ void defaultConfig()
     sprintf(config.trk_mycall, "NOCALL");
     sprintf(config.trk_comment, "");
     memset(config.trk_item, 0, sizeof(config.trk_item));
-    sprintf(config.trk_status, "TRACKER MODE");
+    sprintf(config.trk_status, "https://github.com/nakhonthai/ESP32APRS_LoRa");
     config.trk_sts_interval = 1800;
 
     // WX
@@ -2593,15 +2557,21 @@ void defaultConfig()
         config.wx_sensor_ch[i] = 0;
     }
 
-#ifdef OLED
-    config.i2c_enable = true;
-    config.i2c_sda_pin = 0;
-    config.i2c_sck_pin = 1;
-#else
+    // #ifdef OLED
+    //     config.i2c_enable = true;
+    //     config.i2c_sda_pin = -1;
+    //     config.i2c_sck_pin = -1;
+    // #else
     config.i2c_enable = false;
     config.i2c_sda_pin = -1;
     config.i2c_sck_pin = -1;
-#endif
+    // #endif
+
+    config.i2c_freq = 400000;
+    config.i2c1_enable = false;
+    config.i2c1_sda_pin = -1;
+    config.i2c1_sck_pin = -1;
+    config.i2c1_freq = 100000;
 
 #ifdef TTGO_LORA32_V1
     config.rf_en = true;
@@ -2692,6 +2662,10 @@ void defaultConfig()
     config.rf_nss_active = 0;
     config.pwr_gpio = -1;
     config.pwr_active = 1;
+    config.oled_enable = false;
+    config.i2c_enable = false;
+    config.i2c_sda_pin = -1;
+    config.i2c_sck_pin = -1;
 #elif defined(ESP32C3_MINI)
     config.rf_en = false;
     config.rf_type = RF_SX1268;
@@ -2949,13 +2923,55 @@ void defaultConfig()
     config.i2c_sck_pin = 47;
     config.pwr_gpio = 17;
     config.pwr_active = 1;
+#elif defined(NAWS4)
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = -1;
+    config.rf_reset_gpio = 9;
+    config.rf_dio0_gpio = 7;
+    config.rf_nss_gpio = 17;
+    config.rf_sclk_gpio = 11;
+    config.rf_miso_gpio = 15;
+    config.rf_mosi_gpio = 10;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_nss_active = 0;
+    config.rf_reset_active = 0;
+    config.rf1_tx_gpio = -1; // LORA 2 ANTENNA TX ENABLE
+    config.rf1_rx_gpio = -1;
+    config.rf1_dio1_gpio = 5;
+    config.rf1_reset_gpio = 46;
+    config.rf1_dio0_gpio = 6;
+    config.rf1_nss_gpio = 16;
+    config.rf1_sclk_gpio = 11;
+    config.rf1_miso_gpio = 15;
+    config.rf1_mosi_gpio = 10;
+    config.rf1_tx_active = 1;
+    config.rf1_rx_active = 1;
+    config.rf1_nss_active = 0;
+    config.rf1_reset_active = 0;
+    config.gnss_enable = false;
+    config.gnss_channel = 3;
+    config.uart0_enable = true;
+    config.uart0_rx_gpio = 44;
+    config.uart0_tx_gpio = 43;
+    config.uart1_enable = false;
+    config.uart1_baudrate = 115200;
+    config.uart1_rx_gpio = 42;
+    config.uart1_tx_gpio = 41;
+    config.uart1_rts_gpio = -1;
+    config.uart2_enable = true;
+    config.uart2_baudrate = 9600;
+    config.uart2_rx_gpio = 38;
+    config.uart2_tx_gpio = -1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 13;
+    config.i2c_sck_pin = 14;
+    config.i2c1_enable = true;
+    config.i2c1_sda_pin = 21;
+    config.i2c1_sck_pin = 47;
+    config.oled_enable = false;
 #endif
-
-    config.i2c_freq = 400000;
-    config.i2c1_enable = false;
-    config.i2c1_sda_pin = -1;
-    config.i2c1_sck_pin = -1;
-    config.i2c1_freq = 100000;
 
     config.counter0_enable = false;
     config.counter0_active = 0;
@@ -2975,6 +2991,63 @@ void defaultConfig()
     sprintf(config.path[3], "RFONLY");
 
     config.log = 0;
+
+    config.en_mqtt = false;
+    sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
+    sprintf(config.mqtt_topic, "/APRS/TNC2");
+    sprintf(config.mqtt_subscribe, "/APRS/CTL");
+    config.mqtt_port = 1883;
+
+    config.ppp_enable = false;
+    sprintf(config.ppp_apn, "internet");
+    sprintf(config.ppp_pin, "0000");
+    config.ppp_serial = 1;
+    config.ppp_serial_baudrate = 115200;
+    config.ppp_rx_gpio = -1;
+    config.ppp_tx_gpio = -1;
+    config.ppp_rst_gpio = -1;
+    config.ppp_rts_gpio = -1;
+    config.ppp_rst_active = 0;
+    config.ppp_dtr_gpio = -1;
+    config.ppp_cts_gpio = -1;
+    config.ppp_ri_gpio = -1;
+    config.ppp_rst_delay = 1000;
+    config.ppp_pwr_gpio = -1;
+    config.ppp_pwr_active = 1;
+
+    config.trk_mice_type = 7;
+    config.trk_tlm_interval = 0;
+    config.digi_tlm_interval = 0;
+    config.igate_tlm_interval = 0;
+    config.wx_tlm_interval = 0;
+    sprintf(config.host_name, "ESP32APRS_LoRa");
+
+#ifdef NAWS4
+    config.ppp_enable = true;
+    config.ppp_gnss = false;
+    config.en_mqtt = true;
+    sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
+    sprintf(config.mqtt_topic, "/NW0017/WEATHER/sample");
+    sprintf(config.mqtt_subscribe, "/NW0017/ctl");
+    config.mqtt_port = 1883;
+
+    config.ppp_enable = true;
+    sprintf(config.ppp_apn, "internet");
+    sprintf(config.ppp_pin, "0000");
+    config.ppp_serial = 1;
+    config.ppp_serial_baudrate = 115200;
+    config.ppp_rx_gpio = 41;
+    config.ppp_tx_gpio = 42;
+    config.ppp_rst_gpio = 8;
+    config.ppp_rts_gpio = -1;
+    config.ppp_rst_active = 0;
+    config.ppp_dtr_gpio = 39;
+    config.ppp_cts_gpio = -1;
+    config.ppp_ri_gpio = 40;
+    config.ppp_rst_delay = 1000;
+    config.ppp_pwr_gpio = -1;
+    config.ppp_pwr_active = 1;
+#endif
 
 #ifdef BUOY
     sprintf(config.wifi_ap_ssid, "CBBT00");
@@ -3486,6 +3559,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             }
             if (pkgList[i].raw)
             {
+                memset(pkgList[i].raw, 0, pkgList[i].length);
                 memcpy(pkgList[i].raw, raw, len);
                 pkgList[i].raw[len] = 0;
                 log_d("Update: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
@@ -3540,6 +3614,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         }
         if (pkgList[i].raw)
         {
+            memset(pkgList[i].raw, 0, pkgList[i].length);
             memcpy(pkgList[i].raw, raw, len);
             pkgList[i].raw[len] = 0;
             log_d("New: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
@@ -3666,28 +3741,38 @@ bool pkgTxSend()
         if (txQueue[i].Active)
         {
             int decTime = millis() - txQueue[i].timeStamp;
-            if (txQueue[i].Channel & INET_CHANNEL)
-            {
-                if (config.igate_en == false)
-                {
-                    txQueue[i].Channel &= ~INET_CHANNEL;
-                }
-                else
-                {
-                    if (aprsClient.connected())
-                    {
-                        // status.txCount++;
-                        // aprsClient.printf("%s\r\n", txQueue[i].Info); // Send packet to Inet
-                        aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
-                        aprsClient.write("\r\n");                             // Send CR LF the end frame packet
-                        txQueue[i].Channel &= ~INET_CHANNEL;
-                        log_d("TX->INET: %s", txQueue[i].Info);
-                        continue;
-                    }
-                }
-            }
             if (decTime > txQueue[i].Delay)
             {
+                if (txQueue[i].Channel & INET_CHANNEL)
+                {
+                    if (config.igate_en == false)
+                    {
+                        txQueue[i].Channel &= ~INET_CHANNEL;
+                    }
+                    else
+                    {
+                        if (!(txQueue[i].Channel & RF_CHANNEL)) // Skip RF Channel
+                        {
+                            if (aprsClient.connected())
+                            {
+                                if((config.aprs_port == 14580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
+                                {
+                                    String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
+                                    aprsUDP.beginPacket("aprs.dprns.com", 24580); // Send packet to APRS-IS (udp)
+                                    aprsUDP.write((const uint8_t *)packet.c_str(), packet.length()); // Send binary frame packet to APRS-IS (udp)
+                                    aprsUDP.endPacket();
+                                }else{
+                                    aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
+                                    aprsClient.write("\r\n");                             // Send CR LF the end frame packet
+                                }
+                                txQueue[i].Channel &= ~INET_CHANNEL;
+                                log_d("TX->INET: %s", txQueue[i].Info);
+                                continue;
+                            }
+                        }
+                    }
+                }
+
                 if (config.rf_mode == RF_MODE_AIS) // AIS for RX Only
                 {
                     txQueue[i].Channel &= ~RF_CHANNEL;
@@ -3701,7 +3786,7 @@ bool pkgTxSend()
                             char *info = (char *)calloc(txQueue[i].length + 1, sizeof(char));
                             if (info)
                             {
-                                memset(info, 0, txQueue[i].length);
+                                memset(info, 0, txQueue[i].length + 1);
                                 memcpy(info, txQueue[i].Info, txQueue[i].length);
                                 psramBusy = false;
                                 // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
@@ -3720,16 +3805,22 @@ bool pkgTxSend()
                                 // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
                                 free(info);
                                 txQueue[i].Channel &= ~RF_CHANNEL;
+                                if (txQueue[i].Channel & INET_CHANNEL)
+                                {
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if ((txQueue[i].Channel == 0) || (decTime > 60000))
+            if (decTime > 60000 || decTime < 0) // TX Timeout
             {
                 txQueue[i].Channel = 0;
                 txQueue[i].Active = false;
+                txQueue[i].Delay = 0;
+                txQueue[i].timeStamp = 0;
+                memset(txQueue[i].Info, 0, sizeof(txQueue[i].Info));
             }
         }
     }
@@ -3806,8 +3897,6 @@ uint8_t popGwRaw(uint8_t *raw)
     return size;
 }
 
-WiFiClient aprsClient;
-
 boolean APRSConnect()
 {
     // Serial.println("Connect TCP Server");
@@ -3863,6 +3952,30 @@ void postTransmission()
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
+#ifdef BLUETOOTH
+void bluetooth_init()
+{
+    if (config.bt_master == true)
+    {
+#if !defined(CONFIG_IDF_TARGET_ESP32)
+        // Initialize BLE stack and Nordic UART service
+        NimBLEDevice::init(config.bt_name);
+        NimBLEDevice::getAdvertising()->setName(config.bt_name);
+        // BLE Auth
+        if (config.bt_pin > 0)
+        {
+            NimBLEDevice::setSecurityAuth(true, true, true); /** bonding, MITM, BLE secure connections */
+            NimBLEDevice::setSecurityPasskey(config.bt_pin);
+            NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY); /** Display only passkey */
+            log_d("Bluetooth Security: Passkey %d", config.bt_pin);
+        }
+        NuSerial.begin_uuid(config.bt_uuid, config.bt_uuid_tx, config.bt_uuid_rx, 115200);
+#else
+#endif
+    }
+}
+#endif
+
 // 3 seconds WDT
 #define WDT_TIMEOUT 30
 
@@ -3870,13 +3983,23 @@ bool AFSKInitAct = false;
 unsigned long timeTask;
 void setup()
 {
-    byte *ptr;
+    // byte *ptr;
     int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
-    pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
-    Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
-    txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
-    // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
+    if (psramInit())
+    {
+        psramAddToHeap();
+        pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
+        Telemetry = (TelemetryType *)ps_malloc(sizeof(TelemetryType) * TLMLISTSIZE);
+        txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
+        // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
+    }
+    else
+    {
+        pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
+        Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
+        txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
+    }
 #else
     pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
@@ -3925,11 +4048,11 @@ void setup()
 #endif
 
     // Set up serial port
-#ifdef CORE_DEBUG_LEVEL
+    // #ifdef CORE_DEBUG_LEVEL
     Serial.begin(115200); // debug
-#else
-    Serial.begin(9600); // monitor
-#endif
+                          // #else
+    Serial.begin(9600);   // monitor
+                          // #endif
 
     if (!LITTLEFS.begin(FORMAT_LITTLEFS_IF_FAILED))
     {
@@ -3973,6 +4096,28 @@ void setup()
         if (!loadConfiguration("/default.cfg", config))
             defaultConfig();
     }
+    pinMode(BOOT_PIN, INPUT_PULLUP);
+
+    if (config.ppp_enable)
+    {
+        if (config.ppp_serial == 0)
+        {
+            config.uart0_enable = false;
+        }
+        else if (config.ppp_serial == 1)
+        {
+            config.uart1_enable = false;
+        }
+        else if (config.ppp_serial == 2)
+        {
+            config.uart2_enable = false;
+        }
+    }
+
+#ifdef STRIP_PIN
+    strip.begin();
+    strip.show();
+#endif
 
 #ifdef BUOY
     config.wifi_mode |= WIFI_AP_FIX;
@@ -3981,7 +4126,7 @@ void setup()
     timeLEDoff = 500;
     timeLEDon = 10;
 #else
-    pinMode(BOOT_PIN, INPUT_PULLUP);
+
 #ifdef BV5DJ_BOARD
     pinMode(BUTTON_LEFT, INPUT_PULLUP);
     pinMode(BUTTON_RIGHT, INPUT_PULLUP);
@@ -3993,297 +4138,291 @@ void setup()
 #endif
 #endif
 
+    if (BootReason == ESP_RST_SW)
+    {
+        delay(1000);
+        // LED_Status(0, 0, 0);
+
+        if (digitalRead(BOOT_PIN) == LOW)
+        {
+            defaultConfig();
+            log_d("Manual Default configure!");
+            while (digitalRead(BOOT_PIN) == LOW)
+            {
+                delay(500);
+                // LED_Status(255, 255, 255);
+                // delay(500);
+                // LED_Status(0, 0, 0);
+            }
+        }
+    }
+
     Sleep_Activate = config.pwr_sleep_activate;
     PowerOn();
-
+#if SOC_I2C_NUM > 1
     if (config.i2c1_enable)
     {
         Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
     }
+#endif
 
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2) || defined(NAWS4)
     setupPower();
 #endif
 
-#ifdef OLED
-    config.i2c_enable = true;
-    // pinMode(OLED_RESET,OUTPUT);
-    // digitalWrite(OLED_RESET,HIGH);
-    // delay(300);
-    Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
-
-    // #ifdef APRS_LORA_HT
-    // IP5306 ip5306(config.i2c_sda_pin,config.i2c_sck_pin);  //create instance
-
-    // //set battery voltage
-    // ip5306.set_battery_voltage(BATT_VOLTAGE_0);   //4.2V
-
-    // //Voltage Vout for charging
-    // ip5306.charger_under_voltage(VOUT_5);         //4.7V
-
-    // //set charging complete current
-    // ip5306.end_charge_current(CURRENT_400);       //400mA
-
-    // //set cutoff voltage
-    // ip5306.set_charging_stop_voltage(CUT_OFF_VOLTAGE_3);    // 4.2/4.305/4.35/4.395  V
-
-    // //set light load shutdown time
-    // ip5306.set_light_load_shutdown_time(SHUTDOWN_64s);      //64s
-
-    // //enable low battery shutdown mode
-    // ip5306.low_battery_shutdown(ENABLE);
-
-    // //allow boost even after removing Vin
-    // ip5306.boost_after_vin(ENABLE);
-
-    // //allow auto power on after load detection
-    // ip5306.power_on_load(ENABLE);
-
-    // //enable boost mode
-    // ip5306.boost_mode(ENABLE);
-    // #endif
-
-    // int i2c_timeout = 0;
-    // while (i2c_busy)
-    // {
-    //     delay(10);
-    //     if (++i2c_timeout > 20)
-    //         break;
-    // }
-    i2c_busy = true;
-    // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-    #ifdef SH1106
-        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1);
-    #else
-        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1, false);
-    #endif
-
-    // Initialising the UI will init the display too.
-    if (BootReason != ESP_RST_DEEPSLEEP)
+    if (config.oled_enable)
     {
-        if (config.disp_flip)
-            display.setRotation(2);
-        else
-            display.setRotation(0);
-        display.clearDisplay();
-        display.setTextColor(WHITE);
+#ifdef OLED
 
-        display.setTextSize(1);
-        display.setFont(&FreeSansBold9pt7b);
+        config.i2c_enable = true;
+        // pinMode(OLED_RESET,OUTPUT);
+        // digitalWrite(OLED_RESET,HIGH);
+        // delay(300);
+        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
+
+        // int i2c_timeout = 0;
+        // while (i2c_busy)
+        // {
+        //     delay(10);
+        //     if (++i2c_timeout > 20)
+        //         break;
+        // }
+        i2c_busy = true;
+// by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
+#ifdef SH1106
+        display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1);
+#else
+        display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1, false);
+#endif
+
+        // Initialising the UI will init the display too.
+        if (BootReason != ESP_RST_DEEPSLEEP)
+        {
+            if (config.disp_flip)
+                display.setRotation(2);
+            else
+                display.setRotation(0);
+            display.clearDisplay();
+            display.setTextColor(WHITE);
+
+            display.setTextSize(1);
+            display.setFont(&FreeSansBold9pt7b);
 
 #ifdef SSD1306_72x40
-        if (config.disp_flip)
-            display.setRotation(2);
-        else
-            display.setRotation(0);
-        display.clearDisplay();
-        display.drawYBitmap(0, -4, LOGO, 48, 48, WHITE);
-        display.display();
-        delay(1000);
-        LED_Status(255, 0, 0);
-        display.fillRect(50, 28, 20, 10, WHITE);
-        display.display();
-        delay(1000);
-        LED_Status(0, 255, 0);
-        display.fillRect(50, 16, 20, 10, WHITE);
-        display.display();
-        delay(1000);
-        display.fillRect(50, 4, 20, 10, WHITE);
-        display.display();
-        delay(1000);
-        // display.clearDisplay();
-        // display.setCursor(3, 19);
-        // display.printf("V%s%c", VERSION, VERSION_BUILD);
-        // display.setCursor(5, 38);
-        // display.print("@2024");
-        // display.display();
-        // delay(1000);
+            if (config.disp_flip)
+                display.setRotation(2);
+            else
+                display.setRotation(0);
+            display.clearDisplay();
+            display.drawYBitmap(0, -4, LOGO, 48, 48, WHITE);
+            display.display();
+            delay(1000);
+            LED_Status(255, 0, 0);
+            display.fillRect(50, 28, 20, 10, WHITE);
+            display.display();
+            delay(1000);
+            LED_Status(0, 255, 0);
+            display.fillRect(50, 16, 20, 10, WHITE);
+            display.display();
+            delay(1000);
+            display.fillRect(50, 4, 20, 10, WHITE);
+            display.display();
+            delay(1000);
+            // display.clearDisplay();
+            // display.setCursor(3, 19);
+            // display.printf("V%s%c", VERSION, VERSION_BUILD);
+            // display.setCursor(5, 38);
+            // display.print("@2024");
+            // display.display();
+            // delay(1000);
 // display.drawYBitmap(0, 0, LOGO, 48, 48, WHITE);
 // delay(3000);
 #else
 
-        display.setCursor(0, 15);
-        display.print("APRS");
-        display.setCursor(65, 32);
-        display.print("LoRa");
-        display.drawYBitmap(0, 16, LOGO, 48, 48, WHITE);
-        display.drawRoundRect(52, 16, 75, 22, 3, WHITE);
+            display.setCursor(0, 15);
+            display.print("APRS");
+            display.setCursor(65, 32);
+            display.print("LoRa");
+            display.drawYBitmap(0, 16, LOGO, 48, 48, WHITE);
+            display.drawRoundRect(52, 16, 75, 22, 3, WHITE);
 
+            display.setFont();
+            display.setTextColor(WHITE);
+
+            display.setCursor(60, 5);
+            display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+            display.setCursor(52, 42);
+            display.print("BOOT Wait");
+            display.display();
+            // display.setCursor(60, 40);
+            // display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+            // display.setCursor(65, 5);
+            // display.print("Copy@2024");
+            // display.display();
+
+            delay(1000);
+            LED_Status(255, 0, 0);
+            display.fillRect(49, 49, 78, 8, 0);
+            display.setCursor(70, 52);
+            display.print("After 3");
+            display.display();
+            delay(1000);
+            LED_Status(0, 255, 0);
+            display.fillRect(49, 49, 78, 8, 0);
+            display.setCursor(70, 52);
+            display.print("After 2");
+            display.display();
+            delay(1000);
+            display.fillRect(49, 49, 78, 8, 0);
+            display.setCursor(70, 52);
+            display.print("After 1");
+            display.display();
+            delay(1000);
+#endif
+
+            if (digitalRead(BOOT_PIN) == LOW)
+            {
+                defaultConfig();
+                log_d("Manual Default configure!");
+#ifdef OLED
+                display.clearDisplay();
+#ifdef SSD1306_72x40
+                display.setCursor(5, 25);
+                display.print("RST!");
+#else
+                display.setCursor(10, 22);
+                display.print("Factory Reset!");
+#endif
+                display.display();
+#endif
+                while (digitalRead(BOOT_PIN) == LOW)
+                {
+                    delay(500);
+                    LED_Status(255, 255, 255);
+                    delay(500);
+                    LED_Status(0, 0, 0);
+                }
+            }
+        }
+        else
+        {
+            showDisp = true;
+        }
         display.setFont();
         display.setTextColor(WHITE);
-
-        display.setCursor(60, 40);
-        display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
-        display.setCursor(65, 5);
-        display.print("Copy@2024");
-        display.display();
-
-        delay(1000);
-        LED_Status(255, 0, 0);
-        display.fillRect(49, 49, 50, 8, 0);
-        display.setCursor(70, 50);
-        display.print("3 Sec");
-        display.display();
-        delay(1000);
-        LED_Status(0, 255, 0);
-        display.fillRect(49, 49, 50, 8, 0);
-        display.setCursor(70, 50);
-        display.print("2 Sec");
-        display.display();
-        delay(1000);
-        display.fillRect(49, 49, 50, 8, 0);
-        display.setCursor(70, 50);
-        display.print("1 Sec");
-        display.display();
-        delay(1000);
-#endif
-
-        if (digitalRead(BOOT_PIN) == LOW)
-        {
-            defaultConfig();
-            log_d("Manual Default configure!");
-#ifdef OLED
-            display.clearDisplay();
-#ifdef SSD1306_72x40
-            display.setCursor(5, 25);
-            display.print("RST!");
-#else
-            display.setCursor(10, 22);
-            display.print("Factory Reset!");
-#endif
-            display.display();
-#endif
-            while (digitalRead(BOOT_PIN) == LOW)
-            {
-                delay(500);
-                LED_Status(255, 255, 255);
-                delay(500);
-                LED_Status(0, 0, 0);
-            }
-        }
-    }
-    else
-    {
-        showDisp = true;
-    }
-    display.setFont();
-    display.setTextColor(WHITE);
-    i2c_busy = false;
-#else
-#ifdef ST7735_160x80
-    if (config.i2c_enable)
-    {
-        Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
         i2c_busy = false;
-    }
-    TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
-    TFT_SPI.setFrequency(40000000);
-    // ledcAttachPin(ST7735_LED_K_Pin,0);
-    // pinMode(ST7735_LED_K_Pin, OUTPUT);
-    // ledcAttach(ST7735_LED_K_Pin,5000,8);
-    ledcSetup(0, 5000, 8);
-    ledcAttachPin(ST7735_LED_K_Pin, 0);
-    ledcWrite(0, config.disp_brightness);
-    display.initR(ST7735_MODEL); // initialize a ST7735S chip, mini display
-    if (config.disp_flip)
-        display.setRotation(3);
-    else
-        display.setRotation(1);
-#ifdef NV3022B3
-    uint8_t madctl = 0;
-    madctl = ST77XX_MADCTL_MY | ST77XX_MADCTL_RGB;
-    display.sendCommand(ST77XX_MADCTL, &madctl, 1);
-    display.invertDisplay(true);
 #else
-    display.invertDisplay(false);
-#endif
-    display.setAddrWindow(0, 0, 160, 80);
-    display.enableDisplay(true);
-    if (BootReason != ESP_RST_DEEPSLEEP)
-    {
-        display.fillScreen(ST77XX_BLACK);
-        display.setTextSize(1);
-        display.setFont(&FreeSansBold9pt7b);
-
-        display.setTextColor(ST77XX_YELLOW);
-        display.setCursor(10, 15);
-        display.print("APRS");
-        display.fillRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
-        display.setTextColor(ST77XX_RED);
-        display.setCursor(85, 32);
-        display.print("LoRa");
-        display.drawYBitmap(10, 26, LOGO, 48, 48, ST77XX_BLUE);
-        // display.drawRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
-
-        display.setFont();
-        display.setTextColor(ST77XX_GREEN);
-
-        display.setCursor(80, 50);
-        display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
-        display.setCursor(85, 5);
-        display.print("Copy@2024");
-        display.display();
-
-        delay(1000);
-        LED_Status(255, 0, 0);
-        display.fillRect(69, 59, 50, 8, 0);
-        display.setCursor(90, 60);
-        display.print("3 Sec");
-        display.display();
-
-        delay(1000);
-        digitalWrite(LED_RX, HIGH);
-        LED_Status(0, 255, 0);
-        display.fillRect(69, 59, 50, 8, 0);
-        display.setCursor(90, 60);
-        display.print("2 Sec");
-        display.display();
-
-        delay(1000);
-        LED_Status(0, 0, 255);
-        display.fillRect(69, 59, 50, 8, 0);
-        display.setCursor(90, 60);
-        display.print("1 Sec");
-        display.display();
-
-        delay(1000);
-        LED_Status(0, 0, 0);
-
-        if (digitalRead(BOOT_PIN) == LOW)
-        {
-            defaultConfig();
-            log_d("Manual Default configure!");
 #ifdef ST7735_160x80
-            display.fillRect(69, 59, 50, 8, 0);
-            display.setCursor(70, 60);
-            display.print("Factory Reset!");
-            display.display();
+        if (config.i2c_enable)
+        {
+            Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
+            i2c_busy = false;
+        }
+        TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
+        TFT_SPI.setFrequency(40000000);
+        ledcAttach(ST7735_LED_K_Pin, 10000, 8);
+        ledcWrite(ST7735_LED_K_Pin, config.disp_brightness);
+        display.initR(ST7735_MODEL); // initialize a ST7735S chip, mini display
+        if (config.disp_flip)
+            display.setRotation(3);
+        else
+            display.setRotation(1);
+#ifdef NV3022B3
+        uint8_t madctl = 0;
+        madctl = ST77XX_MADCTL_MY | ST77XX_MADCTL_RGB;
+        display.sendCommand(ST77XX_MADCTL, &madctl, 1);
+        display.invertDisplay(true);
+#else
+        display.invertDisplay(false);
 #endif
-            while (digitalRead(BOOT_PIN) == LOW)
+        display.setAddrWindow(0, 0, 160, 80);
+        display.enableDisplay(true);
+        if (BootReason != ESP_RST_DEEPSLEEP)
+        {
+            display.fillScreen(ST77XX_BLACK);
+            display.setTextSize(1);
+            display.setFont(&FreeSansBold9pt7b);
+
+            display.setTextColor(ST77XX_YELLOW);
+            display.setCursor(10, 15);
+            display.print("APRS");
+            display.fillRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
+            display.setTextColor(ST77XX_RED);
+            display.setCursor(85, 32);
+            display.print("LoRa");
+            display.drawYBitmap(10, 26, LOGO, 48, 48, ST77XX_BLUE);
+            // display.drawRoundRect(72, 16, 75, 22, 3, ST77XX_WHITE);
+
+            display.setFont();
+            display.setTextColor(ST77XX_GREEN);
+
+            display.setCursor(80, 50);
+            display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+            display.setCursor(85, 5);
+            display.print("Copy@2024");
+            display.display();
+
+            delay(1000);
+            LED_Status(255, 0, 0);
+            display.fillRect(69, 59, 50, 8, 0);
+            display.setCursor(90, 60);
+            display.print("3 Sec");
+            display.display();
+
+            delay(1000);
+            digitalWrite(LED_RX, HIGH);
+            LED_Status(0, 255, 0);
+            display.fillRect(69, 59, 50, 8, 0);
+            display.setCursor(90, 60);
+            display.print("2 Sec");
+            display.display();
+
+            delay(1000);
+            LED_Status(0, 0, 255);
+            display.fillRect(69, 59, 50, 8, 0);
+            display.setCursor(90, 60);
+            display.print("1 Sec");
+            display.display();
+
+            delay(1000);
+            LED_Status(0, 0, 0);
+
+            if (digitalRead(BOOT_PIN) == LOW)
             {
-                delay(500);
-                LED_Status(255, 255, 255);
-                delay(500);
-                LED_Status(0, 0, 0);
+                defaultConfig();
+                log_d("Manual Default configure!");
+#ifdef ST7735_160x80
+                display.fillRect(69, 59, 50, 8, 0);
+                display.setCursor(70, 60);
+                display.print("Factory Reset!");
+                display.display();
+#endif
+                while (digitalRead(BOOT_PIN) == LOW)
+                {
+                    delay(500);
+                    LED_Status(255, 255, 255);
+                    delay(500);
+                    LED_Status(0, 0, 0);
+                }
             }
         }
-    }
-    else
-    {
-        showDisp = true;
-    }
-    LED_Status(0, 0, 0);
+        else
+        {
+            showDisp = true;
+        }
+        LED_Status(0, 0, 0);
 #endif
 
-    // if (config.pwr_mode != MODE_A)
-    // {
-    //     delay(1000);
-    //     digitalWrite(LED_TX, LOW);
-    //     delay(1000);
-    //     digitalWrite(LED_RX, LOW);
-    //     delay(1000);
-    // }
+        // if (config.pwr_mode != MODE_A)
+        // {
+        //     delay(1000);
+        //     digitalWrite(LED_TX, LOW);
+        //     delay(1000);
+        //     digitalWrite(LED_RX, LOW);
+        //     delay(1000);
+        // }
 #endif
+    }
     LED_Status(0, 0, 0);
     // if (config.pwr_mode != MODE_A)
     // {
@@ -4355,47 +4494,8 @@ void setup()
 
     log_d("Free heap: %d", ESP.getHeapSize());
 
-    if (config.bt_master == true)
+    if (config.oled_enable)
     {
-    #if !defined(CONFIG_IDF_TARGET_ESP32)
-      // Create the BLE Device
-      NimBLEDevice::init(config.bt_name);
-      NimBLEDevice::setPower(config.bt_power); /** +3db */
-      // BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);  // The line you told me to add
-      // BLESecurity *pSecurity = new BLESecurity();
-      // pSecurity->setStaticPIN(config.bt_pin);
-  
-      // Create the BLE Server
-      pServer = NimBLEDevice::createServer();
-      pServer->setCallbacks(&serverCallbacks);
-      pServer->advertiseOnDisconnect(false);
-  
-      //BLE Auth
-      if(config.bt_pin>0){
-       NimBLEDevice::setSecurityAuth(true, true, true); /** bonding, MITM, BLE secure connections */
-       NimBLEDevice::setSecurityPasskey(config.bt_pin);
-       NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY); /** Display only passkey */
-      }
-  
-      //pServer->getAdvertising()->addServiceUUID(config.bt_uuid);
-  
-      // Create the BLE Service as Nordic UART Service
-      NimBLEService *pService = pServer->createService(config.bt_uuid);
-      // Create a BLE TX Characteristic
-      pTxCharacteristic = pService->createCharacteristic(config.bt_uuid_tx, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
-      pTxCharacteristic->setCallbacks(&chrCallbacks);
-      // Create a BLE RX Characteristic
-      static NimBLECharacteristic *pRxCharacteristic = pService->createCharacteristic(config.bt_uuid_rx, NIMBLE_PROPERTY::WRITE);
-      pRxCharacteristic->setCallbacks(new MyCallbacks());   
-  
-      // Start the service
-      pService->start();
-      pServer->startAdvertising();
-      #else
-      #endif
-    }
-
-
 #ifdef OLED
         int i2c_timeout = 0;
         while (i2c_busy)
@@ -4410,10 +4510,11 @@ void setup()
         display.display();
         i2c_busy = false;
 #elif defined(ST7735_160x80)
-    display.fillScreen(ST77XX_BLACK);
-    display.setTextSize(1);
-    display.display();
+        display.fillScreen(ST77XX_BLACK);
+        display.setTextSize(1);
+        display.display();
 #endif
+    }
 
     showDisp = true;
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
@@ -4421,11 +4522,16 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-    #if !defined(CONFIG_IDF_TARGET_ESP32C6)
-    esp_task_wdt_init(WDT_TIMEOUT,true); // enable panic so ESP32 restarts
-    #else
-    esp_task_wdt_init(WDT_TIMEOUT); // enable panic so ESP32 restarts
-    #endif
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = 30000,                             // 30 seconds
+        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Bitmask of all cores
+        .trigger_panic = false,
+    };
+#if !defined(CONFIG_IDF_TARGET_ESP32C6)
+    esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+#else
+    esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+#endif
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -4458,7 +4564,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        8192,            /* Stack size in words */
+        4096,            /* Stack size in words */
         NULL,            /* Task input parameter */
         2,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -4469,7 +4575,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        10000,              /* Stack size in words */
+        8192,               /* Stack size in words */
         NULL,               /* Task input parameter */
         0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -4538,6 +4644,12 @@ void setup()
     }
 
     esp_task_wdt_add(taskAPRSPollHandle);
+    // esp_task_wdt_add(NULL);
+    // esp_task_wdt_status(NULL);
+#ifdef APRS_LORA_HT
+    attachInterrupt(ROTARY_ENCODER_A_PIN, doEncoder, CHANGE);
+    attachInterrupt(ROTARY_ENCODER_B_PIN, doEncoder, CHANGE);
+#endif
 
     timeTask = millis() + 10000;
 
@@ -4545,6 +4657,9 @@ void setup()
         curTab = 0;
     else
         curTab = 6;
+#ifdef APRS_LORA_HT
+    encoder0PosPrev = encoder0Pos = curTab;
+#endif
 }
 
 String getTimeStamp()
@@ -4586,11 +4701,13 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
     // lat = deg2lat(nowLat);
     // lon = deg2lon(nowLng);
     char lat[15], lon[15];
-    deg2lat(lat,nowLat);
-    deg2lon(lon,nowLng);
+    memset(lat, 0, sizeof(lat));
+    memset(lon, 0, sizeof(lon));
+    deg2lat(lat, nowLat);
+    deg2lon(lon, nowLng);
     // ESP_LOGE("GPS", "Aprs Compress");
     //  Translate from semicircles to Base91 format
-    char aprs_position[13];
+    char aprs_position[15];
     long latitude = semicircles(lat, (nowLat < 0));
     long longitude = semicircles(lon, (nowLng < 0));
     long ltemp = 1073741824L - latitude; // 90 degrees - latitude
@@ -4657,9 +4774,66 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
     return str_comp;
 }
 
+#ifdef MQTT
+
+WiFiClient espClient;
+PubSubClient clientMQTT(espClient);
+
+void mqtt_reconnect()
+{
+    // Loop until we're reconnected
+    if (!clientMQTT.connected())
+    {
+        Serial.print("Attempting MQTT connection...");
+        // Attempt to connect
+        char idMqtt[50];
+        sprintf(idMqtt, "%s", config.wx_mycall);
+        if (strlen(config.wx_object) > 3)
+        {
+            strcat(idMqtt, "_");
+            strcat(idMqtt, config.wx_object);
+        }
+        if (clientMQTT.connect(idMqtt))
+        {
+            log_d("MQTT Connected");
+            // Once connected, publish an announcement...
+            char payload[20];
+            char topic[50];
+            if (strlen(config.wx_object) > 3)
+                sprintf(topic, "/%s/status", config.wx_object);
+            else
+                sprintf(topic, "/%s/status", config.wx_mycall);
+            sprintf(payload, "Connected");
+
+            clientMQTT.publish(topic, payload);
+            // ... and resubscribe
+            clientMQTT.subscribe(config.mqtt_subscribe);
+        }
+        else
+        {
+            log_d("MQTT Failed, rc=%d ", clientMQTT.state());
+        }
+    }
+}
+
+void mqtt_callback(char *topic, byte *payload, unsigned int length)
+{
+    log_d("MQTT Message arrived on topic [%s] with length %d", topic, length);
+    if (payload[0] == 'A' && payload[1] == 'T' && payload[2] == '-')
+    {
+        log_d("AT-Command received: %s", payload);
+    }
+    else
+    {
+        pkgTxPush((const char *)payload, length, 0, RF_CHANNEL);
+    }
+}
+
+#endif // MQTT
+
 // String compress_position(double nowLat, double nowLng, int alt_feed, double course, uint16_t spdKnot, char table, char symbol, bool gps)
 
-String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t *telem, size_t telemLen, char *grid, char *status, int32_t alt, char table, char symbol)
+String compressMicE(char *destCallsign, float lat, float lon, uint16_t heading, uint16_t speed, uint8_t type, uint8_t *telem, size_t telemLen, char *grid, char *status, int32_t alt, char table, char symbol)
 {
     String strRet = "";
     // sanity checks first
@@ -4680,7 +4854,7 @@ String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint
     }
 
     // prepare buffers
-    char destCallsign[7];
+    // char destCallsign[7];
 #if !RADIOLIB_STATIC_ONLY
     size_t infoLen = 10;
     if (telemLen > 0)
@@ -4712,7 +4886,7 @@ String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint
     // as discussed in https://github.com/jgromes/RadioLib/issues/430
 
     // latitude first, because that is in the destination field
-    float lat_abs = RADIOLIB_ABS(lat);
+    float lat_abs = abs(lat);
     int lat_deg = (int)lat_abs;
     int lat_min = (lat_abs - (float)lat_deg) * 60.0f;
     int lat_hun = (((lat_abs - (float)lat_deg) * 60.0f) - lat_min) * 100.0f;
@@ -4767,7 +4941,7 @@ String compressMicE(float lat, float lon, uint16_t heading, uint16_t speed, uint
     info[infoPos++] = RADIOLIB_APRS_MIC_E_GPS_DATA_CURRENT;
 
     // encode the longtitude
-    float lon_abs = RADIOLIB_ABS(lon);
+    float lon_abs = abs(lon);
     int32_t lon_deg = (int32_t)lon_abs;
     int32_t lon_min = (lon_abs - (float)lon_deg) * 60.0f;
     int32_t lon_hun = (((lon_abs - (float)lon_deg) * 60.0f) - lon_min) * 100.0f;
@@ -4929,8 +5103,8 @@ String trk_gps_postion(String comment)
         }
         else
         {
-            dist = distance(LastLng, LastLat, nowLng, nowLat);
-            course = direction(LastLng, LastLat, nowLng, nowLat);
+            dist = aprsParse.distance(LastLng, LastLat, nowLng, nowLat);
+            course = aprsParse.direction(LastLng, LastLat, nowLng, nowLat);
             if (dist > 50.0F)
                 dist = 0;
             if (tdiff > 10 && (nowTime > lastTimeStamp))
@@ -4953,10 +5127,11 @@ String trk_gps_postion(String comment)
         if (config.trk_compress)
         { // Compress DATA
 
-            String compPosition = compress_position(nowLat, nowLng, gps.altitude.feet(), course, spdKnot, aprs_table, aprs_symbol, (gps.satellites.value() > 3));
-            // ESP_LOGE("GPS", "Compress=%s", aprs_position);
-            if (strlen(config.trk_item) >= 3)
+            // String compPosition = compress_position(nowLat, nowLng, gps.altitude.feet(), course, spdKnot, aprs_table, aprs_symbol, (gps.satellites.value() > 3));
+            //  ESP_LOGE("GPS", "Compress=%s", aprs_position);
+            if ((strlen(config.trk_item) >= 3) || (config.trk_timestamp))
             {
+                String compPosition = compress_position(nowLat, nowLng, gps.altitude.feet(), course, spdKnot, aprs_table, aprs_symbol, (gps.satellites.value() > 3));
                 char object[10];
                 memset(object, 0x20, 10);
                 memcpy(object, config.trk_item, strlen(config.trk_item));
@@ -4973,15 +5148,34 @@ String trk_gps_postion(String comment)
             }
             else
             {
-                if (config.trk_timestamp)
+                char destCallsign[8];
+                String compPosition = compressMicE(destCallsign, nowLat, nowLng, (uint16_t)course, spdKnot, config.trk_mice_type, NULL, 0, NULL, NULL, (int32_t)gps.altitude.meters(), aprs_table, aprs_symbol);
+                String tnc2Raw = "";
+                char *strtmp = (char *)calloc(300, sizeof(char));
+                if (strtmp)
                 {
-                    String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, "/%s%s", timeStamp, compPosition.c_str());
+                    memset(strtmp, 0, 300);
+                    if (config.trk_ssid == 0)
+                        sprintf(strtmp, "%s>%s", config.trk_mycall, destCallsign);
+                    else
+                        sprintf(strtmp, "%s-%d>%s", config.trk_mycall, config.trk_ssid, destCallsign);
+                    tnc2Raw = String(strtmp);
+                    free(strtmp);
+                }
+                if (config.trk_path < 5)
+                {
+                    if (config.trk_path > 0)
+                        tnc2Raw += "-" + String(config.trk_path);
                 }
                 else
                 {
-                    sprintf(rawTNC, "!%s", compPosition.c_str());
+                    tnc2Raw += ",";
+                    tnc2Raw += getPath(config.trk_path);
                 }
+                tnc2Raw += ":";
+                tnc2Raw += String(compPosition);
+                tnc2Raw += comment + String(config.trk_comment);
+                return tnc2Raw;
             }
         }
         else
@@ -5045,12 +5239,17 @@ String trk_gps_postion(String comment)
     }
 
     String tnc2Raw = "";
-    char strtmp[300];
-    if (config.trk_ssid == 0)
-        sprintf(strtmp, "%s>APE32L", config.trk_mycall);
-    else
-        sprintf(strtmp, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
-    tnc2Raw = String(strtmp);
+    char *strtmp = (char *)calloc(300, sizeof(char));
+    if (strtmp)
+    {
+        memset(strtmp, 0, 300);
+        if (config.trk_ssid == 0)
+            sprintf(strtmp, "%s>APE32L", config.trk_mycall);
+        else
+            sprintf(strtmp, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
+        tnc2Raw = String(strtmp);
+        free(strtmp);
+    }
     if (config.trk_path < 5)
     {
         if (config.trk_path > 0)
@@ -5069,9 +5268,8 @@ String trk_gps_postion(String comment)
 
 String trk_fix_position(String comment)
 {
-    char strtmp[500], loc[100];
+    char loc[100];
     String tnc2Raw = "";
-    memset(strtmp, 0, sizeof(strtmp));
     memset(loc, 0, sizeof(loc));
     if (config.trk_compress)
     { // Compress DATA
@@ -5159,11 +5357,17 @@ String trk_fix_position(String comment)
         }
     }
 
-    if (config.trk_ssid == 0)
-        sprintf(strtmp, "%s>APE32L", config.trk_mycall);
-    else
-        sprintf(strtmp, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
-    tnc2Raw = String(strtmp);
+    char *strtmp = (char *)calloc(300, sizeof(char));
+    if (strtmp)
+    {
+        memset(strtmp, 0, 300);
+        if (config.trk_ssid == 0)
+            sprintf(strtmp, "%s>APE32L", config.trk_mycall);
+        else
+            sprintf(strtmp, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
+        tnc2Raw = String(strtmp);
+        free(strtmp);
+    }
     if (config.trk_path < 5)
     {
         if (config.trk_path > 0)
@@ -5184,14 +5388,13 @@ String igate_position(double lat, double lon, double alt, String comment)
 {
     String tnc2Raw = "";
     int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
-    char strtmp[500], loc[100];
+    char loc[100];
     char lon_ew = 'E';
     char lat_ns = 'N';
     if (lat < 0)
         lat_ns = 'S';
     if (lon < 0)
         lon_ew = 'W';
-    memset(strtmp, 0, sizeof(strtmp));
     memset(loc, 0, sizeof(loc));
     DD_DDDDDtoDDMMSS(lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(lon, &lon_dd, &lon_mm, &lon_ss);
@@ -5229,11 +5432,17 @@ String igate_position(double lat, double lon, double alt, String comment)
             sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
         }
     }
-    if (config.aprs_ssid == 0)
-        sprintf(strtmp, "%s>APE32L", config.aprs_mycall);
-    else
-        sprintf(strtmp, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
-    tnc2Raw = String(strtmp);
+    char *strtmp = (char *)calloc(300, sizeof(char));
+    if (strtmp)
+    {
+        memset(strtmp, 0, 300);
+        if (config.aprs_ssid == 0)
+            sprintf(strtmp, "%s>APE32L", config.aprs_mycall);
+        else
+            sprintf(strtmp, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
+        tnc2Raw = String(strtmp);
+        free(strtmp);
+    }
     if (config.igate_path < 5)
     {
         if (config.igate_path > 0)
@@ -5254,14 +5463,13 @@ String digi_position(double lat, double lon, double alt, String comment)
 {
     String tnc2Raw = "";
     int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
-    char strtmp[500], loc[100];
+    char loc[100];
     char lon_ew = 'E';
     char lat_ns = 'N';
     if (lat < 0)
         lat_ns = 'S';
     if (lon < 0)
         lon_ew = 'W';
-    memset(strtmp, 0, sizeof(strtmp));
     memset(loc, 0, sizeof(loc));
     DD_DDDDDtoDDMMSS(lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(lon, &lon_dd, &lon_mm, &lon_ss);
@@ -5280,11 +5488,17 @@ String digi_position(double lat, double lon, double alt, String comment)
     {
         sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
     }
-    if (config.digi_ssid == 0)
-        sprintf(strtmp, "%s>APE32L", config.digi_mycall);
-    else
-        sprintf(strtmp, "%s-%d>APE32L", config.digi_mycall, config.digi_ssid);
-    tnc2Raw = String(strtmp);
+    char *strtmp = (char *)calloc(300, sizeof(char));
+    if (strtmp)
+    {
+        memset(strtmp, 0, 300);
+        if (config.digi_ssid == 0)
+            sprintf(strtmp, "%s>APE32L", config.digi_mycall);
+        else
+            sprintf(strtmp, "%s-%d>APE32L", config.digi_mycall, config.digi_ssid);
+        tnc2Raw = String(strtmp);
+        free(strtmp);
+    }
     if (config.digi_path < 5)
     {
         if (config.digi_path > 0)
@@ -5304,7 +5518,7 @@ String digi_position(double lat, double lon, double alt, String comment)
 void tracker_status(char *text)
 {
     char name[50];
-
+    memset(name, 0, 50);
     if (config.trk_ssid > 0)
         sprintf(name, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
     else
@@ -5335,7 +5549,7 @@ void tracker_status(char *text)
 void igate_status(char *text)
 {
     char name[50];
-
+    memset(name, 0, 50);
     if (config.aprs_ssid > 0)
         sprintf(name, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
     else
@@ -5366,7 +5580,7 @@ void igate_status(char *text)
 void digi_status(char *text)
 {
     char name[50];
-
+    memset(name, 0, 50);
     if (config.digi_ssid > 0)
         sprintf(name, "%s-%d>APE32L", config.digi_mycall, config.digi_ssid);
     else
@@ -5398,14 +5612,13 @@ String wx_report(double lat, double lon, double alt, String comment)
 {
     String tnc2Raw = "";
     int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
-    char strtmp[500], loc[100];
+    char loc[100];
     char lon_ew = 'E';
     char lat_ns = 'N';
     if (lat < 0)
         lat_ns = 'S';
     if (lon < 0)
         lon_ew = 'W';
-    memset(strtmp, 0, sizeof(strtmp));
     memset(loc, 0, sizeof(loc));
     DD_DDDDDtoDDMMSS(lat, &lat_dd, &lat_mm, &lat_ss);
     DD_DDDDDtoDDMMSS(lon, &lon_dd, &lon_mm, &lon_ss);
@@ -5430,15 +5643,16 @@ String wx_report(double lat, double lon, double alt, String comment)
         memset(object, 0x20, 10);
         memcpy(object, config.wx_object, strlen(config.wx_object));
         object[9] = 0;
-        if (config.wx_timestamp)
-        {
-            String timeStamp = getTimeStamp();
-            sprintf(loc, ";%s*%s%02d%02d.%02d%c/%03d%02d.%02d%c_", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
-        }
-        else
-        {
-            sprintf(loc, ")%s!%02d%02d.%02d%c/%03d%02d.%02d%c_", config.wx_object, lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
-        }
+        config.wx_timestamp = true; // Force timestamp for wx report
+                                    // if (config.wx_timestamp)
+                                    // {
+        String timeStamp = getTimeStamp();
+        sprintf(loc, ";%s*%s%02d%02d.%02d%c/%03d%02d.%02d%c_", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
+        // }
+        // else
+        // {
+        //     sprintf(loc, ")%s!%02d%02d.%02d%c/%03d%02d.%02d%c_", config.wx_object, lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
+        // }
     }
     else
     {
@@ -5452,11 +5666,18 @@ String wx_report(double lat, double lon, double alt, String comment)
             sprintf(loc, "!%02d%02d.%02d%c/%03d%02d.%02d%c_", lat_dd, lat_mm, lat_ss, lat_ns, lon_dd, lon_mm, lon_ss, lon_ew);
         }
     }
-    if (config.wx_ssid == 0)
-        sprintf(strtmp, "%s>APE32I", config.wx_mycall);
-    else
-        sprintf(strtmp, "%s-%d>APE32I", config.wx_mycall, config.wx_ssid);
-    tnc2Raw = String(strtmp);
+    char *strtmp = (char *)calloc(500, sizeof(char));
+    if (strtmp)
+    {
+        memset(strtmp, 0, 500);
+        if (config.wx_ssid == 0)
+            sprintf(strtmp, "%s>APE32L", config.wx_mycall);
+        else
+            sprintf(strtmp, "%s-%d>APE32L", config.wx_mycall, config.wx_ssid);
+        tnc2Raw = String(strtmp);
+        free(strtmp);
+    }
+
     if (config.wx_path < 5)
     {
         if (config.wx_path > 0)
@@ -5513,6 +5734,8 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
 }
 
 uint8_t led_pin = BOOT_PIN;
+
+#ifdef BUOY
 // Declare an array named letters that holds addresses of string literals
 // (i.e. an array of pointers to strings composed of dots and dashes)
 // Done to preserve memory because strings are not equal in size. A 2D array
@@ -5614,9 +5837,10 @@ void flash_morse_text(char *text, size_t len)
             // delay(dot_duration * 7);
             vTaskDelay(dot_duration * 7 / portTICK_PERIOD_MS);
         }
-        esp_task_wdt_reset();
+        // esp_task_wdt_reset();
     }
 }
+#endif
 
 long sendTimer = 0;
 int btn_count = 0;
@@ -5636,24 +5860,26 @@ uint8_t heapCount = 0;
 
 void msgBox(String msg)
 {
+#ifdef OLED
     int x = msg.length() * 6;
-    int x1 = (SCREEN_WIDTH/2) - (x / 2);
-    int y1 = (SCREEN_HEIGHT/2);
+    int x1 = (SCREEN_WIDTH / 2) - (x / 2);
+    int y1 = (SCREEN_HEIGHT / 2);
 
-    display.fillRect(x1 - 7, y1-6, x + 14, 28, BLACK);
-    display.drawRect(x1 - 5, y1-4, x + 10, 24, WHITE);
-    display.drawLine(x1 - 3, y1+21, x1 + (x + 10) - 4, y1+21, WHITE);
-    display.drawLine(x1 + (x + 10) - 4, y1-2, x1 + (x + 10) - 4, y1+21, WHITE);
-    display.setCursor(x1, y1+5);
+    display.fillRect(x1 - 7, y1 - 6, x + 14, 28, BLACK);
+    display.drawRect(x1 - 5, y1 - 4, x + 10, 24, WHITE);
+    display.drawLine(x1 - 3, y1 + 21, x1 + (x + 10) - 4, y1 + 21, WHITE);
+    display.drawLine(x1 + (x + 10) - 4, y1 - 2, x1 + (x + 10) - 4, y1 + 21, WHITE);
+    display.setCursor(x1, y1 + 5);
     display.print(msg);
     display.display();
+#endif
 }
 
 void loop()
 {
     if (millis() > timeTask)
     {
-        timeTask = millis() + 10000;
+        timeTask = millis() + 30000;
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
         VBat = (double)PMU.getBattVoltage() / 1000;
 #elif defined(HELTEC_HTIT_TRACKER)
@@ -5715,7 +5941,7 @@ void loop()
         // VBat = (double)analogReadMilliVolts(3) / 595.24F;
         // log_d("mV=%.3f",analogReadMilliVolts(3));
 #endif
-        float tempCpu;
+        //float tempCpu;
         // temp_sensor_start();
         // delay(1);
         // temp_sensor_read_celsius(&tempCpu);
@@ -5723,6 +5949,80 @@ void loop()
         log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\t \n", timerAPRS, timerNetwork, timerGPS, timerSerial);
         log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
         // log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
+#ifdef NAWS4
+// int i2c_timeout = 0;
+//         while (i2c_busy)
+//         {
+//             delay(10);
+//             if (++i2c_timeout > 20)
+//                 break;
+//         }
+//         i2c_busy = true;
+//     Wire.beginTransmission(0x30);
+//     byte error = Wire.endTransmission();
+//     if(error!=0){
+//         if(setupPower())
+//         {
+//             APRS_init(&config);
+//         }
+//     }
+//     i2c_busy = false;
+#endif
+        // bool result = PMU.begin(Wire, AXP152_SLAVE_ADDRESS, PMU_I2C_SDA, PMU_I2C_SCL);
+        // if (result == false)
+        // {
+        //     //while (1)
+        //     //{
+        //         log_d("PMU is not online...");
+        //         //delay(500);
+        //     //}
+        // }else
+        // if(1){
+        //     log_d("PMU is online");
+        //     PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
+        //     PMU.setDC3Voltage(3300); // Set DC3 voltage to 3300mV ,VRF_V
+        //      PMU.setDC4Voltage(3400); // Set DC4 voltage to VRF_U
+        //      PMU.setALDO1Voltage(3300); // Set ALDO1 voltage to 3300mV
+        //     PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to
+        //     PMU.setDLDO1Voltage(3300); // Set DLDO1 voltage to 3300mV
+        //     PMU.setDLDO2Voltage(3300); // Set DLDO2 voltage to 3300mV
+        //     PMU.writeRegister(0x12,0xBF);
+        //     //PMU.enableDC1();         // Enable DC1
+        //     //PMU.setDC2Voltage(3300); // Set DC2 voltage to 3300mV
+        //     //PMU.enableDC2();         // Enable DC2
+        //     //PMU.setDC3Voltage(3300); // Set DC3 voltage to 3300mV
+        //     //PMU.enableDC3();         // Enable DC3
+        //      //PMU.enableDC4();         // Enable DC4
+        //     // PMU.setALDO1Voltage(3300); // Set ALDO1 voltage to 3300mV
+        //     // PMU.enableALDO1();         // Enable ALDO1
+        //     // PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to
+        //     // PMU.enableALDO2();         // Enable ALDO2
+        //     // PMU.setDLDO1Voltage(3300); // Set DLDO1 voltage to 3300mV
+        //     // PMU.enableDLDO1();         // Enable DLDO1
+        //     // PMU.setDLDO2Voltage(3300); // Set DLDO2 voltage to 3300mV
+        //     // PMU.enableDLDO2();         // Enable DLDO2
+        //     // PMU.disableDC2(); // Disable DC2
+        //     // PMU.disableDC3(); // Disable DC3
+        //     // PMU.disableALDO1(); // Disable ALDO1
+        //     // PMU.disableALDO2(); // Disable ALDO2
+        //     // PMU.disableDLDO1(); // Disable DLDO1
+        //     // PMU.disableDLDO2(); // Disable DLDO2
+
+        //     delay(100);
+        //     log_d("DCDC=======================================================================");
+        //     log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
+        //     //log_d("DC2  : %s   Voltage:%u mV \n", PMU.isEnableDC2() ? "+" : "-", PMU.getDC2Voltage());
+        //     log_d("DC3  : %s   Voltage:%u mV \n", PMU.isEnableDC3() ? "+" : "-", PMU.getDC3Voltage());
+        //     log_d("DC4  : %s   Voltage:%u mV \n", PMU.isEnableDC4() ? "+" : "-", PMU.getDC4Voltage());
+        //     log_d("ALDO=======================================================================");
+        //     log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
+        //     log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
+        //     //log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableLDO0 ? "+" : "-", PMU.getLDO0Voltage());
+        //     log_d("BLDO=======================================================================");
+        //     log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableDLDO1() ? "+" : "-", PMU.getDLDO1Voltage());
+        //     log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableDLDO2() ? "+" : "-", PMU.getDLDO2Voltage());
+        //     log_d("===========================================================================");
+        // }
 
         // Automatic Restart when heap memory not enough
         if (ESP.getFreeHeap() < 60000)
@@ -5809,16 +6109,28 @@ void loop()
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
-#ifdef BLUETOOTH
-    if (config.bt_master)
-        Bluetooth();
-#endif
-
 #ifndef BUOY
+#ifdef APRS_LORA_HT
+    if (encoder0PosPrev != encoder0Pos)
+    {
+        if (encoder0Pos > 7)
+        {
+            encoder0Pos = 0;
+        }
+        if (encoder0Pos < 0)
+        {
+            encoder0Pos = 7;
+        }
+        curTab = (uint8_t)encoder0Pos; // Set current tab
+        encoder0PosPrev = encoder0Pos;
+        showDisp = true;
+        timeSec = timeHalfSec = millis();
+    }
+#endif
     if (digitalRead(BOOT_PIN) == LOW)
     {
         btn_count++;
-        if (btn_count > 200) // Push BOOT 10sec
+        if (btn_count > 200) // Push BOOT >2sec
         {
             btn_count = 0;
             if (curTab == 0)
@@ -5903,9 +6215,10 @@ void loop()
                 showDisp = true;
                 timeSec = timeHalfSec = millis();
 #ifdef ST7735_LED_K_Pin
-                ledcWrite(0, (uint32_t)config.disp_brightness);
+                ledcWrite(ST7735_LED_K_Pin, (uint32_t)config.disp_brightness);
 #endif
 
+#ifndef APRS_LORA_HT
                 // if (oledSleepTimeout > 0)
                 //{
                 curTab++;
@@ -5913,6 +6226,7 @@ void loop()
                     curTab = 0;
                 //}
                 log_d("curTab=%d", curTab);
+#endif
             }
         }
         btn_count = 0;
@@ -5996,7 +6310,7 @@ void loop()
                             display.clearDisplay();
                             display.display();
 #elif defined(ST7735_160x80)
-                            ledcWrite(0, 5);
+                            ledcWrite(ST7735_LED_K_Pin, 5);
 #endif
                             i2c_busy = false;
                         }
@@ -6055,7 +6369,7 @@ void loop()
     // Tick one secound
     if (millis() > timeSleep)
     {
-        esp_task_wdt_reset();
+        // esp_task_wdt_reset();
         timeSleep = millis() + 1000;
 
         if (config.pwr_en)
@@ -6091,7 +6405,7 @@ void loop()
                         PMU.disableDC3();
 #endif
                         setCpuFrequencyMhz(80);
-                        esp_task_wdt_reset();
+                        // esp_task_wdt_reset();
                         delay(100);
                     }
                     else
@@ -6101,11 +6415,11 @@ void loop()
                         log_d("System to Wakeup save mode A %d Sec", config.pwr_sleep_interval);
                         // sleep_timer = millis() + (config.pwr_sleep_interval * 1000);
                         StandByTick = millis() + (config.pwr_stanby_delay * 1000);
-#if defined(__XTENSA__)
-                        setCpuFrequencyMhz(240);
-#else
+                        // #if defined(__XTENSA__)
+                        //                         setCpuFrequencyMhz(240);
+                        // #else
                         setCpuFrequencyMhz(160);
-#endif
+                        // #endif
                         PowerOn();
                         sensorInit(false);
                         delay(100);
@@ -6151,8 +6465,13 @@ void loop()
                         // vTaskSuspend(taskNetworkHandle);
                         // delay(100);
                         setCpuFrequencyMhz(80);
-                        // esp_task_wdt_deinit();
+// esp_task_wdt_deinit();
+#ifdef __XTENSA__
+#if SOC_PM_SUPPORT_RTC_SLOW_MEM_PD
+                        esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
+#endif
                         esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+#endif
 #if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
                         PMU.disableDC5();
                         PMU.disableALDO1(); // QMC6310,BME280,OLED
@@ -6201,13 +6520,13 @@ void loop()
 #else
                         setCpuFrequencyMhz(160);
 #endif
-                        esp_task_wdt_reset();
-                        // esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
-                        // esp_task_wdt_add(NULL);               // add current thread to WDT watch
                         // esp_task_wdt_reset();
-                        // adc_power_on();
-                        // WiFi.disconnect(false);  // Reconnect the network
-                        // WiFi.mode(WIFI_STA);    // Switch WiFi off
+                        //  esp_task_wdt_init(WDT_TIMEOUT, true); // enable panic so ESP32 restarts
+                        //  esp_task_wdt_add(NULL);               // add current thread to WDT watch
+                        //  esp_task_wdt_reset();
+                        //  adc_power_on();
+                        //  WiFi.disconnect(false);  // Reconnect the network
+                        //  WiFi.mode(WIFI_STA);    // Switch WiFi off
                         PowerOn();
                         sensorInit(false);
                         delay(100);
@@ -6472,7 +6791,7 @@ void sendTelemetry_0(char *raw, bool header)
 #endif
 }
 
-void sendTelemetry_trk(char *raw)
+void sendTelemetry_trk(char *raw, int dly_ms)
 {
     char str[300];
     char call[11];
@@ -6527,7 +6846,7 @@ void sendTelemetry_trk(char *raw)
         SendMode |= RF_CHANNEL;
     if (config.trk_loc2inet)
         SendMode |= INET_CHANNEL;
-    pkgTxPush(str, strlen(str), 0, SendMode);
+    pkgTxPush(str, strlen(str), dly_ms, SendMode);
 
     // if (config.trk_loc2rf)
     // { // TLM SEND TO RF
@@ -6544,7 +6863,7 @@ void sendTelemetry_trk(char *raw)
     // }
 }
 
-void sendTelemetry_igate(char *raw)
+void sendTelemetry_igate(char *raw, int dly_ms)
 {
     char str[300];
     char call[11];
@@ -6599,7 +6918,7 @@ void sendTelemetry_igate(char *raw)
         SendMode |= RF_CHANNEL;
     if (config.igate_loc2inet)
         SendMode |= INET_CHANNEL;
-    pkgTxPush(str, strlen(str), 0, SendMode);
+    pkgTxPush(str, strlen(str), dly_ms, SendMode);
     // if (config.igate_loc2rf)
     // { // TLM SEND TO RF
     //     pkgTxPush(str, strlen(str), 0);
@@ -6615,7 +6934,7 @@ void sendTelemetry_igate(char *raw)
     // }
 }
 
-void sendTelemetry_digi(char *raw)
+void sendTelemetry_digi(char *raw, int dly_ms)
 {
     char str[300];
     char call[11];
@@ -6664,7 +6983,7 @@ void sendTelemetry_digi(char *raw)
         SendMode |= RF_CHANNEL;
     if (config.digi_loc2inet)
         SendMode |= INET_CHANNEL;
-    pkgTxPush(str, strlen(str), 0, SendMode);
+    pkgTxPush(str, strlen(str), dly_ms, SendMode);
     // if (config.digi_loc2rf)
     // { // TLM SEND TO RF
     //     pkgTxPush(str, strlen(str), 0);
@@ -6743,10 +7062,21 @@ bool getBits(int ch)
         val = wireguard_active();
         break;
     case 7: // 4G LTE
-        val = 0;
+        if (PPP.connected())
+            val = 1;
+        else
+            val = 0;
         break;
     case 8: // MQTT
+#if defined(MQTT_ENABLE)
+        if (clientMQTT.connected())
+            val = 1;
+        else
+            val = 0;
+        break;
+#else
         val = 0;
+#endif
         break;
     }
     return val;
@@ -7089,7 +7419,7 @@ void taskGPS(void *pvParameters)
                                         // if (webServiceBegin == false)
                                         if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                                         {
-                                            if (ws_gnss.availableForWriteAll())
+                                            // if (ws_gnss.availableForWriteAll())
                                             {
                                                 handle_ws_gnss(nmea, nmea_idx);
                                             }
@@ -7448,6 +7778,9 @@ long timeSlot;
 unsigned long iGatetickInterval;
 unsigned long WxInterval;
 bool initInterval = true;
+int trkTlmInvCount = 0;
+int igateTlmInvCount = 0;
+int digiTlmInvCount = 0;
 void taskAPRS(void *pvParameters)
 {
     char sts[50];
@@ -7462,7 +7795,7 @@ void taskAPRS(void *pvParameters)
     PacketBuffer.clean();
 
     APRS_init(&config);
-    APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
+    // APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
     igateTLM.TeleTimeout = millis() + 60000; // 1Min
 
@@ -7503,6 +7836,61 @@ void taskAPRS(void *pvParameters)
         timerAPRS = micros() - timerAPRS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerAPRS_old = micros();
+
+#ifdef BLUETOOTH
+#if !defined(CONFIG_IDF_TARGET_ESP32)
+        if (NuSerial.isConnected())
+        {
+            if (NuSerial.available())
+            {
+                log_d("Bluetooth RX Data: %d Byte", NuSerial.available());
+                if (config.bt_mode == 1)
+                { // TNC2RAW MODE
+                    String rxValue = NuSerial.readString();
+                    uint8_t SendMode = TNC_CHANNEL;
+                    if (config.igate_loc2rf)
+                        SendMode |= RF_CHANNEL;
+                    if (config.igate_loc2inet)
+                        SendMode |= INET_CHANNEL;
+                    pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
+                }
+                else if (config.bt_mode == 2)
+                {
+                    // KISS MODE
+                    size_t num = NuSerial.available();
+                    for (int i = 0; i < num; i++)
+                    {
+                        kiss_serial((uint8_t)NuSerial.read());
+                    }
+                }
+            }
+        }
+#else
+        if (SerialBT.available())
+        {
+            log_d("Bluetooth RX Data: %d Byte", SerialBT.available());
+            if (config.bt_mode == 1)
+            { // TNC2RAW MODE
+                String rxValue = SerialBT.readString();
+                uint8_t SendMode = TNC_CHANNEL;
+                if (config.igate_loc2rf)
+                    SendMode |= RF_CHANNEL;
+                if (config.igate_loc2inet)
+                    SendMode |= INET_CHANNEL;
+                pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
+            }
+            else if (config.bt_mode == 2)
+            {
+                // KISS MODE
+                size_t num = SerialBT.available();
+                for (int i = 0; i < num; i++)
+                {
+                    kiss_serial((uint8_t)SerialBT.read());
+                }
+            }
+        }
+#endif
+#endif
 
         // if (config.rf_en)
         //{ // RF Module enable
@@ -7627,141 +8015,149 @@ void taskAPRS(void *pvParameters)
                 String cmn = "";
                 Sleep_Activate &= ~ACTIVATE_TRACKER;
                 StandByTick = millis() + (5000);
-                if (config.trk_tlm_sensor[0] | config.trk_tlm_sensor[1] | config.trk_tlm_sensor[2] | config.trk_tlm_sensor[3] | config.trk_tlm_sensor[4])
+                if (config.trk_tlm_interval > 0)
                 {
-                    char tlm_result[100];
-                    char tlm_data[200];
-                    size_t tlm_sz;
-                    if ((TLM_SEQ % 100) == 0)
+                    trkTlmInvCount++;
+                    if (trkTlmInvCount >= config.trk_tlm_interval)
                     {
-                        char rawInfo[100];
-                        char name[10];
-                        sprintf(rawInfo, "PARM.");
-                        int i, c = 0;
-                        for (i = 0; i < 5; i++)
+                        trkTlmInvCount = 0;
+                        if (config.trk_tlm_sensor[0] | config.trk_tlm_sensor[1] | config.trk_tlm_sensor[2] | config.trk_tlm_sensor[3] | config.trk_tlm_sensor[4])
                         {
-                            if (config.trk_tlm_sensor[i] == 0)
+                            char tlm_result[100];
+                            char tlm_data[200];
+                            size_t tlm_sz;
+                            if ((TLM_SEQ % 100) == 0)
                             {
-                                c++;
-                                continue;
-                            }
-                            else
-                            {
-                                if (i > 0)
+                                char rawInfo[100];
+                                char name[10];
+                                sprintf(rawInfo, "PARM.");
+                                int i, c = 0;
+                                for (i = 0; i < 5; i++)
+                                {
+                                    if (config.trk_tlm_sensor[i] == 0)
+                                    {
+                                        c++;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        if (i > 0)
+                                            strcat(rawInfo, ",");
+                                        sprintf(name, "%s", config.trk_tlm_PARM[i]);
+                                        strcat(rawInfo, name);
+                                    }
+                                }
+                                for (int n = c + 8; n > 0; n--)
+                                {
                                     strcat(rawInfo, ",");
-                                sprintf(name, "%s", config.trk_tlm_PARM[i]);
-                                strcat(rawInfo, name);
-                            }
-                        }
-                        for (int n = c + 8; n > 0; n--)
-                        {
-                            strcat(rawInfo, ",");
-                        }
-                        sendTelemetry_trk(rawInfo);
-                        memset(rawInfo, 0, sizeof(rawInfo));
-                        sprintf(rawInfo, "UNIT.");
-                        c = 0;
-                        for (i = 0; i < 5; i++)
-                        {
-                            if (config.trk_tlm_sensor[i] == 0)
-                            {
-                                c++;
-                                continue;
-                            }
-                            else
-                            {
-                                if (i > 0)
+                                }
+                                sendTelemetry_trk(rawInfo, 5000);
+                                memset(rawInfo, 0, sizeof(rawInfo));
+                                sprintf(rawInfo, "UNIT.");
+                                c = 0;
+                                for (i = 0; i < 5; i++)
+                                {
+                                    if (config.trk_tlm_sensor[i] == 0)
+                                    {
+                                        c++;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        if (i > 0)
+                                            strcat(rawInfo, ",");
+                                        sprintf(name, "%s", config.trk_tlm_UNIT[i]);
+                                        strcat(rawInfo, name);
+                                    }
+                                }
+                                for (int n = c + 8; n > 0; n--)
+                                {
                                     strcat(rawInfo, ",");
-                                sprintf(name, "%s", config.trk_tlm_UNIT[i]);
-                                strcat(rawInfo, name);
-                            }
-                        }
-                        for (int n = c + 8; n > 0; n--)
-                        {
-                            strcat(rawInfo, ",");
-                        }
-                        sendTelemetry_trk(rawInfo);
-                        memset(rawInfo, 0, sizeof(rawInfo));
-                        sprintf(rawInfo, "EQNS.");
-                        c = 0;
-                        for (i = 0; i < 5; i++)
-                        {
-                            if (config.trk_tlm_sensor[i] == 0)
-                            {
-                                c++;
-                                continue;
-                            }
-                            else
-                            {
-                                if (i > 0)
+                                }
+                                sendTelemetry_trk(rawInfo, 10000);
+                                memset(rawInfo, 0, sizeof(rawInfo));
+                                sprintf(rawInfo, "EQNS.");
+                                c = 0;
+                                for (i = 0; i < 5; i++)
+                                {
+                                    if (config.trk_tlm_sensor[i] == 0)
+                                    {
+                                        c++;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        if (i > 0)
+                                            strcat(rawInfo, ",");
+                                        if (fmod(config.trk_tlm_EQNS[i][0], 1) == 0)
+                                            sprintf(name, "%0.f", config.trk_tlm_EQNS[i][0]);
+                                        else
+                                            sprintf(name, "%.3f", config.trk_tlm_EQNS[i][0]);
+                                        strcat(rawInfo, name);
+                                        if (fmod(config.trk_tlm_EQNS[i][1], 1) == 0)
+                                            sprintf(name, ",%0.f", config.trk_tlm_EQNS[i][1]);
+                                        else
+                                            sprintf(name, ",%.3f", config.trk_tlm_EQNS[i][1]);
+                                        strcat(rawInfo, name);
+                                        if (fmod(config.trk_tlm_EQNS[i][2], 1) == 0)
+                                            sprintf(name, ",%0.f", config.trk_tlm_EQNS[i][2]);
+                                        else
+                                            sprintf(name, ",%.3f", config.trk_tlm_EQNS[i][2]);
+                                        strcat(rawInfo, name);
+                                    }
+                                }
+                                for (int n = c; n > 0; n--)
+                                {
                                     strcat(rawInfo, ",");
-                                if (fmod(config.trk_tlm_EQNS[i][0], 1) == 0)
-                                    sprintf(name, "%0.f", config.trk_tlm_EQNS[i][0]);
-                                else
-                                    sprintf(name, "%.3f", config.trk_tlm_EQNS[i][0]);
-                                strcat(rawInfo, name);
-                                if (fmod(config.trk_tlm_EQNS[i][1], 1) == 0)
-                                    sprintf(name, ",%0.f", config.trk_tlm_EQNS[i][1]);
-                                else
-                                    sprintf(name, ",%.3f", config.trk_tlm_EQNS[i][1]);
-                                strcat(rawInfo, name);
-                                if (fmod(config.trk_tlm_EQNS[i][2], 1) == 0)
-                                    sprintf(name, ",%0.f", config.trk_tlm_EQNS[i][2]);
-                                else
-                                    sprintf(name, ",%.3f", config.trk_tlm_EQNS[i][2]);
-                                strcat(rawInfo, name);
+                                    sprintf(name, "0");
+                                    strcat(rawInfo, name);
+                                    sprintf(name, ",1");
+                                    strcat(rawInfo, name);
+                                    sprintf(name, ",0");
+                                    strcat(rawInfo, name);
+                                }
+                                // strcat(rawInfo, ",");
+                                sendTelemetry_trk(rawInfo, 15000);
                             }
-                        }
-                        for (int n = c; n > 0; n--)
-                        {
-                            strcat(rawInfo, ",");
-                            sprintf(name, "0");
-                            strcat(rawInfo, name);
-                            sprintf(name, ",1");
-                            strcat(rawInfo, name);
-                            sprintf(name, ",0");
-                            strcat(rawInfo, name);
-                        }
-                        // strcat(rawInfo, ",");
-                        sendTelemetry_trk(rawInfo);
-                    }
 
-                    if (++TLM_SEQ > 8279)
-                        TLM_SEQ = 0;
-                    memset(tlm_data, 0, 200);
-                    memset(tlm_result, 0, 100);
-                    int n = 0;
-                    sprintf(tlm_data, "%i", TLM_SEQ);
-                    for (int s = 0; s < 5; s++)
-                    {
-                        if (config.trk_tlm_sensor[s] == 0)
-                        {
-                            continue;
-                            // strcat(tlm_data, "0");
-                        }
-                        else
-                        {
-                            strcat(tlm_data, ",");
-                            int sen_idx = config.trk_tlm_sensor[s] - 1;
-                            double data = 0;
-                            if (sen[sen_idx].visable)
-                                data = sen[sen_idx].sample;
-                            double precision = pow(10.0f, (double)config.trk_tlm_precision[s]);
-                            int val = (int)((data + config.trk_tlm_offset[s]) * precision);
-                            // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
-                            if (val > 8280)
-                                val = 8280;
-                            if (val < 0)
-                                val = 0;
-                            char strVal[10];
-                            sprintf(strVal, "%i", val);
-                            strcat(tlm_data, strVal);
+                            if (++TLM_SEQ > 8279)
+                                TLM_SEQ = 0;
+                            memset(tlm_data, 0, 200);
+                            memset(tlm_result, 0, 100);
+                            int n = 0;
+                            sprintf(tlm_data, "%i", TLM_SEQ);
+                            for (int s = 0; s < 5; s++)
+                            {
+                                if (config.trk_tlm_sensor[s] == 0)
+                                {
+                                    continue;
+                                    // strcat(tlm_data, "0");
+                                }
+                                else
+                                {
+                                    strcat(tlm_data, ",");
+                                    int sen_idx = config.trk_tlm_sensor[s] - 1;
+                                    double data = 0;
+                                    if (sen[sen_idx].visable)
+                                        data = sen[sen_idx].sample;
+                                    double precision = pow(10.0f, (double)config.trk_tlm_precision[s]);
+                                    int val = (int)((data + config.trk_tlm_offset[s]) * precision);
+                                    // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
+                                    if (val > 8280)
+                                        val = 8280;
+                                    if (val < 0)
+                                        val = 0;
+                                    char strVal[10];
+                                    sprintf(strVal, "%i", val);
+                                    strcat(tlm_data, strVal);
+                                }
+                            }
+                            // log_d("TLM_DATA:%s",tlm_data);
+                            //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
+                            telemetry_base91(tlm_data, tlm_result, tlm_sz);
+                            cmn = String(tlm_result);
                         }
                     }
-                    // log_d("TLM_DATA:%s",tlm_data);
-                    //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
-                    telemetry_base91(tlm_data, tlm_result, tlm_sz);
-                    cmn = String(tlm_result);
                 }
 
                 if (config.trk_rssi)
@@ -7772,18 +8168,22 @@ void taskAPRS(void *pvParameters)
                 if (config.trk_gps) // TRACKER by GPS
                 {
                     rawData = trk_gps_postion(cmn);
+                    #ifdef LOG_FILE
                     if (config.log & LOG_TRACKER)
                     {
                         logTracker(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                     }
+                    #endif
                 }
                 else // TRACKER by FIX position
                 {
                     rawData = trk_fix_position(cmn);
+                    #ifdef LOG_FILE
                     if (config.log & LOG_TRACKER)
                     {
                         logTracker(config.trk_lat, config.trk_lon, 0, 0);
                     }
+                    #endif
                 }
 
                 log_d("TRACKER RAW: %s\n", rawData.c_str());
@@ -7909,7 +8309,7 @@ void taskAPRS(void *pvParameters)
                     }
                 }
             }
-
+#ifdef BLUETOOTH
             if (config.bt_master)
             { // Output TNC2RAW to BT Serial
               // SerialBT.println(tnc2);
@@ -7917,57 +8317,65 @@ void taskAPRS(void *pvParameters)
                 {
                     char *rawP = (char *)malloc(tnc2.length());
                     memcpy(rawP, tnc2.c_str(), tnc2.length());
-                    #if defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(CONFIG_IDF_TARGET_ESP32)
                     SerialBT.write((uint8_t *)rawP, tnc2.length());
-                    #else
-                    pTxCharacteristic->setValue((uint8_t *)rawP, tnc2.length());
-                    pTxCharacteristic->notify();
-                    #endif
+#else
+                    if (NuSerial.isConnected())
+                    {
+                        NuSerial.write((uint8_t *)rawP, tnc2.length());
+                    }
+#endif
                     free(rawP);
                 }
                 else if (config.bt_mode == 2)
                 { // KISS
                     uint8_t pkg[500];
                     int sz = kiss_wrapper(pkg);
-                    #if defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(CONFIG_IDF_TARGET_ESP32)
                     SerialBT.write(pkg, sz);
-                    #else
-                    pTxCharacteristic->setValue(pkg, sz);
-                    pTxCharacteristic->notify();
-                    #endif
+#else
+                    if (NuSerial.isConnected())
+                    {
+                        NuSerial.write(pkg, sz);
+                    }
+#endif
                 }
             }
+#endif
 
             log_d("RX: %s", tnc2.c_str());
 
             // SerialBT.println(tnc2);
             uint16_t type = pkgType((char *)incomingPacket.info);
-            char call[11];
-            if (incomingPacket.src.ssid > 0)
-                sprintf(call, "%s-%d", incomingPacket.src.call, incomingPacket.src.ssid);
-            else
-                sprintf(call, "%s", incomingPacket.src.call);
-
-            char *rawP = (char *)calloc(tnc2.length(), sizeof(char));
-            if (rawP)
+            if (!(type & FILTER_THIRDPARTY))
             {
-                memset(rawP, 0, tnc2.length());
-                tnc2.toCharArray(rawP, tnc2.length(), 0);
-                // memcpy(rawP, tnc2.c_str(), tnc2.length());
-                int idx = pkgListUpdate(call, rawP, type, 0);
+                char call[11];
+                if (incomingPacket.src.ssid > 0)
+                    sprintf(call, "%s-%d", incomingPacket.src.call, incomingPacket.src.ssid);
+                else
+                    sprintf(call, "%s", incomingPacket.src.call);
+
+                char *rawP = (char *)calloc(tnc2.length(), sizeof(char));
+                if (rawP)
+                {
+                    memset(rawP, 0, tnc2.length());
+                    tnc2.toCharArray(rawP, tnc2.length(), 0);
+                    // memcpy(rawP, tnc2.c_str(), tnc2.length());
+                    int idx = pkgListUpdate(call, rawP, type, 0);
 
 #if defined OLED || defined ST7735_160x80
-                if (idx > -1)
-                {
-
-                    if (config.rx_display && config.dispRF && (type & config.dispFilter))
+                    if (idx > -1)
                     {
-                        dispBuffer.push(tnc2.c_str());
-                        log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, tnc2.c_str());
+
+                        if (config.rx_display && config.dispRF && (type & config.dispFilter))
+                        {
+                            dispBuffer.push(tnc2.c_str());
+                            log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, tnc2.c_str());
+                        }
                     }
-                }
 #endif
-                free(rawP);
+                    free(rawP);
+                }
             }
             lastPkg = true;
             lastPkgRaw = tnc2;
@@ -8000,161 +8408,172 @@ void taskAPRS(void *pvParameters)
                         if (gps.location.isValid())
                         {
                             rawData = igate_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                            #ifdef LOG_FILE
                             if (config.log & LOG_IGATE)
                             {
                                 logIGate(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                             }
+                            #endif
                         }
                     }
                     else
                     { // IGATE Send fix position
                         rawData = igate_position(config.igate_lat, config.igate_lon, config.igate_alt, "");
+                        #ifdef LOG_FILE
                         if (config.log & LOG_TRACKER)
                         {
                             logIGate(config.igate_lat, config.igate_lon, 0, 0);
                         }
+                        #endif
                     }
                     if (rawData != "")
                     {
                         iGatetickInterval = millis() + (config.igate_interval * 1000);
                         Sleep_Activate &= ~ACTIVATE_IGATE;
                         StandByTick = millis() + (5000);
-
-                        if (config.igate_tlm_sensor[0] | config.igate_tlm_sensor[1] | config.igate_tlm_sensor[2] | config.igate_tlm_sensor[3] | config.igate_tlm_sensor[4])
+                        if (config.igate_tlm_interval > 0)
                         {
-                            char tlm_result[100];
-                            char tlm_data[200];
-                            size_t tlm_sz;
-                            if ((IGATE_TLM_SEQ % 100) == 0)
+                            igateTlmInvCount++;
+                            if (igateTlmInvCount >= config.igate_tlm_interval)
                             {
-                                char rawInfo[100];
-                                char name[10];
-                                sprintf(rawInfo, "PARM.");
-                                int i, c = 0;
-                                for (i = 0; i < 5; i++)
+                                igateTlmInvCount = 0;
+                                if (config.igate_tlm_sensor[0] | config.igate_tlm_sensor[1] | config.igate_tlm_sensor[2] | config.igate_tlm_sensor[3] | config.igate_tlm_sensor[4])
                                 {
-                                    if (config.igate_tlm_sensor[i] == 0)
+                                    char tlm_result[100];
+                                    char tlm_data[200];
+                                    size_t tlm_sz;
+                                    if ((IGATE_TLM_SEQ % 100) == 0)
                                     {
-                                        c++;
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        if (i > 0)
+                                        char rawInfo[100];
+                                        char name[10];
+                                        sprintf(rawInfo, "PARM.");
+                                        int i, c = 0;
+                                        for (i = 0; i < 5; i++)
+                                        {
+                                            if (config.igate_tlm_sensor[i] == 0)
+                                            {
+                                                c++;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                if (i > 0)
+                                                    strcat(rawInfo, ",");
+                                                sprintf(name, "%s", config.igate_tlm_PARM[i]);
+                                                strcat(rawInfo, name);
+                                            }
+                                        }
+                                        for (int n = c + 8; n > 0; n--)
+                                        {
                                             strcat(rawInfo, ",");
-                                        sprintf(name, "%s", config.igate_tlm_PARM[i]);
-                                        strcat(rawInfo, name);
-                                    }
-                                }
-                                for (int n = c + 8; n > 0; n--)
-                                {
-                                    strcat(rawInfo, ",");
-                                }
-                                sendTelemetry_igate(rawInfo);
-                                memset(rawInfo, 0, sizeof(rawInfo));
-                                sprintf(rawInfo, "UNIT.");
-                                c = 0;
-                                for (i = 0; i < 5; i++)
-                                {
-                                    if (config.igate_tlm_sensor[i] == 0)
-                                    {
-                                        c++;
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        if (i > 0)
+                                        }
+                                        sendTelemetry_igate(rawInfo, 3000);
+                                        memset(rawInfo, 0, sizeof(rawInfo));
+                                        sprintf(rawInfo, "UNIT.");
+                                        c = 0;
+                                        for (i = 0; i < 5; i++)
+                                        {
+                                            if (config.igate_tlm_sensor[i] == 0)
+                                            {
+                                                c++;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                if (i > 0)
+                                                    strcat(rawInfo, ",");
+                                                sprintf(name, "%s", config.igate_tlm_UNIT[i]);
+                                                strcat(rawInfo, name);
+                                            }
+                                        }
+                                        for (int n = c + 8; n > 0; n--)
+                                        {
                                             strcat(rawInfo, ",");
-                                        sprintf(name, "%s", config.igate_tlm_UNIT[i]);
-                                        strcat(rawInfo, name);
-                                    }
-                                }
-                                for (int n = c + 8; n > 0; n--)
-                                {
-                                    strcat(rawInfo, ",");
-                                }
-                                sendTelemetry_igate(rawInfo);
-                                memset(rawInfo, 0, sizeof(rawInfo));
-                                sprintf(rawInfo, "EQNS.");
-                                c = 0;
-                                for (i = 0; i < 5; i++)
-                                {
-                                    if (config.igate_tlm_sensor[i] == 0)
-                                    {
-                                        c++;
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        if (i > 0)
+                                        }
+                                        sendTelemetry_igate(rawInfo, 6000);
+                                        memset(rawInfo, 0, sizeof(rawInfo));
+                                        sprintf(rawInfo, "EQNS.");
+                                        c = 0;
+                                        for (i = 0; i < 5; i++)
+                                        {
+                                            if (config.igate_tlm_sensor[i] == 0)
+                                            {
+                                                c++;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                if (i > 0)
+                                                    strcat(rawInfo, ",");
+                                                if (fmod(config.igate_tlm_EQNS[i][0], 1) == 0)
+                                                    sprintf(name, "%0.f", config.igate_tlm_EQNS[i][0]);
+                                                else
+                                                    sprintf(name, "%.3f", config.igate_tlm_EQNS[i][0]);
+                                                strcat(rawInfo, name);
+                                                if (fmod(config.igate_tlm_EQNS[i][1], 1) == 0)
+                                                    sprintf(name, ",%0.f", config.igate_tlm_EQNS[i][1]);
+                                                else
+                                                    sprintf(name, ",%.3f", config.igate_tlm_EQNS[i][1]);
+                                                strcat(rawInfo, name);
+                                                if (fmod(config.igate_tlm_EQNS[i][2], 1) == 0)
+                                                    sprintf(name, ",%0.f", config.igate_tlm_EQNS[i][2]);
+                                                else
+                                                    sprintf(name, ",%.3f", config.igate_tlm_EQNS[i][2]);
+                                                strcat(rawInfo, name);
+                                            }
+                                        }
+                                        for (int n = c; n > 0; n--)
+                                        {
                                             strcat(rawInfo, ",");
-                                        if (fmod(config.igate_tlm_EQNS[i][0], 1) == 0)
-                                            sprintf(name, "%0.f", config.igate_tlm_EQNS[i][0]);
-                                        else
-                                            sprintf(name, "%.3f", config.igate_tlm_EQNS[i][0]);
-                                        strcat(rawInfo, name);
-                                        if (fmod(config.igate_tlm_EQNS[i][1], 1) == 0)
-                                            sprintf(name, ",%0.f", config.igate_tlm_EQNS[i][1]);
-                                        else
-                                            sprintf(name, ",%.3f", config.igate_tlm_EQNS[i][1]);
-                                        strcat(rawInfo, name);
-                                        if (fmod(config.igate_tlm_EQNS[i][2], 1) == 0)
-                                            sprintf(name, ",%0.f", config.igate_tlm_EQNS[i][2]);
-                                        else
-                                            sprintf(name, ",%.3f", config.igate_tlm_EQNS[i][2]);
-                                        strcat(rawInfo, name);
+                                            sprintf(name, "0");
+                                            strcat(rawInfo, name);
+                                            sprintf(name, ",1");
+                                            strcat(rawInfo, name);
+                                            sprintf(name, ",0");
+                                            strcat(rawInfo, name);
+                                        }
+                                        // strcat(rawInfo, ",");
+                                        sendTelemetry_igate(rawInfo, 9000);
                                     }
-                                }
-                                for (int n = c; n > 0; n--)
-                                {
-                                    strcat(rawInfo, ",");
-                                    sprintf(name, "0");
-                                    strcat(rawInfo, name);
-                                    sprintf(name, ",1");
-                                    strcat(rawInfo, name);
-                                    sprintf(name, ",0");
-                                    strcat(rawInfo, name);
-                                }
-                                // strcat(rawInfo, ",");
-                                sendTelemetry_igate(rawInfo);
-                            }
 
-                            if (++IGATE_TLM_SEQ > 8279)
-                                IGATE_TLM_SEQ = 0;
-                            memset(tlm_data, 0, 200);
-                            memset(tlm_result, 0, 100);
-                            int n = 0;
-                            sprintf(tlm_data, "%i", IGATE_TLM_SEQ);
-                            for (int s = 0; s < 5; s++)
-                            {
-                                if (config.igate_tlm_sensor[s] == 0)
-                                {
-                                    continue;
-                                    // strcat(tlm_data, "0");
-                                }
-                                else
-                                {
-                                    strcat(tlm_data, ",");
-                                    int sen_idx = config.igate_tlm_sensor[s] - 1;
-                                    double data = 0;
-                                    if (sen[sen_idx].visable)
-                                        data = sen[sen_idx].sample;
-                                    double precision = pow(10.0f, (double)config.igate_tlm_precision[s]);
-                                    int val = (int)((data + config.igate_tlm_offset[s]) * precision);
-                                    // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
-                                    if (val > 8280)
-                                        val = 8280;
-                                    if (val < 0)
-                                        val = 0;
-                                    char strVal[10];
-                                    sprintf(strVal, "%i", val);
-                                    strcat(tlm_data, strVal);
+                                    if (++IGATE_TLM_SEQ > 8279)
+                                        IGATE_TLM_SEQ = 0;
+                                    memset(tlm_data, 0, 200);
+                                    memset(tlm_result, 0, 100);
+                                    int n = 0;
+                                    sprintf(tlm_data, "%i", IGATE_TLM_SEQ);
+                                    for (int s = 0; s < 5; s++)
+                                    {
+                                        if (config.igate_tlm_sensor[s] == 0)
+                                        {
+                                            continue;
+                                            // strcat(tlm_data, "0");
+                                        }
+                                        else
+                                        {
+                                            strcat(tlm_data, ",");
+                                            int sen_idx = config.igate_tlm_sensor[s] - 1;
+                                            double data = 0;
+                                            if (sen[sen_idx].visable)
+                                                data = sen[sen_idx].sample;
+                                            double precision = pow(10.0f, (double)config.igate_tlm_precision[s]);
+                                            int val = (int)((data + config.igate_tlm_offset[s]) * precision);
+                                            // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
+                                            if (val > 8280)
+                                                val = 8280;
+                                            if (val < 0)
+                                                val = 0;
+                                            char strVal[10];
+                                            sprintf(strVal, "%i", val);
+                                            strcat(tlm_data, strVal);
+                                        }
+                                    }
+                                    // log_d("TLM_DATA:%s",tlm_data);
+                                    //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
+                                    telemetry_base91(tlm_data, tlm_result, tlm_sz);
+                                    rawData += String(tlm_result);
                                 }
                             }
-                            // log_d("TLM_DATA:%s",tlm_data);
-                            //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
-                            telemetry_base91(tlm_data, tlm_result, tlm_sz);
-                            rawData += String(tlm_result);
                         }
                         if (strlen(config.igate_comment) > 0)
                         {
@@ -8249,161 +8668,172 @@ void taskAPRS(void *pvParameters)
                         if (gps.location.isValid())
                         {
                             rawData = digi_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                            #ifdef LOG_FILE
                             if (config.log & LOG_DIGI)
                             {
                                 logDigi(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                             }
+                            #endif
                         }
                     }
                     else
                     { // DIGI Send fix position
                         rawData = digi_position(config.digi_lat, config.digi_lon, config.digi_alt, "");
+                        #ifdef LOG_FILE
                         if (config.log & LOG_DIGI)
                         {
                             logDigi(config.digi_lat, config.digi_lon, 0, 0);
                         }
+                        #endif
                     }
                     if (rawData != "")
                     {
                         DiGiInterval = millis() + (config.digi_interval * 1000);
                         Sleep_Activate &= ~ACTIVATE_DIGI;
                         StandByTick = millis() + (5000);
-
-                        if (config.digi_tlm_sensor[0] | config.digi_tlm_sensor[1] | config.digi_tlm_sensor[2] | config.digi_tlm_sensor[3] | config.digi_tlm_sensor[4])
+                        if (config.digi_tlm_interval > 0)
                         {
-                            char tlm_result[100];
-                            char tlm_data[200];
-                            size_t tlm_sz;
-                            if ((DIGI_TLM_SEQ % 100) == 0)
+                            digiTlmInvCount++;
+                            if (digiTlmInvCount >= config.digi_tlm_interval)
                             {
-                                char rawInfo[100];
-                                char name[10];
-                                sprintf(rawInfo, "PARM.");
-                                int i, c = 0;
-                                for (i = 0; i < 5; i++)
+                                digiTlmInvCount = 0;
+                                if (config.digi_tlm_sensor[0] | config.digi_tlm_sensor[1] | config.digi_tlm_sensor[2] | config.digi_tlm_sensor[3] | config.digi_tlm_sensor[4])
                                 {
-                                    if (config.digi_tlm_sensor[i] == 0)
+                                    char tlm_result[100];
+                                    char tlm_data[200];
+                                    size_t tlm_sz;
+                                    if ((DIGI_TLM_SEQ % 100) == 0)
                                     {
-                                        c++;
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        if (i > 0)
+                                        char rawInfo[100];
+                                        char name[10];
+                                        sprintf(rawInfo, "PARM.");
+                                        int i, c = 0;
+                                        for (i = 0; i < 5; i++)
+                                        {
+                                            if (config.digi_tlm_sensor[i] == 0)
+                                            {
+                                                c++;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                if (i > 0)
+                                                    strcat(rawInfo, ",");
+                                                sprintf(name, "%s", config.digi_tlm_PARM[i]);
+                                                strcat(rawInfo, name);
+                                            }
+                                        }
+                                        for (int n = c + 8; n > 0; n--)
+                                        {
                                             strcat(rawInfo, ",");
-                                        sprintf(name, "%s", config.digi_tlm_PARM[i]);
-                                        strcat(rawInfo, name);
-                                    }
-                                }
-                                for (int n = c + 8; n > 0; n--)
-                                {
-                                    strcat(rawInfo, ",");
-                                }
-                                sendTelemetry_digi(rawInfo);
-                                memset(rawInfo, 0, sizeof(rawInfo));
-                                sprintf(rawInfo, "UNIT.");
-                                c = 0;
-                                for (i = 0; i < 5; i++)
-                                {
-                                    if (config.digi_tlm_sensor[i] == 0)
-                                    {
-                                        c++;
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        if (i > 0)
+                                        }
+                                        sendTelemetry_digi(rawInfo, 6000);
+                                        memset(rawInfo, 0, sizeof(rawInfo));
+                                        sprintf(rawInfo, "UNIT.");
+                                        c = 0;
+                                        for (i = 0; i < 5; i++)
+                                        {
+                                            if (config.digi_tlm_sensor[i] == 0)
+                                            {
+                                                c++;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                if (i > 0)
+                                                    strcat(rawInfo, ",");
+                                                sprintf(name, "%s", config.digi_tlm_UNIT[i]);
+                                                strcat(rawInfo, name);
+                                            }
+                                        }
+                                        for (int n = c + 8; n > 0; n--)
+                                        {
                                             strcat(rawInfo, ",");
-                                        sprintf(name, "%s", config.digi_tlm_UNIT[i]);
-                                        strcat(rawInfo, name);
-                                    }
-                                }
-                                for (int n = c + 8; n > 0; n--)
-                                {
-                                    strcat(rawInfo, ",");
-                                }
-                                sendTelemetry_digi(rawInfo);
-                                memset(rawInfo, 0, sizeof(rawInfo));
-                                sprintf(rawInfo, "EQNS.");
-                                c = 0;
-                                for (i = 0; i < 5; i++)
-                                {
-                                    if (config.digi_tlm_sensor[i] == 0)
-                                    {
-                                        c++;
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        if (i > 0)
+                                        }
+                                        sendTelemetry_digi(rawInfo, 11000);
+                                        memset(rawInfo, 0, sizeof(rawInfo));
+                                        sprintf(rawInfo, "EQNS.");
+                                        c = 0;
+                                        for (i = 0; i < 5; i++)
+                                        {
+                                            if (config.digi_tlm_sensor[i] == 0)
+                                            {
+                                                c++;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                if (i > 0)
+                                                    strcat(rawInfo, ",");
+                                                if (fmod(config.digi_tlm_EQNS[i][0], 1) == 0)
+                                                    sprintf(name, "%0.f", config.digi_tlm_EQNS[i][0]);
+                                                else
+                                                    sprintf(name, "%.3f", config.digi_tlm_EQNS[i][0]);
+                                                strcat(rawInfo, name);
+                                                if (fmod(config.digi_tlm_EQNS[i][1], 1) == 0)
+                                                    sprintf(name, ",%0.f", config.digi_tlm_EQNS[i][1]);
+                                                else
+                                                    sprintf(name, ",%.3f", config.digi_tlm_EQNS[i][1]);
+                                                strcat(rawInfo, name);
+                                                if (fmod(config.digi_tlm_EQNS[i][2], 1) == 0)
+                                                    sprintf(name, ",%0.f", config.digi_tlm_EQNS[i][2]);
+                                                else
+                                                    sprintf(name, ",%.3f", config.digi_tlm_EQNS[i][2]);
+                                                strcat(rawInfo, name);
+                                            }
+                                        }
+                                        for (int n = c; n > 0; n--)
+                                        {
                                             strcat(rawInfo, ",");
-                                        if (fmod(config.digi_tlm_EQNS[i][0], 1) == 0)
-                                            sprintf(name, "%0.f", config.digi_tlm_EQNS[i][0]);
-                                        else
-                                            sprintf(name, "%.3f", config.digi_tlm_EQNS[i][0]);
-                                        strcat(rawInfo, name);
-                                        if (fmod(config.digi_tlm_EQNS[i][1], 1) == 0)
-                                            sprintf(name, ",%0.f", config.digi_tlm_EQNS[i][1]);
-                                        else
-                                            sprintf(name, ",%.3f", config.digi_tlm_EQNS[i][1]);
-                                        strcat(rawInfo, name);
-                                        if (fmod(config.digi_tlm_EQNS[i][2], 1) == 0)
-                                            sprintf(name, ",%0.f", config.digi_tlm_EQNS[i][2]);
-                                        else
-                                            sprintf(name, ",%.3f", config.digi_tlm_EQNS[i][2]);
-                                        strcat(rawInfo, name);
+                                            sprintf(name, "0");
+                                            strcat(rawInfo, name);
+                                            sprintf(name, ",1");
+                                            strcat(rawInfo, name);
+                                            sprintf(name, ",0");
+                                            strcat(rawInfo, name);
+                                        }
+                                        // strcat(rawInfo, ",");
+                                        sendTelemetry_digi(rawInfo, 16000);
                                     }
-                                }
-                                for (int n = c; n > 0; n--)
-                                {
-                                    strcat(rawInfo, ",");
-                                    sprintf(name, "0");
-                                    strcat(rawInfo, name);
-                                    sprintf(name, ",1");
-                                    strcat(rawInfo, name);
-                                    sprintf(name, ",0");
-                                    strcat(rawInfo, name);
-                                }
-                                // strcat(rawInfo, ",");
-                                sendTelemetry_digi(rawInfo);
-                            }
 
-                            if (++DIGI_TLM_SEQ > 8279)
-                                DIGI_TLM_SEQ = 0;
-                            memset(tlm_data, 0, 200);
-                            memset(tlm_result, 0, 100);
-                            int n = 0;
-                            sprintf(tlm_data, "%i", DIGI_TLM_SEQ);
-                            for (int s = 0; s < 5; s++)
-                            {
-                                if (config.digi_tlm_sensor[s] == 0)
-                                {
-                                    continue;
-                                    // strcat(tlm_data, "0");
-                                }
-                                else
-                                {
-                                    strcat(tlm_data, ",");
-                                    int sen_idx = config.digi_tlm_sensor[s] - 1;
-                                    double data = 0;
-                                    if (sen[sen_idx].visable)
-                                        data = sen[sen_idx].sample;
-                                    double precision = pow(10.0f, (double)config.digi_tlm_precision[s]);
-                                    int val = (int)((data + config.digi_tlm_offset[s]) * precision);
-                                    // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
-                                    if (val > 8280)
-                                        val = 8280;
-                                    if (val < 0)
-                                        val = 0;
-                                    char strVal[10];
-                                    sprintf(strVal, "%i", val);
-                                    strcat(tlm_data, strVal);
+                                    if (++DIGI_TLM_SEQ > 8279)
+                                        DIGI_TLM_SEQ = 0;
+                                    memset(tlm_data, 0, 200);
+                                    memset(tlm_result, 0, 100);
+                                    int n = 0;
+                                    sprintf(tlm_data, "%i", DIGI_TLM_SEQ);
+                                    for (int s = 0; s < 5; s++)
+                                    {
+                                        if (config.digi_tlm_sensor[s] == 0)
+                                        {
+                                            continue;
+                                            // strcat(tlm_data, "0");
+                                        }
+                                        else
+                                        {
+                                            strcat(tlm_data, ",");
+                                            int sen_idx = config.digi_tlm_sensor[s] - 1;
+                                            double data = 0;
+                                            if (sen[sen_idx].visable)
+                                                data = sen[sen_idx].sample;
+                                            double precision = pow(10.0f, (double)config.digi_tlm_precision[s]);
+                                            int val = (int)((data + config.digi_tlm_offset[s]) * precision);
+                                            // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
+                                            if (val > 8280)
+                                                val = 8280;
+                                            if (val < 0)
+                                                val = 0;
+                                            char strVal[10];
+                                            sprintf(strVal, "%i", val);
+                                            strcat(tlm_data, strVal);
+                                        }
+                                    }
+                                    // log_d("TLM_DATA:%s",tlm_data);
+                                    //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
+                                    telemetry_base91(tlm_data, tlm_result, tlm_sz);
+                                    rawData += String(tlm_result);
                                 }
                             }
-                            // log_d("TLM_DATA:%s",tlm_data);
-                            //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
-                            telemetry_base91(tlm_data, tlm_result, tlm_sz);
-                            rawData += String(tlm_result);
                         }
                         if (strlen(config.digi_comment) > 0)
                         {
@@ -8522,19 +8952,23 @@ void taskAPRS(void *pvParameters)
                     if (gps.location.isValid())
                     {
                         rawData = wx_report(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
+                        #ifdef LOG_FILE
                         if (config.log & LOG_WX)
                         {
                             logWeather(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                         }
+                        #endif
                     }
                 }
                 else
                 { // Wx Send fix position
                     rawData = wx_report(config.wx_lat, config.wx_lon, config.wx_alt, "");
+                    #ifdef LOG_FILE
                     if (config.log & LOG_WX)
                     {
                         logWeather(config.wx_lat, config.wx_lon, 0, 0);
                     }
+                    #endif
                 }
                 if (rawData != "")
                 {
@@ -8576,6 +9010,15 @@ void taskAPRS(void *pvParameters)
                 {
                     WxInterval = millis() + (10 * 1000);
                 }
+#ifdef MQTT
+                if (clientMQTT.connected() && config.en_mqtt)
+                {
+                    char payload[500];
+                    getWxJson(&payload[0]);
+                    log_d("Publish MQTT Topic: %s Payload: %s", config.mqtt_topic, payload);
+                    clientMQTT.publish(config.mqtt_topic, payload);
+                }
+#endif
             }
         }
 
@@ -8673,7 +9116,7 @@ void taskAPRS(void *pvParameters)
                     }
                     b <<= 1;
                 }
-                // sendTelemetry_0(rawTlm, false);
+                sendTelemetry_0(rawTlm, false);
             }
         }
     }
@@ -8705,6 +9148,210 @@ long wifiTTL = 0;
 const uint32_t connectTimeoutMs = 5000;
 uint8_t APStationNum = 0;
 
+pppType pppStatus;
+
+IPAddress ap_ip(192, 168, 4, 1);
+IPAddress ap_mask(255, 255, 255, 0);
+IPAddress ap_leaseStart(192, 168, 4, 2);
+IPAddress ap_dns(8, 8, 4, 4);
+
+void onEvent(arduino_event_id_t event, arduino_event_info_t info)
+{
+    switch (event)
+    {
+    case ARDUINO_EVENT_PPP_START:
+        log_d("PPP Started");
+        break;
+    case ARDUINO_EVENT_PPP_CONNECTED:
+        log_d("PPP Connected");
+#ifdef MQTT
+        if (config.en_mqtt)
+        {
+            if (!clientMQTT.connected())
+            {
+                clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
+                clientMQTT.setCallback(mqtt_callback);
+            }
+        }
+#endif
+        break;
+    case ARDUINO_EVENT_PPP_GOT_IP:
+        pppStatus.ip = info.got_ip.ip_info.ip.addr;
+        pppStatus.gateway = info.got_ip.ip_info.gw.addr;
+        pppStatus.netmask = info.got_ip.ip_info.netmask.addr;
+        log_d("PPP Got IP");
+        log_d("PPP IP: %s", IPAddress(pppStatus.ip).toString().c_str());
+        log_d("PPP Gateway: %s", IPAddress(pppStatus.gateway).toString().c_str());
+        log_d("PPP Subnet: %s", IPAddress(pppStatus.netmask).toString().c_str());
+        WiFi.AP.enableNAPT(true);
+        break;
+    case ARDUINO_EVENT_PPP_LOST_IP:
+        log_d("PPP Lost IP");
+        WiFi.AP.enableNAPT(false);
+        break;
+    case ARDUINO_EVENT_PPP_DISCONNECTED:
+        log_d("PPP Disconnected");
+        WiFi.AP.enableNAPT(false);
+        break;
+    case ARDUINO_EVENT_PPP_STOP:
+        log_d("PPP Stopped");
+        break;
+
+    case ARDUINO_EVENT_WIFI_AP_START:
+        log_d("AP Started");
+        Serial.println(WiFi.AP);
+        break;
+    case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
+        log_d("AP STA Connected");
+        break;
+    case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
+        log_d("AP STA Disconnected");
+        break;
+    case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:
+        log_d("AP STA IP Assigned: ");
+        log_d("%s", IPAddress(info.wifi_ap_staipassigned.ip.addr).toString().c_str());
+        break;
+    case ARDUINO_EVENT_WIFI_AP_PROBEREQRECVED:
+        log_d("AP Probe Request Received");
+        break;
+    case ARDUINO_EVENT_WIFI_AP_STOP:
+        log_d("AP Stopped");
+        break;
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+// String info = "WiFi Infor:";
+// info += "\nSSID: " + WiFi.SSID();
+// info += "\nRSSI: " + String(WiFi.RSSI()) + "dBm";
+// info += "\nIP: " + WiFi.localIP().toString();
+// info += "\nGW IP: " + WiFi.gatewayIP().toString();
+// info += "\nMAC: " + WiFi.macAddress();
+// lv_label_set_text(ui_txtSystemInfo, info.c_str());
+#ifdef MQTT
+        if (config.en_mqtt)
+        {
+            if (!clientMQTT.connected())
+            {
+                clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
+                clientMQTT.setCallback(mqtt_callback);
+            }
+        }
+#endif
+        log_d("WiFi Connected");
+        break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+        log_d("WiFi Disconnected");
+        break;
+    default:
+        break;
+    }
+}
+
+long int pppTimeout = 0;
+
+void PPPOS_Start()
+{
+    if (config.ppp_enable)
+    {
+        pppTimeout = millis() + (600 * 1000);
+        log_d("Starting the modem. It might take a while!");
+        pinMode(config.ppp_rst_gpio, OUTPUT);
+        digitalWrite(config.ppp_rst_gpio, config.ppp_rst_active);
+        delay(config.ppp_rst_delay);
+        digitalWrite(config.ppp_rst_gpio, !config.ppp_rst_active);
+        // pinMode(39, INPUT_PULLUP); // Set GPIO39 as input with pull-up resistor
+        //  digitalWrite(39, HIGH); // Set GPIO39 to high to enable pull-up resistor
+        delay(1000); // Wait for the modem to reset
+
+        PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
+        PPP.begin(PPP_MODEM_MODEL, config.ppp_serial, 115200);
+
+        // Configure the modem
+        if (config.ppp_gnss)
+        {
+            Serial.println(PPP.cmd("AT+QGPSCFG=\"outport\",\"uartdebug\"", 10000)); // กำหนดให้ NMEA output ผ่านพอร์ต UART Debug
+            Serial.println(PPP.cmd("AT+QGPSCFG=\"nmeasrc\",0", 10000));             // ปิดการดึง NMEA sentence ผ่าน AT+QGPSGNMEA
+            Serial.println(PPP.cmd("AT+QGPSCFG=\"gpsnmeatype\",63", 10000));        // เปิดใช้งาน NMEA sentence ทั้งหมด (GGA, RMC, GSV, GSA, VTG, GLL)
+            Serial.println(PPP.cmd("AT+QGPSCFG=\"gnssconfig\",1", 10000));          // เลือกใช้ระบบดาวเทียม GPS + BeiDou
+            Serial.println(PPP.cmd("AT+QGPSCFG=\"autogps\",0", 10000));             // ปิดใช้งาน GNSS อัตโนมัติเมื่อโมดูลเริ่มทำงาน
+            Serial.println(PPP.cmd("AT+QGPSCFG=\"apflash\",1", 10000));             // เปิดใช้งาน AP-Flash เพื่อการเริ่มต้นที่รวดเร็ว
+            Serial.println(PPP.cmd("AT+QGPS=1", 10000));
+        }
+
+        PPP.setApn("INTERNET");     // Set the APN for the modem
+        PPP.cmd("AT+CTZU=1", 1000); // Enable automatic time zone update
+        // PPP.setUser(ppp_user);
+        // PPP.setPass(ppp_pass);
+        // PPP.setApn(config.ppp_apn);
+        // PPP.setPin(config.ppp_pin);
+        // PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
+        // PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio, config.ppp_rts_gpio, config.ppp_cts_gpio, PPP_MODEM_FC);
+
+        PPP.setBaudrate(config.ppp_serial_baudrate); // Set the baud rate for the modem
+        sprintf(pppStatus.manufacturer, "%s", PPP.cmd("AT+CGMI", 10000).c_str());
+        sprintf(pppStatus.model, "%s", PPP.moduleName().c_str());
+        sprintf(pppStatus.imei, "%s", PPP.IMEI().c_str());
+        log_d("Manufacturer: %s", pppStatus.manufacturer);
+        log_d("Model: %s", pppStatus.model);
+        log_d("IMEI: %s", pppStatus.imei);
+
+        bool attached = PPP.attached();
+        if (!attached)
+        {
+            int i = 0;
+            unsigned int s = millis();
+            log_d("Waiting to connect to network");
+            while (!attached && ((++i) < 300))
+            {
+                log_d(".");
+                delay(100);
+                attached = PPP.attached();
+            }
+            log_d("%ds", (millis() - s) / 1000.0);
+            attached = PPP.attached();
+        }
+
+        log_d("Attached: %d", attached);
+        log_d("State: %d", PPP.radioState());
+        if (attached)
+        {
+            sprintf(pppStatus.oper, "%s", PPP.operatorName().c_str());
+            sprintf(pppStatus.imsi, "%s", PPP.IMSI().c_str());
+            log_d("IMSI: %s", pppStatus.imsi);
+            pppStatus.rssi = PPP.RSSI();
+            log_d("Operator: %s", pppStatus.oper);
+            log_d("RSSI: %d dBm", pppStatus.rssi);
+            // log_d("RSSI: %i", PPP.RSSI());
+            //  PPP.started(); // Start the PPP connection
+            //   if(PPP.sms("0984958488","Test SMS from ESP32")){
+            //       log_d("SMS sent successfully!");
+            //   } else {
+            //       log_d("Failed to send SMS.");
+            //   }
+            int ber = PPP.BER();
+            if (ber > 0)
+            {
+                log_d("BER: %i", ber);
+                log_d("NetMode: %i", PPP.networkMode());
+            }
+
+            log_d("Switching to data mode...");
+            PPP.mode(ESP_MODEM_MODE_DATA); // Data and Command mixed mode
+            if (!PPP.waitStatusBits(ESP_NETIF_CONNECTED_BIT, 5000))
+            {
+                log_d("Failed to connect to internet!");
+                PPP.mode(ESP_MODEM_MODE_COMMAND); // Switch back to command mode
+            }
+            else
+            {
+                log_d("Connected to internet!");
+            }
+        }
+        else
+        {
+            log_d("Failed to connect to network!");
+        }
+    }
+}
+
 void taskNetwork(void *pvParameters)
 {
     int c = 0;
@@ -8712,12 +9359,16 @@ void taskNetwork(void *pvParameters)
     log_d("Task Network has been start");
     manualWiFi = false;
 
+    // Listen for modem events
+    Network.onEvent(onEvent);
+
     // WiFi.onEvent(Wifi_connected,SYSTEM_EVENT_STA_CONNECTED);
     // WiFi.onEvent(Get_IPAddress, SYSTEM_EVENT_STA_GOT_IP);
     // WiFi.onEvent(Wifi_disconnected, SYSTEM_EVENT_STA_DISCONNECTED);
 
     if (config.wifi_mode == WIFI_STA_FIX)
-    { /**< WiFi station mode */
+    {
+        /**< WiFi station mode */
         WiFi.mode(WIFI_MODE_STA);
         WiFi.setTxPower((wifi_power_t)config.wifi_power);
     }
@@ -8747,32 +9398,51 @@ void taskNetwork(void *pvParameters)
             }
         }
         WiFi.setHostname("ESP32APRS_LoRa");
+        if (wifiMulti.run() == WL_CONNECTED)
+        {
+            log_d("Wi-Fi CONNECTED!");
+            log_d("IP address: %s", WiFi.localIP().toString().c_str());
+            NTP_Timeout = millis() + 2000;
+        }
     }
 
     if (config.wifi_mode & WIFI_AP_FIX)
     {
         manualWiFi = true;
         // กำหนดค่าการทำงานไวไฟเป็นแอสเซสพ้อย
-        WiFi.softAP(config.wifi_ap_ssid, config.wifi_ap_pass); // Start HOTspot removing password will disable security
-        WiFi.softAPConfig(local_IP, gateway, subnet);
+        // WiFi.softAP(config.wifi_ap_ssid, config.wifi_ap_pass); // Start HOTspot removing password will disable security
+        // WiFi.softAPConfig(local_IP, gateway, subnet);
         log_d("Access point running. IP address: ");
         log_d("%s", WiFi.softAPIP().toString().c_str());
+        // Start the Access Point
+        WiFi.AP.begin();
+        WiFi.AP.config(ap_ip, ap_ip, ap_mask, ap_leaseStart, ap_dns);
+        WiFi.AP.create(config.wifi_ap_ssid, config.wifi_ap_pass);
+        if (!WiFi.AP.waitStatusBits(ESP_NETIF_STARTED_BIT, 1000))
+        {
+            Serial.println("Failed to start AP!");
+            // return;
+        }
     }
 
-    if (wifiMulti.run() == WL_CONNECTED)
-    {
-        log_d("Wi-Fi CONNECTED!");
-        log_d("IP address: %s", WiFi.localIP().toString().c_str());
-        NTP_Timeout = millis() + 2000;
-    }
-
-    //WiFi.setSleep(false);
+    // WiFi.setSleep(false);
+    //  if (config.uart1_enable)
+    //  {
+    //      PPPOS_init(config.uart1_tx_gpio, config.uart1_rx_gpio, config.uart1_baudrate, 1, ppp_user, ppp_pass);
+    //  }
 
     pingTimeout = millis() + 10000;
     unsigned long timeNetworkOld = millis();
     timeNetwork = 0;
     if (config.wifi_mode & WIFI_AP_STA_FIX)
         webService();
+
+    PPPOS_Start(); // Start PPP connection if enabled
+
+    #ifdef BLUETOOTH
+    bluetooth_init(); // Initialize Bluetooth if enabled
+    #endif
+
     for (;;)
     {
         unsigned long now = millis();
@@ -8784,7 +9454,20 @@ void taskNetwork(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerNetwork_old = micros();
 
-        if (WiFi.isConnected() == true || WiFi.softAPgetStationNum() > 0)
+        if (config.ppp_enable)
+        {
+            if (!PPP.connected())
+            {
+                if (millis() > pppTimeout)
+                {
+                    log_d("PPP connection timeout!");
+                    PPPOS_Start(); // Restart PPP connection
+                    pppTimeout = millis() + (600 * 1000);
+                }
+            }
+        }
+
+        if (WiFi.isConnected() == true || WiFi.softAPgetStationNum() > 0 || PPP.connected())
         {
             if (lastHeard_Flag)
             {
@@ -8806,8 +9489,12 @@ void taskNetwork(void *pvParameters)
                 }
             }
         }
-
-        if (wifiMulti.run(connectTimeoutMs) == WL_CONNECTED)
+        uint8_t wifiStatus = WL_DISCONNECTED;
+        if (config.wifi_mode & WIFI_STA_FIX)
+        {
+            wifiStatus = wifiMulti.run(connectTimeoutMs);
+        }
+        if ((wifiStatus == WL_CONNECTED) || (PPP.connected()))
         {
             // config.pwr_sleep_activate |= ACTIVATE_WIFI;
             if (millis() > NTP_Timeout)
@@ -8830,6 +9517,10 @@ void taskNetwork(void *pvParameters)
                     pingTimeout = millis() + 2000;
                     if (config.vpn)
                     {
+                        // if (wireguard_up())
+                        //     log_d("Wireguard UP Link");
+                        // else
+                        //     log_d("Wireguard Connect Fail!");
                         if (!wireguard_active())
                         {
                             log_d("Setup Wiregurad VPN!");
@@ -8923,6 +9614,7 @@ void taskNetwork(void *pvParameters)
                                                 char *strtmp = (char *)calloc(350, sizeof(char));
                                                 if (strtmp)
                                                 {
+                                                    memset(strtmp, 0, 350);
                                                     if (config.aprs_ssid == 0)
                                                         sprintf(strtmp, "%s>APE32L", config.aprs_mycall);
                                                     else
@@ -8952,61 +9644,84 @@ void taskNetwork(void *pvParameters)
                 }
             }
 
-            if (millis() > pingTimeout)
+#ifdef MQTT
+            if (config.en_mqtt)
             {
-                pingTimeout = millis() + 60000;
-                log_d("Ping GW to %s\n", WiFi.gatewayIP().toString().c_str());
-                if (ping_start(WiFi.gatewayIP(), 2, 0, 0, 5) == true)
+                if (!clientMQTT.connected())
                 {
-                    log_d("GW Success!!\n");
+                    mqtt_reconnect();
                 }
                 else
                 {
-                    log_d("GW Fail!\n");
-                    WiFi.disconnect();
-                    WiFi.persistent(false);
-                    WiFi.mode(WIFI_OFF); // Switch WiFi off
-
-                    wifiTTL = 0;
-                    delay(3000);
-                    if (config.wifi_mode == WIFI_STA_FIX)
-                    { /**< WiFi station mode */
-                        WiFi.mode(WIFI_MODE_STA);
-                        WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                    }
-                    else if (config.wifi_mode == WIFI_AP_FIX)
-                    { /**< WiFi soft-AP mode */
-                        WiFi.mode(WIFI_MODE_AP);
-                        WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                    }
-                    else if (config.wifi_mode == WIFI_AP_STA_FIX)
-                    { /**< WiFi station + soft-AP mode */
-                        WiFi.mode(WIFI_MODE_APSTA);
-                        WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                    }
-                    else
-                    {
-                        WiFi.mode(WIFI_MODE_NULL);
-                    }
-                    WiFi.reconnect();
-                    wifiMulti.run(5000);
+                    clientMQTT.loop();
                 }
+            }
+#endif
+
+            if (millis() > pingTimeout)
+            {
+                pingTimeout = millis() + 60000;
+                // if(config.wifi_mode & WIFI_STA_FIX){
+                //     log_d("Ping GW to %s\n", WiFi.gatewayIP().toString().c_str());
+                //     if (ping_start(WiFi.gatewayIP(), 2, 0, 0, 5) == true)
+                //     {
+                //         log_d("GW Success!!\n");
+                //     }
+                //     else
+                //     {
+                //         log_d("GW Fail!\n");
+                //         WiFi.disconnect();
+                //         WiFi.persistent(false);
+                //         WiFi.mode(WIFI_OFF); // Switch WiFi off
+
+                //         wifiTTL = 0;
+                //         delay(3000);
+                //         if (config.wifi_mode == WIFI_STA_FIX)
+                //         { /**< WiFi station mode */
+                //             WiFi.mode(WIFI_MODE_STA);
+                //             WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                //         }
+                //         else if (config.wifi_mode == WIFI_AP_FIX)
+                //         { /**< WiFi soft-AP mode */
+                //             WiFi.mode(WIFI_MODE_AP);
+                //             WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                //         }
+                //         else if (config.wifi_mode == WIFI_AP_STA_FIX)
+                //         { /**< WiFi station + soft-AP mode */
+                //             WiFi.mode(WIFI_MODE_APSTA);
+                //             WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                //         }
+                //         else
+                //         {
+                //             WiFi.mode(WIFI_MODE_NULL);
+                //         }
+                //         WiFi.reconnect();
+                //         wifiMulti.run(5000);
+                //     }
+                // }
                 if (config.vpn)
                 {
-                    IPAddress vpnIP;
-                    vpnIP.fromString(String(config.wg_gw_address));
-                    log_d("Ping VPN to %s", vpnIP.toString().c_str());
-                    if (ping_start(vpnIP, 2, 0, 0, 10) == true)
+                    if (!wireguard_active())
                     {
-                        log_d("VPN Ping Success!!");
-                    }
-                    else
-                    {
-                        log_d("VPN Ping Fail!");
+                        log_d("Reconnection Wiregurad VPN!");
                         wireguard_remove();
-                        delay(3000);
+                        delay(1000);
                         wireguard_setup();
                     }
+                    // IPAddress vpnIP;
+                    // vpnIP.fromString(String(config.wg_gw_address));
+                    // log_d("Ping VPN to %s", vpnIP.toString().c_str());
+                    // if (ping_start(vpnIP, 2, 0, 0, 10) == true)
+                    // {
+                    //     log_d("VPN Ping Success!!");
+                    // }
+                    // else
+                    // {
+                    //     log_d("VPN Ping Fail!");
+                    //     wireguard_remove();
+                    //     delay(3000);
+                    //     wireguard_setup();
+                    // }
                 }
             }
         }
@@ -9104,11 +9819,11 @@ void dispTxWindow(txDisp txs)
     disp_delay = config.dispDelay * 1000;
     timeHalfSec = millis() + disp_delay;
 
-    #ifdef SSD1306_72x40
+#ifdef SSD1306_72x40
     display.fillRect(0, 0, 72, 9, WHITE);
     display.setTextColor(BLACK);
     display.setCursor(0, 1);
-    //display.print("");
+    // display.print("");
 
     txs.name[sizeof(txs.name) - 1] = 0;
     if (strlen(txs.name))
@@ -9143,17 +9858,17 @@ void dispTxWindow(txDisp txs)
     display.setFont();
     display.setTextColor(WHITE);
 
-    // char *pch;
-    // int y = 30;
-    // pch = strtok(txs.info, "\n");
-    // while (pch != NULL)
-    // {
-    //     display.setCursor(50, y);
-    //     display.printf("%s", pch);
-    //     pch = strtok(NULL, "\n");
-    //     y += 9;
-    // }
-    #else
+// char *pch;
+// int y = 30;
+// pch = strtok(txs.info, "\n");
+// while (pch != NULL)
+// {
+//     display.setCursor(50, y);
+//     display.printf("%s", pch);
+//     pch = strtok(NULL, "\n");
+//     y += 9;
+// }
+#else
     display.setFont(&FreeSansBold9pt7b);
     display.setCursor(0, 14);
     txs.name[sizeof(txs.name) - 1] = 0;
@@ -9217,12 +9932,12 @@ void dispTxWindow(txDisp txs)
         pch = strtok(NULL, "\n");
         y += 9;
     }
-    #endif
+#endif
     display.display();
 #elif defined(ST7735_160x80)
     display.fillScreen(ST77XX_BLACK);
     display.setTextColor(ST77XX_BLUE);
-    ledcWrite(0, config.disp_brightness);
+    ledcWrite(ST7735_LED_K_Pin, config.disp_brightness);
     disp_delay = config.dispDelay * 1000;
     timeHalfSec = millis() + disp_delay;
 
@@ -9519,7 +10234,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 display.drawChar(5, 4, aprs.symbol[0], BLACK, WHITE, 1);
                 display.drawChar(6, 5, aprs.symbol[0], BLACK, WHITE, 1);
             }
-        #ifdef SSD1306_72x40
+#ifdef SSD1306_72x40
             display.setFont();
             display.setTextColor(BLACK);
             display.print(src_call);
@@ -9617,8 +10332,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setFont();
                     display.setTextColor(WHITE);
                     display.setCursor(0, 12);
-                    //display.print(Telemetry[idx].PARM[0]);
-                    //display.print(":");
+                    // display.print(Telemetry[idx].PARM[0]);
+                    // display.print(":");
 
                     if (fmod(Telemetry[idx].VAL[0], 1) == 0)
                         display.print(Telemetry[idx].VAL[0], 0);
@@ -9626,32 +10341,32 @@ void dispWindow(String line, uint8_t mode, bool filter)
                         display.print(Telemetry[idx].VAL[0], 1);
                     display.print(Telemetry[idx].UNIT[0]);
                     display.setCursor(20, 12);
-                    //display.print(Telemetry[idx].PARM[1]);
-                    //display.print(":");
+                    // display.print(Telemetry[idx].PARM[1]);
+                    // display.print(":");
                     if (fmod(Telemetry[idx].VAL[1], 1) == 0)
                         display.print(Telemetry[idx].VAL[1], 0);
                     else
                         display.print(Telemetry[idx].VAL[1], 1);
                     display.print(Telemetry[idx].UNIT[1]);
                     display.setCursor(0, 22);
-                    //display.print(Telemetry[idx].PARM[2]);
-                    //display.print(":");
+                    // display.print(Telemetry[idx].PARM[2]);
+                    // display.print(":");
                     if (fmod(Telemetry[idx].VAL[2], 1) == 0)
                         display.print(Telemetry[idx].VAL[2], 0);
                     else
                         display.print(Telemetry[idx].VAL[2], 1);
                     display.print(Telemetry[idx].UNIT[2]);
                     display.setCursor(21, 22);
-                    //display.print(Telemetry[idx].PARM[3]);
-                    //display.print(":");
+                    // display.print(Telemetry[idx].PARM[3]);
+                    // display.print(":");
                     if (fmod(Telemetry[idx].VAL[3], 1) == 0)
                         display.print(Telemetry[idx].VAL[3], 0);
                     else
                         display.print(Telemetry[idx].VAL[3], 1);
                     display.print(Telemetry[idx].UNIT[3]);
                     display.setCursor(0, 32);
-                    //display.print(Telemetry[idx].PARM[4]);
-                    //display.print(":");
+                    // display.print(Telemetry[idx].PARM[4]);
+                    // display.print(":");
                     display.print(Telemetry[idx].VAL[4], 1);
                     display.print(Telemetry[idx].UNIT[4]);
 
@@ -9721,15 +10436,15 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.print("MESSAGE");
                     display.setCursor(0, 10);
                     display.print("{");
-                    //char txtID[7];
-                    //memset(txtID, 0, sizeof(txtID));
-                    //strncpy(&txtID[0], aprs.msg.msgid, aprs.msg.msgid_len);
-                    //int msgid = atoi(txtID);
-                    // display.print(msgid, DEC);
-                    //display.printf("%s", txtID);
-                    //display.print("}");
-                    // memset(&text[0], 0, sizeof(text));
-                    // memcpy(&text[0], aprs.comment, aprs.comment_len);
+                    // char txtID[7];
+                    // memset(txtID, 0, sizeof(txtID));
+                    // strncpy(&txtID[0], aprs.msg.msgid, aprs.msg.msgid_len);
+                    // int msgid = atoi(txtID);
+                    //  display.print(msgid, DEC);
+                    // display.printf("%s", txtID);
+                    // display.print("}");
+                    //  memset(&text[0], 0, sizeof(text));
+                    //  memcpy(&text[0], aprs.comment, aprs.comment_len);
                     display.setFont();
                     display.setTextColor(WHITE);
                     // display.setCursor(2, 10);
@@ -9775,7 +10490,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
             }
             display.setFont();
             display.drawFastHLine(0, 16, 70, WHITE);
-            //display.drawFastVLine(48, 16, 48, WHITE);
+            // display.drawFastVLine(48, 16, 48, WHITE);
             display.setCursor(16, 4);
             if (aprs.srcname_len > 0)
             {
@@ -9903,39 +10618,39 @@ void dispWindow(String line, uint8_t mode, bool filter)
                         lat = config.igate_lat;
                         lon = config.igate_lon;
                     }
-                    //double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
-                    //double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
-                    // if (config.h_up == true)
-                    // {
-                    //     // double course = gps.course.deg();
-                    //     double course = SB_HEADING;
-                    //     if (dtmp >= course)
-                    //     {
-                    //         dtmp -= course;
-                    //     }
-                    //     else
-                    //     {
-                    //         double diff = dtmp - course;
-                    //         dtmp = diff + 360.0F;
-                    //     }
-                    //     compass_label(25, 37, 15, course, WHITE);
-                    //     display.setCursor(0, 17);
-                    //     display.printf("H");
-                    // }
-                    // else
-                    // {
-                    //     compass_label(25, 37, 15, 0.0F, WHITE);
-                    // }
-                    // compass_label(25, 37, 15, 0.0F, WHITE);
-                    // compass_arrow(25, 37, 12, dtmp, WHITE);
-                    // display.drawFastHLine(1, 63, 45, WHITE);
-                    // display.drawFastVLine(1, 58, 5, WHITE);
-                    // display.drawFastVLine(46, 58, 5, WHITE);
-                    // display.setCursor(4, 55);
-                    // if (dist > 999)
-                    //     display.printf("%.fKm", dist);
-                    // else
-                    //     display.printf("%.1fKm", dist);
+                    // double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
+                    // double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
+                    //  if (config.h_up == true)
+                    //  {
+                    //      // double course = gps.course.deg();
+                    //      double course = SB_HEADING;
+                    //      if (dtmp >= course)
+                    //      {
+                    //          dtmp -= course;
+                    //      }
+                    //      else
+                    //      {
+                    //          double diff = dtmp - course;
+                    //          dtmp = diff + 360.0F;
+                    //      }
+                    //      compass_label(25, 37, 15, course, WHITE);
+                    //      display.setCursor(0, 17);
+                    //      display.printf("H");
+                    //  }
+                    //  else
+                    //  {
+                    //      compass_label(25, 37, 15, 0.0F, WHITE);
+                    //  }
+                    //  compass_label(25, 37, 15, 0.0F, WHITE);
+                    //  compass_arrow(25, 37, 12, dtmp, WHITE);
+                    //  display.drawFastHLine(1, 63, 45, WHITE);
+                    //  display.drawFastVLine(1, 58, 5, WHITE);
+                    //  display.drawFastVLine(46, 58, 5, WHITE);
+                    //  display.setCursor(4, 55);
+                    //  if (dist > 999)
+                    //      display.printf("%.fKm", dist);
+                    //  else
+                    //      display.printf("%.1fKm", dist);
                 }
                 // else
                 // {
@@ -10011,7 +10726,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
 
                 display.setCursor(0, x += 9);
                 display.print("DX: ");
-                str = String(dist, 5)+"Km";
+                str = String(dist, 5) + "Km";
                 l = str.length() * 6;
                 display.setCursor(70 - l, x);
                 display.print(str);
@@ -10059,7 +10774,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.print(aprs.comment);
                 }*/
             }
-        #else
+#else
             display.setCursor(20, 7);
             display.setTextSize(1);
             display.setFont(&FreeSansBold9pt7b);
@@ -10601,11 +11316,11 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.print(aprs.comment);
                 }*/
             }
-            #endif
+#endif
             display.display();
 #elif defined(ST7735_160x80)
             display.fillScreen(ST77XX_BLACK);
-            ledcWrite(0, config.disp_brightness);
+            ledcWrite(ST7735_LED_K_Pin, config.disp_brightness);
             if (dispPush)
             {
                 disp_delay = 600 * 1000;
@@ -10917,8 +11632,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(68, x += 10);
                     display.drawYBitmap(61, x, &Temperature_Symbol[0], 5, 8, WHITE);
-                    //display.printf("%.2fC", aprs.wave_report.Temp);
-                    display.print(aprs.wave_report.Temp,2);
+                    // display.printf("%.2fC", aprs.wave_report.Temp);
+                    display.print(aprs.wave_report.Temp, 2);
                     display.print("C");
                 }
                 if (aprs.wave_report.flags & O_HS)
@@ -10926,16 +11641,16 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     // display.setCursor(102, x);
                     display.setCursor(68, x += 9);
                     display.print("Hs: ");
-                    //display.printf("%0.1f M", aprs.wave_report.Hs / 100);
-                    display.print(aprs.wave_report.Hs/100,1);
+                    // display.printf("%0.1f M", aprs.wave_report.Hs / 100);
+                    display.print(aprs.wave_report.Hs / 100, 1);
                     display.print("M");
                 }
                 if (aprs.wave_report.flags & O_TZ)
                 {
                     display.setCursor(68, x += 9);
                     display.print("Tz: ");
-                    //display.printf("%0.1f S", aprs.wave_report.Tz);
-                    display.print(aprs.wave_report.Tz,1);
+                    // display.printf("%0.1f S", aprs.wave_report.Tz);
+                    display.print(aprs.wave_report.Tz, 1);
                     display.print("S");
                 }
                 // if (aprs.wave_report.flags & O_TC)
@@ -10948,8 +11663,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(68, x += 9);
                     display.print("BAT: ");
-                    //display.printf("%0.2fV", aprs.wave_report.Bat);
-                    display.print(aprs.wave_report.Bat,2);
+                    // display.printf("%0.2fV", aprs.wave_report.Bat);
+                    display.print(aprs.wave_report.Bat, 2);
                     display.print("V");
                 }
             }
@@ -10963,24 +11678,24 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(68, x += 10);
                     display.drawYBitmap(61, x, &Temperature_Symbol[0], 5, 8, WHITE);
-                    //display.printf("%.1fC", aprs.wx_report.temp);
-                    display.print(aprs.wx_report.temp,2);
+                    // display.printf("%.1fC", aprs.wx_report.temp);
+                    display.print(aprs.wx_report.temp, 2);
                     display.print("C");
                 }
                 if (aprs.wx_report.flags & W_HUM)
                 {
                     display.setCursor(122, x);
                     display.drawYBitmap(115, x, &Humidity_Symbol[0], 5, 8, WHITE);
-                    //display.printf("%d%%", aprs.wx_report.humidity);
-                    display.print(aprs.wx_report.humidity,1);
+                    // display.printf("%d%%", aprs.wx_report.humidity);
+                    display.print(aprs.wx_report.humidity, 1);
                     display.print("%%");
                 }
                 if (aprs.wx_report.flags & W_BAR)
                 {
                     display.setCursor(68, x += 9);
                     display.drawYBitmap(61, x, &Pressure_Symbol[0], 5, 8, WHITE);
-                    //display.printf("%.1fhPa", aprs.wx_report.pressure);
-                    display.print(aprs.wx_report.pressure,1);
+                    // display.printf("%.1fhPa", aprs.wx_report.pressure);
+                    display.print(aprs.wx_report.pressure, 1);
                     display.print("hPa");
                 }
                 if (aprs.wx_report.flags & W_R24H)
@@ -10988,8 +11703,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     // if (aprs.wx_report.rain_1h > 0) {
                     display.setCursor(68, x += 9);
                     display.drawYBitmap(61, x, &Rain_Symbol[0], 5, 8, WHITE);
-                    //display.printf("%.1fmm.", aprs.wx_report.rain_24h);
-                    display.print(aprs.wx_report.rain_24h,1);
+                    // display.printf("%.1fmm.", aprs.wx_report.rain_24h);
+                    display.print(aprs.wx_report.rain_24h, 1);
                     display.print("mm");
                     //}
                 }
@@ -10999,12 +11714,12 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setCursor(61, x += 9);
                     display.printf("%c", 0x0f);
                     display.setCursor(68, x);
-                    //display.printf("%dW/m", aprs.wx_report.luminosity);
+                    // display.printf("%dW/m", aprs.wx_report.luminosity);
                     display.print(aprs.wx_report.luminosity);
                     display.print("W/m");
                     if (aprs.wx_report.flags & W_UV)
                     {
-                        //display.printf(" UV%d", aprs.wx_report.uv);
+                        // display.printf(" UV%d", aprs.wx_report.uv);
                         display.print("UV:");
                         display.print(aprs.wx_report.uv);
                     }
@@ -11018,8 +11733,8 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     int dirIdx = ((aprs.wx_report.wind_dir + 22) / 45) % 8;
                     if (dirIdx > 8)
                         dirIdx = 8;
-                    //display.printf("%.1fkPh(%s)", aprs.wx_report.wind_speed, directions[dirIdx]);
-                    display.print(aprs.wx_report.wind_speed,1);
+                    // display.printf("%.1fkPh(%s)", aprs.wx_report.wind_speed, directions[dirIdx]);
+                    display.print(aprs.wx_report.wind_speed, 1);
                     display.print("kPh(");
                     display.print(directions[dirIdx]);
                     display.print(")");
@@ -11072,7 +11787,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     //     //display.printf("%.fKm", dist);
                     //     display.print(dist,0);
                     // else
-                    display.print(dist,1);
+                    display.print(dist, 1);
                     display.print("Km");
                 }
                 else
@@ -11150,7 +11865,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 // else
                 //     display.printf("DX:%.1fKm", dist);
                 display.print("DX:");
-                display.print(dist,1);
+                display.print(dist, 1);
                 display.print("Km");
                 display.setTextColor(WHITE);
                 if (aprs.flags & F_CSRSPD)
@@ -11158,15 +11873,15 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     display.setCursor(61, x += 9);
                     // display.printf("SPD %d/", aprs.course);
                     // display.setCursor(50, x += 9);
-                    //display.printf("SPD %.1fkPh\n", aprs.speed);
+                    // display.printf("SPD %.1fkPh\n", aprs.speed);
                     display.print("SPD: ");
-                    display.print(aprs.speed,1);
+                    display.print(aprs.speed, 1);
                     display.print("Kph");
                     int dirIdx = ((aprs.course + 22) / 45) % 8;
                     if (dirIdx > 8)
                         dirIdx = 8;
                     display.setCursor(61, x += 9);
-                    //display.printf("CSD %d(%s)", aprs.course, directions[dirIdx]);
+                    // display.printf("CSD %d(%s)", aprs.course, directions[dirIdx]);
                     display.print("CSD: ");
                     display.print(aprs.course);
                     display.print("(");
@@ -11176,9 +11891,9 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 if (aprs.flags & F_ALT)
                 {
                     display.setCursor(61, x += 9);
-                    //display.printf("ALT %.1fM\n", aprs.altitude);
+                    // display.printf("ALT %.1fM\n", aprs.altitude);
                     display.print("ALT: ");
-                    display.print(aprs.altitude,1);
+                    display.print(aprs.altitude, 1);
                     display.print("M");
                 }
                 if (aprs.flags & F_PHG)
@@ -11192,17 +11907,17 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     height = height / 3.2808;
                     gain = (int)aprs.phg[2] - 0x30;
                     display.setCursor(61, x += 9);
-                    //display.printf("PHG %dM.\n", height);
+                    // display.printf("PHG %dM.\n", height);
                     display.print("PHG: ");
                     display.print(height);
                     display.print("M");
                     display.setCursor(61, x += 9);
-                    //display.printf("PWR %dWatt\n", power);
+                    // display.printf("PWR %dWatt\n", power);
                     display.print("PWR: ");
                     display.print(power);
                     display.print("Watt");
                     display.setCursor(61, x += 9);
-                    //display.printf("ANT %ddBi\n", gain);
+                    // display.printf("ANT %ddBi\n", gain);
                     display.print("ANT: ");
                     display.print(gain);
                     display.print("dBi");
@@ -11210,7 +11925,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 if (aprs.flags & F_RNG)
                 {
                     display.setCursor(61, x += 9);
-                    //display.printf("RNG %dKm\n", aprs.radio_range);
+                    // display.printf("RNG %dKm\n", aprs.radio_range);
                     display.print("RNG: ");
                     display.print(aprs.radio_range);
                     display.print("Km");
@@ -12043,10 +12758,10 @@ void wifiDisp()
     display.setTextSize(1);
     display.setFont(&FreeSansBold9pt7b);
     display.setTextColor(BLACK);
-    if(manualWiFi)
-    display.print("WiFi [ON]");
+    if (manualWiFi)
+        display.print("WiFi [ON]");
     else
-    display.print("WiFi [OFF]");
+        display.print("WiFi [OFF]");
     display.setFont();
     display.setCursor(150, 7);
     display.print("6");
@@ -12206,7 +12921,7 @@ void radioDisp()
     display.setTextSize(1);
     display.setFont(&FreeSansBold9pt7b);
     display.setTextColor(BLACK);
-    if(config.rf_en)
+    if (config.rf_en)
         display.print("RADIO [ON]");
     else
         display.print("RADIO [OFF]");

@@ -1,18 +1,20 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-
 #include "KISS.h"
+#include "AX25.h"
 
 extern size_t ctxbufflen;
 size_t frame_len;
 extern uint8_t *ctxbuffer;
 
 static uint8_t serialBuffer[AX25_MAX_FRAME_LEN]; // Buffer for holding incoming serial data
-AX25Ctx testkiss;
+// AX25Ctx testkiss;
+extern AX25Ctx AX25;
+extern void aprs_msg_callback(struct AX25Msg *msg);
 
-bool IN_FRAME;
-bool ESCAPE;
+bool IN_FRAME = false;
+bool ESCAPE = false;
 
 uint8_t command = CMD_UNKNOWN;
 extern unsigned long custom_preamble;
@@ -49,13 +51,17 @@ int kiss_wrapper(uint8_t *pkg)
     size = ptr - pkg;
     return size;
 }
-
 void kiss_serial(uint8_t sbyte)
 {
     if (IN_FRAME && sbyte == FEND && command == CMD_DATA)
     {
         IN_FRAME = false;
-        ax25_sendRaw(&testkiss, serialBuffer, frame_len);
+        // ax25_sendRaw(&AX25, serialBuffer, frame_len);
+        log_d("[KISS] Received packet! %d Byte", frame_len);
+        ax25_init(&AX25, aprs_msg_callback);
+        AX25.frame_len = frame_len;
+        memcpy(AX25.buf, serialBuffer, frame_len);
+        ax25_decode(&AX25);
     }
     else if (sbyte == FEND)
     {
