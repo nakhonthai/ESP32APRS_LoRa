@@ -2151,6 +2151,8 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 		return 0;
 	}
 
+	pb->packettype |= T_WX;
+
 	/* Initialize result vars. */
 	memset(wind_dir, 0, 4);
 	memset(wind_speed, 0, 4);
@@ -2574,7 +2576,7 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	{
 		pb->wx_report.flags |= W_HUM;
 		pb->wx_report.humidity = atof(humidity2)/10.0F; // tenths of percent to percent
-		log_d("Humidity: %0.1f\n", pb->wx_report.humidity);
+		log_d("Humidity2: %0.1f\n", pb->wx_report.humidity);
 	}else if (is_number(humidity))
 	{
 		pb->wx_report.flags |= W_HUM;

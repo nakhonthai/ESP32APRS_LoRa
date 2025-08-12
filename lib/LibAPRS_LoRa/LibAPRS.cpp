@@ -31,7 +31,7 @@ extern Configuration config;
 extern WiFiClient aprsClient;
 
 // Radio::Radio()
-#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6 || CONFIG_IDF_TARGET_ESP32S3
 SPIClass spi(FSPI);
 #else
 SPIClass spi(VSPI);

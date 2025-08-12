@@ -3957,7 +3957,7 @@ void bluetooth_init()
 {
     if (config.bt_master == true)
     {
-#if !defined(CONFIG_IDF_TARGET_ESP32)
+#if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
         // Initialize BLE stack and Nordic UART service
         NimBLEDevice::init(config.bt_name);
         NimBLEDevice::getAdvertising()->setName(config.bt_name);
@@ -7838,7 +7838,7 @@ void taskAPRS(void *pvParameters)
         timerAPRS_old = micros();
 
 #ifdef BLUETOOTH
-#if !defined(CONFIG_IDF_TARGET_ESP32)
+#if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
         if (NuSerial.isConnected())
         {
             if (NuSerial.available())
@@ -8317,7 +8317,7 @@ void taskAPRS(void *pvParameters)
                 {
                     char *rawP = (char *)malloc(tnc2.length());
                     memcpy(rawP, tnc2.c_str(), tnc2.length());
-#if defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(CONFIG_IDF_TARGET_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32C6)
                     SerialBT.write((uint8_t *)rawP, tnc2.length());
 #else
                     if (NuSerial.isConnected())
@@ -8331,7 +8331,7 @@ void taskAPRS(void *pvParameters)
                 { // KISS
                     uint8_t pkg[500];
                     int sz = kiss_wrapper(pkg);
-#if defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(CONFIG_IDF_TARGET_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32C6)
                     SerialBT.write(pkg, sz);
 #else
                     if (NuSerial.isConnected())
@@ -8355,10 +8355,10 @@ void taskAPRS(void *pvParameters)
                 else
                     sprintf(call, "%s", incomingPacket.src.call);
 
-                char *rawP = (char *)calloc(tnc2.length(), sizeof(char));
+                char *rawP = (char *)calloc(tnc2.length()+1, sizeof(char));
                 if (rawP)
                 {
-                    memset(rawP, 0, tnc2.length());
+                    memset(rawP, 0, tnc2.length()+1);
                     tnc2.toCharArray(rawP, tnc2.length(), 0);
                     // memcpy(rawP, tnc2.c_str(), tnc2.length());
                     int idx = pkgListUpdate(call, rawP, type, 0);
@@ -8369,8 +8369,8 @@ void taskAPRS(void *pvParameters)
 
                         if (config.rx_display && config.dispRF && (type & config.dispFilter))
                         {
-                            dispBuffer.push(tnc2.c_str());
-                            log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, tnc2.c_str());
+                            dispBuffer.push(rawP);
+                            log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
                         }
                     }
 #endif
@@ -10564,7 +10564,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(28, x);
                     display.drawYBitmap(20, x, &Humidity_Symbol[0], 5, 8, WHITE);
-                    display.printf("%d%%", aprs.wx_report.humidity);
+                    display.printf("%0.1f%%", aprs.wx_report.humidity);
                 }
                 if (aprs.wx_report.flags & W_BAR)
                 {
@@ -11113,7 +11113,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(102, x);
                     display.drawYBitmap(95, x, &Humidity_Symbol[0], 5, 8, WHITE);
-                    display.printf("%d%%", aprs.wx_report.humidity);
+                    display.printf("%0.1f%%", aprs.wx_report.humidity);
                 }
                 if (aprs.wx_report.flags & W_BAR)
                 {
@@ -11686,9 +11686,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 {
                     display.setCursor(122, x);
                     display.drawYBitmap(115, x, &Humidity_Symbol[0], 5, 8, WHITE);
-                    // display.printf("%d%%", aprs.wx_report.humidity);
-                    display.print(aprs.wx_report.humidity, 1);
-                    display.print("%%");
+                    display.printf("%0.1f%%", aprs.wx_report.humidity);
                 }
                 if (aprs.wx_report.flags & W_BAR)
                 {

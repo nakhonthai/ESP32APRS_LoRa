@@ -51,15 +51,11 @@
 
 #ifdef BOARD_HAS_PSRAM
 #define TLMLISTSIZE 100
-#define PKGLISTSIZE 20
-#define PKGTXSIZE 100
+#define PKGLISTSIZE 30
+#define PKGTXSIZE 10
 #else
 #define TLMLISTSIZE 5
-#if defined(CONFIG_IDF_TARGET_ESP32)
-#define PKGLISTSIZE 10
-#else
 #define PKGLISTSIZE 20
-#endif
 #define PKGTXSIZE 5
 #endif
 
@@ -300,7 +296,6 @@ typedef struct Telemetry_struct
 typedef struct txQueue_struct
 {
 	bool Active;
-	bool IsCB;
 	uint8_t Channel;
 	long timeStamp;
 	int Delay;
