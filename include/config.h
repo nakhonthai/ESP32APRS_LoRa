@@ -318,7 +318,7 @@ typedef struct Config_Struct
 	bool vpn;
 	bool modem;
 	uint16_t wg_port;
-	char wg_peer_address[16];
+	char wg_peer_address[32];
 	char wg_local_address[16];
 	char wg_netmask_address[16];
 	char wg_gw_address[16];

@@ -2566,7 +2566,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Address</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input  size=\"20\" id=\"wg_peer_address\" name=\"wg_peer_address\" type=\"text\" value=\"" + String(config.wg_peer_address) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input  size=\"20\" maxlength=\"32\" id=\"wg_peer_address\" name=\"wg_peer_address\" type=\"text\" value=\"" + String(config.wg_peer_address) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
