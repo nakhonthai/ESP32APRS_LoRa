@@ -4039,7 +4039,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "<tr>\n";
 
 		html += "<td align=\"right\"><b>PIN:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input min=\"0\" max=\"999999\" name=\"pppPin\" type=\"number\" value=\"" + String(config.ppp_pin, DEC) + "\" /> <i>*PIN of SIM</i></td>\n";
+		html += "<td style=\"text-align: left;\"><input min=\"0\" max=\"999999\" name=\"pppPin\" type=\"number\" value=\"" + String(config.ppp_pin) + "\" /> <i>*PIN of SIM</i></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 
