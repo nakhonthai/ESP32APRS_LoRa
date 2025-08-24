@@ -116,10 +116,11 @@ void IRAM_ATTR doEncoder()
 }
 #endif
 
+#ifdef PPPOS
 #include <PPP.h>
 #define PPP_MODEM_APN "internet"
 #define PPP_MODEM_PIN "0000" // or NULL
-
+#endif
 // WaveShare SIM7600 HW Flow Control
 // #define PPP_MODEM_RST       25
 // #define PPP_MODEM_RST_LOW   false  //active HIGH
@@ -142,6 +143,7 @@ void IRAM_ATTR doEncoder()
 #define PPP_MODEM_FC ESP_MODEM_FLOW_CONTROL_NONE
 #define PPP_MODEM_MODEL PPP_MODEM_SIM7000
 #else
+#ifdef PPPOS
 // SIM800 basic module with just TX,RX and RST
 #define PPP_MODEM_RST_DELAY 500
 #define PPP_MODEM_RST 13
@@ -154,13 +156,21 @@ void IRAM_ATTR doEncoder()
 #define PPP_MODEM_MODEL PPP_MODEM_SIM800
 #endif
 
+#endif
+
 // #if !defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(CONFIG_IDF_TARGET_ESP32C6)
 
-#ifdef TTGO_T_Beam_S3_SUPREME_V3
+#ifdef T_BEAM_S3_SUPREME
 #include <XPowersLib.h>
 #define PMU_I2C_SDA (42)
 #define PMU_I2C_SCL (41)
 #define PMU_IRQ (40)
+XPowersAXP2101 PMU;
+#elif T_BEAM_S3_BPF
+#include <XPowersLib.h>
+#define PMU_I2C_SDA (8)
+#define PMU_I2C_SCL (9)
+#define PMU_IRQ (4)
 XPowersAXP2101 PMU;
 #endif
 
@@ -656,7 +666,7 @@ bool setupPower()
 }
 #endif
 
-#ifdef TTGO_T_Beam_S3_SUPREME_V3
+#ifdef T_BEAM_S3_SUPREME
 void setupPower()
 {
     bool result = PMU.begin(Wire1, AXP2101_SLAVE_ADDRESS, PMU_I2C_SDA, PMU_I2C_SCL);
@@ -737,6 +747,229 @@ void setupPower()
 
     //! BLDO1 MIC VDD
     PMU.enableBLDO1();
+
+    //! DC3 Radio & Pixels VDD
+    PMU.enableDC3();
+
+    // power off when not in use
+    PMU.disableDC2();
+    PMU.disableDC4();
+    PMU.disableCPUSLDO();
+    PMU.disableDLDO1();
+    PMU.disableDLDO2();
+
+    log_d("DCDC=======================================================================");
+    log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
+    log_d("DC2  : %s   Voltage:%u mV \n", PMU.isEnableDC2() ? "+" : "-", PMU.getDC2Voltage());
+    log_d("DC3  : %s   Voltage:%u mV \n", PMU.isEnableDC3() ? "+" : "-", PMU.getDC3Voltage());
+    log_d("DC4  : %s   Voltage:%u mV \n", PMU.isEnableDC4() ? "+" : "-", PMU.getDC4Voltage());
+    log_d("DC5  : %s   Voltage:%u mV \n", PMU.isEnableDC5() ? "+" : "-", PMU.getDC5Voltage());
+    log_d("ALDO=======================================================================");
+    log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
+    log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
+    log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableALDO3() ? "+" : "-", PMU.getALDO3Voltage());
+    log_d("ALDO4: %s   Voltage:%u mV\n", PMU.isEnableALDO4() ? "+" : "-", PMU.getALDO4Voltage());
+    log_d("BLDO=======================================================================");
+    log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableBLDO1() ? "+" : "-", PMU.getBLDO1Voltage());
+    log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableBLDO2() ? "+" : "-", PMU.getBLDO2Voltage());
+    log_d("===========================================================================");
+
+    // Set the time of pressing the button to turn off
+    PMU.setPowerKeyPressOffTime(XPOWERS_POWEROFF_4S);
+    uint8_t opt = PMU.getPowerKeyPressOffTime();
+    log_d("PowerKeyPressOffTime:");
+    switch (opt)
+    {
+    case XPOWERS_POWEROFF_4S:
+        log_d("4 Second");
+        break;
+    case XPOWERS_POWEROFF_6S:
+        log_d("6 Second");
+        break;
+    case XPOWERS_POWEROFF_8S:
+        log_d("8 Second");
+        break;
+    case XPOWERS_POWEROFF_10S:
+        log_d("10 Second");
+        break;
+    default:
+        break;
+    }
+    // Set the button power-on press time
+    PMU.setPowerKeyPressOnTime(XPOWERS_POWERON_128MS);
+    opt = PMU.getPowerKeyPressOnTime();
+    log_d("PowerKeyPressOnTime:");
+    switch (opt)
+    {
+    case XPOWERS_POWERON_128MS:
+        log_d("128 Ms");
+        break;
+    case XPOWERS_POWERON_512MS:
+        log_d("512 Ms");
+        break;
+    case XPOWERS_POWERON_1S:
+        log_d("1 Second");
+        break;
+    case XPOWERS_POWERON_2S:
+        log_d("2 Second");
+        break;
+    default:
+        break;
+    }
+
+    log_d("===========================================================================");
+    // It is necessary to disable the detection function of the TS pin on the board
+    // without the battery temperature detection function, otherwise it will cause abnormal charging
+    PMU.disableTSPinMeasure();
+
+    // Enable internal ADC detection
+    PMU.enableBattDetection();
+    PMU.enableVbusVoltageMeasure();
+    PMU.enableBattVoltageMeasure();
+    PMU.enableSystemVoltageMeasure();
+
+    /*
+      The default setting is CHGLED is automatically controlled by the PMU.
+    - XPOWERS_CHG_LED_OFF,
+    - XPOWERS_CHG_LED_BLINK_1HZ,
+    - XPOWERS_CHG_LED_BLINK_4HZ,
+    - XPOWERS_CHG_LED_ON,
+    - XPOWERS_CHG_LED_CTRL_CHG,
+    * */
+    // PMU.setChargingLedMode(XPOWERS_CHG_LED_BLINK_1HZ);
+    PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
+    // Force add pull-up
+    pinMode(PMU_IRQ, INPUT);
+    // attachInterrupt(PMU_IRQ, setFlag, FALLING);
+
+    // Disable all interrupts
+    PMU.disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
+    // Clear all interrupt flags
+    PMU.clearIrqStatus();
+    // Enable the required interrupt function
+    PMU.enableIRQ(
+        XPOWERS_AXP2101_BAT_INSERT_IRQ | XPOWERS_AXP2101_BAT_REMOVE_IRQ |    // BATTERY
+        XPOWERS_AXP2101_VBUS_INSERT_IRQ | XPOWERS_AXP2101_VBUS_REMOVE_IRQ |  // VBUS
+        XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ |     // POWER KEY
+        XPOWERS_AXP2101_BAT_CHG_DONE_IRQ | XPOWERS_AXP2101_BAT_CHG_START_IRQ // CHARGE
+    );
+    PMU.setIrqLevel(2);
+
+    // Set the precharge charging current
+    PMU.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_200MA);
+
+    // Set constant current charge current limit
+    //! Using inferior USB cables and adapters will not reach the maximum charging current.
+    //! Please pay attention to add a suitable heat sink above the PMU when setting the charging current to 1A
+    PMU.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_1000MA);
+
+    // Set stop charging termination current
+    PMU.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_150MA);
+
+    // Set charge cut-off voltage
+    PMU.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
+
+    // Disable the PMU long press shutdown function
+    // PMU.disableLongPressShutdown();
+    PMU.enableLongPressShutdown();
+
+    // Get charging target current
+    const uint16_t currTable[] = {
+        0, 0, 0, 0, 100, 125, 150, 175, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+    uint8_t val = PMU.getChargerConstantCurr();
+    log_d("Val = %d", val);
+    log_d("Setting Charge Target Current : %d", currTable[val]);
+
+    // Get charging target voltage
+    const uint16_t tableVoltage[] = {
+        0, 4000, 4100, 4200, 4350, 4400, 255};
+    val = PMU.getChargeTargetVoltage();
+    log_d("Setting Charge Target Voltage : %d", tableVoltage[val]);
+}
+#endif
+
+#ifdef T_BEAM_S3_BPF
+void setupPower()
+{
+    bool result = PMU.begin(Wire, AXP2101_SLAVE_ADDRESS, PMU_I2C_SDA, PMU_I2C_SCL);
+    if (result == false)
+    {
+        while (1)
+        {
+            log_d("PMU is not online...");
+            delay(500);
+        }
+    }
+
+    // Set the minimum common working voltage of the PMU VBUS input,
+    // below this value will turn off the PMU
+    PMU.setVbusVoltageLimit(XPOWERS_AXP2101_VBUS_VOL_LIM_3V88);
+
+    // Set the maximum current of the PMU VBUS input,
+    // higher than this value will turn off the PMU
+    PMU.setVbusCurrentLimit(XPOWERS_AXP2101_VBUS_CUR_LIM_2000MA);
+
+    // Get the VSYS shutdown voltage
+    uint16_t vol = PMU.getSysPowerDownVoltage();
+    log_d("->  getSysPowerDownVoltage:%u\n", vol);
+
+    // Set VSY off voltage as 2600mV , Adjustment range 2600mV ~ 3300mV
+    PMU.setSysPowerDownVoltage(2800);
+
+    //! DC1 ESP32S3 Core VDD , Don't change
+    PMU.setDC1Voltage(3300); //ESP32-S3
+    PMU.enableDC1();         // Enable DC1
+
+    //! DC3 Radio & Pixels VDD , Don't change
+    PMU.setDC3Voltage(3300); //External pin header
+
+    //! ALDO2 MICRO TF Card VDD, Don't change
+    PMU.setALDO2Voltage(3300); //SD Card
+
+    //! ALDO4 GNSS VDD, Don't change
+    PMU.setALDO4Voltage(3300); //GNSS
+
+    //! BLDO1 MIC VDD, Don't change
+    PMU.setBLDO1Voltage(3300);
+
+    //! The following supply voltages can be controlled by the user
+    // DC5 IMAX=2A
+    // 1200mV
+    // 1400~3700mV,100mV/step,24steps
+    PMU.setDC5Voltage(3300); //External pin header
+
+    // ALDO1 IMAX=300mA
+    // 500~3500mV, 100mV/step,31steps
+    PMU.setALDO1Voltage(3300); //External pin header
+
+    // ALDO3 IMAX=300mA
+    // 500~3500mV, 100mV/step,31steps
+    PMU.setALDO3Voltage(3300); //External pin header
+
+    // BLDO2 IMAX=300mA
+    // 500~3500mV, 100mV/step,31steps
+    PMU.setBLDO2Voltage(3300); //External pin header
+
+    //! END
+
+    // Turn on the power that needs to be used
+    //! DC1 ESP32S3 Core VDD , Don't change
+    // PMU.enableDC3();
+
+    //! External pin power supply
+    PMU.enableDC5();
+    PMU.enableALDO1();
+    PMU.enableALDO3();
+    PMU.enableBLDO2(); //SD Card
+
+    //! ALDO2 MICRO TF Card VDD
+    PMU.enableALDO2();
+
+    //! ALDO4 GNSS VDD
+    PMU.enableALDO4(); //GNSS
+
+    PMU.enableBLDO2();
 
     //! DC3 Radio & Pixels VDD
     PMU.enableDC3();
@@ -2199,7 +2432,7 @@ void defaultConfig()
     config.trk_path = 2;
 
     //--Position
-    config.trk_gps = false;
+    config.trk_gps = true;
     config.trk_lat = 13.7555;
     config.trk_lon = 100.4930;
     config.trk_alt = 0;
@@ -2469,7 +2702,7 @@ void defaultConfig()
     sprintf(config.sensor[9].parm, "Wind Speed");
     sprintf(config.sensor[9].unit, "kPh");
 
-#ifdef CORE_DEBUG_LEVEL
+#if (CORE_DEBUG_LEVEL>0)
     config.uart0_enable = true;
     config.uart0_baudrate = 115200;
     config.uart0_rx_gpio = 20;
@@ -2644,6 +2877,82 @@ void defaultConfig()
     config.i2c_sck_pin = 22;
     config.pwr_gpio = -1;
     config.pwr_active = 0;
+#elif defined(LORA_TRACKER)
+    config.rf_en = true;
+    config.rf_type = RF_SX1262;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 3;
+    config.rf_reset_gpio = 5;
+    config.rf_dio0_gpio = 4;
+    config.rf_nss_gpio = 8;
+    config.rf_sclk_gpio = 10;
+    config.rf_miso_gpio = 6;
+    config.rf_mosi_gpio = 7;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.pwr_gpio = 2;
+    config.pwr_active = 0;
+    config.oled_enable = false;
+    config.i2c_enable = false;
+    config.i2c_sda_pin = 21;
+    config.i2c_sck_pin = 20;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 19;
+    config.uart1_tx_gpio = -1;
+    config.uart1_rts_gpio = -1;
+    config.uart0_enable = false;
+    config.trk_gps = true;
+    sprintf(config.wifi_ap_ssid, "LoRaTracker");
+    config.sensor[0].enable = true;
+    config.sensor[0].port = 2;
+    config.sensor[0].address = 0;
+    config.sensor[0].samplerate = 10;
+    config.sensor[0].averagerate = 600;
+    config.sensor[0].eqns[0] = 0; // a
+    config.sensor[0].eqns[1] = 0.00768F; // b
+    config.sensor[0].eqns[2] = 0; // c
+    config.sensor[0].type = 27;
+    sprintf(config.sensor[0].parm, "Battery");
+    sprintf(config.sensor[0].unit, "V");
+
+    config.sensor[1].enable = true;
+    config.sensor[1].port = 18;
+    config.sensor[1].address = 0;
+    config.sensor[1].samplerate = 10;
+    config.sensor[1].averagerate = 600;
+    config.sensor[1].eqns[0] = 0; // a
+    config.sensor[1].eqns[1] = 1; // b
+    config.sensor[1].eqns[2] = 0; // c
+    config.sensor[1].type = 25;
+    sprintf(config.sensor[1].parm, "Satellite");
+    config.sensor[1].unit[0]=0;
+    
+    config.trk_interval = 10;
+    config.trk_tlm_avg[0] = false;
+    config.trk_tlm_sensor[0] = 1;
+    config.trk_tlm_precision[0] = 2;
+    config.trk_tlm_offset[0] = 0;
+    sprintf(config.trk_tlm_UNIT[0], "V");
+    sprintf(config.trk_tlm_PARM[0], "BAT");
+    config.trk_tlm_EQNS[0][0] = 0;    // a av2 + bv + c
+    config.trk_tlm_EQNS[0][1] = 0.01; // b
+    config.trk_tlm_EQNS[0][2] = 0;    // c
+
+    config.trk_tlm_avg[1] = false;
+    config.trk_tlm_sensor[1] = 2;
+    config.trk_tlm_precision[1] = 0;
+    config.trk_tlm_offset[1] = 0;
+    sprintf(config.trk_tlm_UNIT[1], "");
+    sprintf(config.trk_tlm_PARM[1], "SAT");
+    config.trk_tlm_EQNS[1][0] = 0;    // a av2 + bv + c
+    config.trk_tlm_EQNS[1][1] = 1; // b
+    config.trk_tlm_EQNS[1][2] = 0;    // c
 #elif defined(HT_CT62)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -2766,7 +3075,7 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
-#elif defined(TTGO_T_Beam_S3_SUPREME_V3)
+#elif defined(T_BEAM_S3_SUPREME)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
@@ -2797,6 +3106,45 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
+#elif defined(T_BEAM_S3_BPF)
+    config.rf_en = true;
+    config.rf_type = RF_SX1278;
+    config.rf_freq = 144.410;
+    config.rf_freq_offset = 0;
+    config.rf_bw = 10.4F;
+    config.rf_sf = 8;
+    config.rf_cr = 5;
+    config.rf_power = 20;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 21;
+    config.rf_reset_gpio = 18;
+    config.rf_dio0_gpio = 14;
+    config.rf_nss_gpio = 1;
+    config.rf_sclk_gpio = 12;
+    config.rf_miso_gpio = 13;
+    config.rf_mosi_gpio = 11;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_nss_active = 0;
+    config.rf_reset_active = 0;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart1_enable = false;
+    config.uart0_rx_gpio = 44;
+    config.uart0_tx_gpio = 43;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 5;
+    config.uart1_tx_gpio = 6;
+    config.uart1_rts_gpio = -1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = PMU_I2C_SDA;
+    config.i2c_sck_pin = PMU_I2C_SCL;
+    config.i2c1_enable = false;
+    config.i2c1_sda_pin = -1;
+    config.i2c1_sck_pin = -1;    
+    config.oled_enable = true;
 #elif defined(HELTEC_V3_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3915,6 +4263,7 @@ boolean APRSConnect()
                 return false;
         }
         // ขอเชื่อมต่อกับ aprsc
+        login.clear();
         if (strlen(config.igate_object) >= 3)
         {
             uint16_t passcode = aprsParse.passCode(config.igate_object);
@@ -4084,6 +4433,10 @@ void setup()
     //     log_d("Factory Default");
     //     defaultConfig();
     // }
+#ifdef STRIP_PIN
+    strip.begin();
+    LED_Status(200,200,200);
+#endif
 
     if (!LITTLEFS.exists("/default.cfg"))
     {
@@ -4115,8 +4468,7 @@ void setup()
     }
 
 #ifdef STRIP_PIN
-    strip.begin();
-    strip.show();
+    LED_Status(0,0,0);
 #endif
 
 #ifdef BUOY
@@ -4138,24 +4490,24 @@ void setup()
 #endif
 #endif
 
-    if (BootReason == ESP_RST_SW)
-    {
-        delay(1000);
-        // LED_Status(0, 0, 0);
+    // if (BootReason == ESP_RST_SW)
+    // {
+    //     delay(1000);
+    //     // LED_Status(0, 0, 0);
 
-        if (digitalRead(BOOT_PIN) == LOW)
-        {
-            defaultConfig();
-            log_d("Manual Default configure!");
-            while (digitalRead(BOOT_PIN) == LOW)
-            {
-                delay(500);
-                // LED_Status(255, 255, 255);
-                // delay(500);
-                // LED_Status(0, 0, 0);
-            }
-        }
-    }
+    //     if (digitalRead(BOOT_PIN) == LOW)
+    //     {
+    //         defaultConfig();
+    //         log_d("Manual Default configure!");
+    //         while (digitalRead(BOOT_PIN) == LOW)
+    //         {
+    //             delay(500);
+    //             // LED_Status(255, 255, 255);
+    //             // delay(500);
+    //             // LED_Status(0, 0, 0);
+    //         }
+    //     }
+    // }
 
     Sleep_Activate = config.pwr_sleep_activate;
     PowerOn();
@@ -4166,7 +4518,7 @@ void setup()
     }
 #endif
 
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2) || defined(NAWS4)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2) || defined(NAWS4)
     setupPower();
 #endif
 
@@ -4280,29 +4632,29 @@ void setup()
             delay(1000);
 #endif
 
-            if (digitalRead(BOOT_PIN) == LOW)
-            {
-                defaultConfig();
-                log_d("Manual Default configure!");
-#ifdef OLED
-                display.clearDisplay();
-#ifdef SSD1306_72x40
-                display.setCursor(5, 25);
-                display.print("RST!");
-#else
-                display.setCursor(10, 22);
-                display.print("Factory Reset!");
-#endif
-                display.display();
-#endif
-                while (digitalRead(BOOT_PIN) == LOW)
-                {
-                    delay(500);
-                    LED_Status(255, 255, 255);
-                    delay(500);
-                    LED_Status(0, 0, 0);
-                }
-            }
+//             if (digitalRead(BOOT_PIN) == LOW)
+//             {
+//                 defaultConfig();
+//                 log_d("Manual Default configure!");
+// #ifdef OLED
+//                 display.clearDisplay();
+// #ifdef SSD1306_72x40
+//                 display.setCursor(5, 25);
+//                 display.print("RST!");
+// #else
+//                 display.setCursor(10, 22);
+//                 display.print("Factory Reset!");
+// #endif
+//                 display.display();
+// #endif
+//                 while (digitalRead(BOOT_PIN) == LOW)
+//                 {
+//                     delay(500);
+//                     LED_Status(255, 255, 255);
+//                     delay(500);
+//                     LED_Status(0, 0, 0);
+//                 }
+//             }
         }
         else
         {
@@ -4387,14 +4739,61 @@ void setup()
             delay(1000);
             LED_Status(0, 0, 0);
 
-            if (digitalRead(BOOT_PIN) == LOW)
-            {
-                defaultConfig();
-                log_d("Manual Default configure!");
-#ifdef ST7735_160x80
-                display.fillRect(69, 59, 50, 8, 0);
-                display.setCursor(70, 60);
+//             if (digitalRead(BOOT_PIN) == LOW)
+//             {
+//                 defaultConfig();
+//                 log_d("Manual Default configure!");
+// #ifdef ST7735_160x80
+//                 display.fillRect(69, 59, 50, 8, 0);
+//                 display.setCursor(70, 60);
+//                 display.print("Factory Reset!");
+//                 display.display();
+// #endif
+//                 while (digitalRead(BOOT_PIN) == LOW)
+//                 {
+//                     delay(500);
+//                     LED_Status(255, 255, 255);
+//                     delay(500);
+//                     LED_Status(0, 0, 0);
+//                 }
+//             }
+        }
+        else
+        {
+            showDisp = true;
+        }
+        LED_Status(0, 0, 0);
+#endif
+
+        
+#endif
+    }else{
+        if (!config.pwr_en)
+        {
+            LED_Status(200, 0, 0);
+            delay(1000);
+            LED_Status(0, 200, 0);
+            delay(1000);
+            LED_Status(0, 0, 200);
+            delay(1000);
+        }
+    }
+    LED_Status(0, 0, 0);
+    if (BootReason != ESP_RST_DEEPSLEEP)
+    {
+                if (digitalRead(BOOT_PIN) == LOW)
+                {
+                    defaultConfig();
+                    log_d("Manual Default configure!");
+        #ifdef OLED
+                display.clearDisplay();
+#ifdef SSD1306_72x40
+                display.setCursor(5, 25);
+                display.print("RST!");
+#else
+                display.setCursor(10, 22);
                 display.print("Factory Reset!");
+#endif
                 display.display();
 #endif
                 while (digitalRead(BOOT_PIN) == LOW)
@@ -4404,51 +4803,9 @@ void setup()
                     delay(500);
                     LED_Status(0, 0, 0);
                 }
-            }
-        }
-        else
-        {
-            showDisp = true;
-        }
-        LED_Status(0, 0, 0);
-#endif
-
-        // if (config.pwr_mode != MODE_A)
-        // {
-        //     delay(1000);
-        //     digitalWrite(LED_TX, LOW);
-        //     delay(1000);
-        //     digitalWrite(LED_RX, LOW);
-        //     delay(1000);
-        // }
-#endif
+                }
     }
     LED_Status(0, 0, 0);
-    // if (config.pwr_mode != MODE_A)
-    // {
-    //     //         if (digitalRead(9) == LOW)
-    //     //         {
-    //     //             defaultConfig();
-    //     //             log_d("Manual Default configure!");
-    //     // #ifdef OLED
-    //     //             display.clearDisplay();
-    //     //             display.setCursor(10, 22);
-    //     //             display.print("Factory Reset!");
-    //     //             display.display();
-    //     // #endif
-    //     //             while (digitalRead(9) == LOW)
-    //     //             {
-    //     //                 delay(500);
-    //     //                 digitalWrite(LED_TX, LOW);
-    //     //                 digitalWrite(LED_RX, LOW);
-    //     //                 delay(500);
-    //     //                 digitalWrite(LED_TX, HIGH);
-    //     //                 digitalWrite(LED_RX, HIGH);
-    //     //             }
-    //     //         }
-    //     digitalWrite(LED_TX, LOW);
-    //     digitalWrite(LED_RX, LOW);
-    // }
 
     if (config.uart0_enable)
     {
@@ -5880,7 +6237,7 @@ void loop()
     if (millis() > timeTask)
     {
         timeTask = millis() + 30000;
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
         VBat = (double)PMU.getBattVoltage() / 1000;
 #elif defined(HELTEC_HTIT_TRACKER)
         analogReadResolution(12);
@@ -6376,7 +6733,7 @@ void loop()
         {
             if (config.pwr_mode == MODE_A) // CPU and Radio active, power down control
             {
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                 if (PMU.isCharging())
                 {
                     StandByTick = millis() + (config.pwr_stanby_delay * 1000);
@@ -6394,7 +6751,7 @@ void loop()
                         // Power OFF
                         PowerOff();
 
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                         PMU.disableDC5();
                         PMU.disableALDO1(); // QMC6310,BME280,OLED
                         // PMU.disableALDO3(); //LoRa
@@ -6424,7 +6781,7 @@ void loop()
                         sensorInit(false);
                         delay(100);
                         vTaskResume(taskSensorHandle);
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                         PMU.enableDC5();
                         PMU.enableALDO1();
                         PMU.enableALDO3();
@@ -6439,7 +6796,7 @@ void loop()
             }
             else if (config.pwr_mode == MODE_B) // Wake up and wait for delay time to sleepp
             {
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                 if (PMU.isCharging())
                 {
                     StandByTick = millis() + (config.pwr_stanby_delay * 1000);
@@ -6472,7 +6829,7 @@ void loop()
 #endif
                         esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 #endif
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                         PMU.disableDC5();
                         PMU.disableALDO1(); // QMC6310,BME280,OLED
                         // PMU.disableALDO3(); //LoRa
@@ -6567,7 +6924,7 @@ void loop()
                             0);                /* Core where the task should run */
 #endif
                         // vTaskResume(taskNetworkHandle);
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                         PMU.enableDC5();
                         PMU.enableALDO1();
                         PMU.enableALDO3();
@@ -6591,7 +6948,7 @@ void loop()
                     // delay(100);
                     // esp_sleep_enable_ext0_wakeup(GPIO_NUM_14,LOW);
                     radioSleep();
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
                     PMU.disableDC5();
                     PMU.disableALDO1();
                     PMU.disableALDO3();
@@ -7062,9 +7419,11 @@ bool getBits(int ch)
         val = wireguard_active();
         break;
     case 7: // 4G LTE
+    #ifdef PPPOS
         if (PPP.connected())
             val = 1;
         else
+    #endif
             val = 0;
         break;
     case 8: // MQTT
@@ -7794,6 +8153,10 @@ void taskAPRS(void *pvParameters)
     log_d("Task APRS has been start");
     PacketBuffer.clean();
 
+    #ifdef T_BEAM_S3_BPF
+    pinMode(16,OUTPUT);
+    digitalWrite(16,HIGH);
+    #endif
     APRS_init(&config);
     // APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
@@ -9148,7 +9511,9 @@ long wifiTTL = 0;
 const uint32_t connectTimeoutMs = 5000;
 uint8_t APStationNum = 0;
 
+#ifdef PPPOS
 pppType pppStatus;
+#endif
 
 IPAddress ap_ip(192, 168, 4, 1);
 IPAddress ap_mask(255, 255, 255, 0);
@@ -9159,6 +9524,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 {
     switch (event)
     {
+    #ifdef PPPOS
     case ARDUINO_EVENT_PPP_START:
         log_d("PPP Started");
         break;
@@ -9196,6 +9562,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
     case ARDUINO_EVENT_PPP_STOP:
         log_d("PPP Stopped");
         break;
+    #endif
 
     case ARDUINO_EVENT_WIFI_AP_START:
         log_d("AP Started");
@@ -9245,6 +9612,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
     }
 }
 
+#ifdef PPPOS
 long int pppTimeout = 0;
 
 void PPPOS_Start()
@@ -9351,6 +9719,7 @@ void PPPOS_Start()
         }
     }
 }
+#endif
 
 void taskNetwork(void *pvParameters)
 {
@@ -9437,7 +9806,9 @@ void taskNetwork(void *pvParameters)
     if (config.wifi_mode & WIFI_AP_STA_FIX)
         webService();
 
+    #ifdef PPPOS
     PPPOS_Start(); // Start PPP connection if enabled
+    #endif
 
     #ifdef BLUETOOTH
     bluetooth_init(); // Initialize Bluetooth if enabled
@@ -9454,6 +9825,7 @@ void taskNetwork(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerNetwork_old = micros();
 
+        #ifdef PPPOS
         if (config.ppp_enable)
         {
             if (!PPP.connected())
@@ -9468,7 +9840,10 @@ void taskNetwork(void *pvParameters)
         }
 
         if (WiFi.isConnected() == true || WiFi.softAPgetStationNum() > 0 || PPP.connected())
-        {
+        #else
+        if (WiFi.isConnected() == true || WiFi.softAPgetStationNum())
+        #endif
+        {        
             if (lastHeard_Flag)
             {
                 lastHeard_Flag = false;
@@ -9494,7 +9869,11 @@ void taskNetwork(void *pvParameters)
         {
             wifiStatus = wifiMulti.run(connectTimeoutMs);
         }
+        #ifdef PPPOS
         if ((wifiStatus == WL_CONNECTED) || (PPP.connected()))
+        #else
+        if ((wifiStatus == WL_CONNECTED))
+        #endif
         {
             // config.pwr_sleep_activate |= ACTIVATE_WIFI;
             if (millis() > NTP_Timeout)
@@ -12584,7 +12963,7 @@ void systemDisp()
     x = str.length() * 6;
     display.setCursor(126 - x, 44);
     display.print(str);
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
     display.setCursor(3, 53);
     display.print("BAT:");
     str = String((float)PMU.getBattVoltage() / 1000, 2) + "V" + "(" + String(PMU.getBatteryPercent()) + "%)";
@@ -12643,7 +13022,7 @@ void systemDisp()
     x = str.length() * 6;
     display.setCursor(158 - x, 58);
     display.print(str);
-#if defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(TTGO_T_Beam_V1_2)
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
     display.setCursor(3, 68);
     display.print("BAT:");
     str = String((float)PMU.getBattVoltage() / 1024, 2) + "V" + "(" + String(PMU.getBatteryPercent()) + "%)";

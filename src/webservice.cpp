@@ -26,7 +26,10 @@ AsyncWebSocket ws_gnss("/ws_gnss");
 #include <PubSubClient.h>
 extern PubSubClient clientMQTT;
 #endif
+
+#ifdef PPPOS
 extern pppType pppStatus;
+#endif
 
 // Create an Event Source on /events
 AsyncEventSource lastheard_events("/eventHeard");
@@ -583,7 +586,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<th><span>SPIFFS(KByte)</span></th>\n";
 	html += "<th><span>VBat(V)</span></th>\n";
 	html += "<th><span>Temp(C)</span></th>\n";
-#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
+#elif defined(HELTEC_HTIT_TRACKER) || defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
 	html += "<th><span>SPIFFS(KByte)</span></th>\n";
 	html += "<th><span>VBat(V)</span></th>\n";
 #else
@@ -605,7 +608,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
 	html += "<td><b>" + String(VBat, 2) + "</b></td>\n";
 	html += "<td><b>" + String(TempNTC, 2) + "</b></td>\n";
-#elif defined(HELTEC_HTIT_TRACKER) || defined(TTGO_T_Beam_S3_SUPREME_V3) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
+#elif defined(HELTEC_HTIT_TRACKER) || defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(APRS_LORA_HT) || defined(APRS_LORA_DONGLE) || defined(HELTEC_V3_GPS)
 	unsigned long cardTotal = LITTLEFS.totalBytes();
 	unsigned long cardUsed = LITTLEFS.usedBytes();
 	html += "<td><b>" + String((double)cardUsed / 1024, 1) + "/" + String((double)cardTotal / 1024, 1) + "</b></td>\n";
@@ -8023,7 +8026,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 		html += "var x=0;\n";
 		html += "x = document.getElementById(\"sensorP\"+idx).value;\n";
 		html += "if (x>=10 && x<=13) {\n";
-#ifdef TTGO_T_Beam_S3_SUPREME_V3
+#ifdef T_BEAM_S3_SUPREME
 		html += "document.getElementById(\"address\"+idx).value=119;\n";
 #else
 		html += "document.getElementById(\"address\"+idx).value=118;\n";
@@ -9635,6 +9638,8 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\">";
 #ifdef HT_CT62
 	webString += "HT-CT62,ESP32-C3 DIY";
+#elif LORA_TRACKER
+	webString += "APRS LoRa Tracker Rev.1";	
 #elif ESP32C3_MINI
 	webString += "ESP32-C3-Mini,ESP32-C3 DIY";
 #elif defined(TTGO_LORA32_V1)
@@ -9647,8 +9652,10 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "TTGO_T_Beam_V1.0,ESP32 DIY";
 #elif defined(TTGO_T_LORA32_V2_1_GPS)
 	webString += "TTGO_T_LORA32_V2.1-GPS,ESP32 DIY";
-#elif defined(TTGO_T_Beam_S3_SUPREME_V3)
-	webString += "TTGO_T_Beam_S3_SUPREME_V3,ESP32-S3 DIY";
+#elif defined(T_BEAM_S3_SUPREME)
+	webString += "T_BEAM_S3_SUPREME";
+#elif defined(T_BEAM_S3_BPF)
+	webString += "LilyGo T-Beam-BPF";	
 #elif defined(HELTEC_V3_GPS)
 	webString += "HELTEC_V3_GPS,ESP32 DIY";
 #elif defined(HELTEC_HTIT_TRACKER)
@@ -9661,6 +9668,8 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "TTGO_T_Beam_V1_2_SX1262,TTGO_T_Beam_V1_2_SX1268";
 #elif defined(BV5DJ_BOARD)
 	webString += "BV5DJ BOARD";
+#else
+	webString += "UNKNOW BOARD";
 #endif
 	webString += "</td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
@@ -9784,6 +9793,7 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "</td><td width=\"2%\" style=\"border:unset;\"></td>";
 	webString += "<td width=\"49%\" style=\"border:unset;\">";
 	webString += "<table>\n";
+	#ifdef PPPOS
 	webString += "<th colspan=\"2\"><span><b>PPPoS Status</b></span></th>\n";
 	webString += "<tr><td align=\"right\" width=\"30%\"><b>Manufacturer:</b></td>\n";
 	webString += "<td align=\"left\">" + String(pppStatus.manufacturer) + "</td></tr>\n";
@@ -9803,6 +9813,25 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<td align=\"left\">" + String(IPAddress(pppStatus.gateway)) + "</td></tr>\n";
 	// webString += "<tr><td align=\"right\"><b>DNS:</b></td>\n";
 	// webString += "<td align=\"left\">" + String(IPAddress(pppStatus.dns)) + "</td></tr>\n";
+	#else
+		webString += "<th colspan=\"2\"><span><b>PPPoS Disable</b></span></th>\n";
+	webString += "<tr><td align=\"right\" width=\"30%\"><b>Manufacturer:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>Model:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>IMEI:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>IMSI:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>Operator:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>RSSI:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>IP:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>Gateway:</b></td>\n";
+	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
+	#endif
 	webString += "</table>\n";
 	webString += "</td></tr></table><br />";
 
