@@ -915,7 +915,7 @@ void setupPower()
     log_d("->  getSysPowerDownVoltage:%u\n", vol);
 
     // Set VSY off voltage as 2600mV , Adjustment range 2600mV ~ 3300mV
-    PMU.setSysPowerDownVoltage(2800);
+    PMU.setSysPowerDownVoltage(3000);
 
     //! DC1 ESP32S3 Core VDD , Don't change
     PMU.setDC1Voltage(3300); //ESP32-S3
@@ -2342,8 +2342,8 @@ void defaultConfig()
     config.rf_mode = 1;
     config.rf_ax25 = true;
     config.rf_br = 9.7;
-    config.rf_shaping = RADIOLIB_SHAPING_0_5;
-    config.rf_encoding = RADIOLIB_ENCODING_NRZ;
+    config.rf_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
+    config.rf_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
 
     config.rf1_en = true;
     config.rf1_type = RF_SX1278;
@@ -2360,8 +2360,8 @@ void defaultConfig()
     config.rf1_mode = 1;
     config.rf1_ax25 = true;
     config.rf1_br = 9.7;
-    config.rf1_shaping = RADIOLIB_SHAPING_0_5;
-    config.rf1_encoding = RADIOLIB_ENCODING_NRZ;
+    config.rf1_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
+    config.rf1_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
 #endif
 
     // IGATE
@@ -4879,16 +4879,16 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-    esp_task_wdt_config_t twdt_config = {
-        .timeout_ms = 30000,                             // 30 seconds
-        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Bitmask of all cores
-        .trigger_panic = false,
-    };
-#if !defined(CONFIG_IDF_TARGET_ESP32C6)
-    esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
-#else
-    esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
-#endif
+//     esp_task_wdt_config_t twdt_config = {
+//         .timeout_ms = 30000,                             // 30 seconds
+//         .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Bitmask of all cores
+//         .trigger_panic = false,
+//     };
+// #if !defined(CONFIG_IDF_TARGET_ESP32C6)
+//     esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+// #else
+//     esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+// #endif
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -5000,7 +5000,7 @@ void setup()
             0);                /* Core where the task should run */
     }
 
-    esp_task_wdt_add(taskAPRSPollHandle);
+    //esp_task_wdt_add(taskAPRSPollHandle);
     // esp_task_wdt_add(NULL);
     // esp_task_wdt_status(NULL);
 #ifdef APRS_LORA_HT
@@ -9492,7 +9492,7 @@ void taskAPRSPoll(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         if ((config.rf_en == true) && (AFSKInitAct == true))
         {
-            esp_task_wdt_reset();
+            //esp_task_wdt_reset();
             if (APRS_poll())
             {
                 // StandByTick += millis() + 10000;
