@@ -41,6 +41,8 @@ int16_t RadioHal<SX1278>::begin(float freq, float bw, uint8_t sf, uint8_t cr, ui
 { 
     
     if (power>=17) radio->setCurrentLimit(150);
+    radio->setDIOMapping(5,0x00);
+    //radio->setDIOMapping(5,0x07);    
     return radio->begin(freq, bw, sf, cr, syncWord, power, preambleLength, gain);
 }
 template<>

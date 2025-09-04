@@ -461,7 +461,7 @@ bool APRS_init(Configuration *cfg)
         if (cfg->rf_type == RF_SX1278)
         {
             log_d("Init chip SX1278");
-            radioHal = new RadioHal<SX1278>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+            radioHal = new RadioHal<SX1278>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));          
         }
         else if (cfg->rf_type == RF_SX1272)
         {

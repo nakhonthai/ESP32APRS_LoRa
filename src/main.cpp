@@ -534,6 +534,8 @@ typedef struct
 #ifdef NAWS4
 bool setupPower()
 {
+    Wire.begin(PMU_I2C_SDA, PMU_I2C_SCL,100000);
+    delay(10);
     Wire.beginTransmission(0x30);
     byte error = Wire.endTransmission();
     if (error != 0)
@@ -599,9 +601,12 @@ bool setupPower()
     {
         delay(1000);
         log_d("PMU is online");
-        PMU.disablePwrOk();               // Disable PWR_OK pin, not used
+        PMU.writeRegister(0x32, 0b00000100); //Power off
+        PMU.writeRegister(0x36, 0); // PEK parameter
+        PMU.writeRegister(0x93, 0b00001001); // GPIO3
+        //PMU.disablePwrOk();               // Disable PWR_OK pin, not used
         PMU.setSysPowerDownVoltage(2600); // Set VSYS off voltage as 2800mV, Adjustment range 2600mV ~ 3300mV
-        PMU.setPowerKeyPressOnTime(0b10010101);
+        //PMU.setPowerKeyPressOnTime(0b10010101);
         delay(500);
         PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
         delay(500);
@@ -618,7 +623,7 @@ bool setupPower()
         PMU.writeRegister(0x90, 0b00000000); // GPIO0
         PMU.writeRegister(0x91, 0b00000011); // GPIO1
         PMU.writeRegister(0x92, 0b00000011); // GPIO2
-        PMU.writeRegister(0x93, 0b00001000); // GPIO3
+        //PMU.writeRegister(0x93, 0b00001000); // GPIO3
         PMU.writeRegister(0x81, 0);
         PMU.writeRegister(0x36, 0b00001000); // PEK parameter
         delay(500);

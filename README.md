@@ -8,7 +8,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 * Support GFSK9600(G3RUH) Modem for APRS(Test by Direwolf,VX8-DR,FTM-350,FTM-400DR TX Delay 100mS)
 * Support AIS (Automatic Identification System) RX Only, IGate by APRS-CB recommend.
 * Support APRS on AX.25 Protocol
-* Support hardware: TTGO_LoRa32,TTGO T-Beam V1.2,LILYGO T-Beam Supreme,Heltec HTIT-Tracker,HT-CT62,TTGO T-Beam V1.2, TTGO LoRa32 (T3) V1.6, Heltec LoRa V3 and D.I.Y Mod GPIO
+* Support hardware: TTGO_LoRa32,TTGO T-Beam V1.2,LILYGO T-Beam Supreme,T-Beam BPF,Heltec HTIT-Tracker,HT-CT62,TTGO T-Beam V1.2, TTGO LoRa32 (T3) V1.6, Heltec LoRa V3 and D.I.Y Mod GPIO
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
@@ -29,7 +29,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 * display received and transmit packet on the LED and display OLED
 
 ## Hardware screen short
-![LILYGO_T_BEAM_SUPREME](doc/LILYGO_T_BEAM_SUPREME.jpg) ![HTIT_Tracker](doc/APRS_LoRa_Heltec_HTIT_Tracker_Quaterwave.jpg) ![APRS_LoRa_VHF](doc/APRS_LoRa_VHF_DIY.jpg)
+![LILYGO_T_BEAM_BPF](https://lilygo.cc/cdn/shop/files/LILYGO-T-Beam-BPF_1.jpg) ![LILYGO_T_BEAM_SUPREME](doc/LILYGO_T_BEAM_SUPREME.jpg) ![HTIT_Tracker](doc/APRS_LoRa_Heltec_HTIT_Tracker_Quaterwave.jpg) ![APRS_LoRa_VHF](doc/APRS_LoRa_VHF_DIY.jpg)
 
 ## Web service screen short
 ![Map_LoRa_VHF](doc/TEST_APRS_LoRa_VHF.jpg)
