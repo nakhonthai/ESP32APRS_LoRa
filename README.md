@@ -91,7 +91,8 @@ https://www.espressif.com/en/support/download/other-tools
 
 ## Credits & Reference
 
-- APRS Library by markqvist [LibAPRS](https://github.com/markqvist/LibAPRS)
+- Thank you for support device hardware (LiLyGo T-Beam-S3 Supreme,T-Beam-S3 BPF,HTIT-Tracker) chakphanu [E24OUW](https://github.com/chakphanu)
+- Thank you for all library from github
 
 ## HITH
 This project implement by APRS text (TNC2 Raw) only,It not support null string(0x00) in the package.
