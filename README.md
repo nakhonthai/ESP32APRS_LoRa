@@ -1,3 +1,5 @@
+# Arduino core for the ESP32, ESP32-C3, ESP32-C6 and ESP32-S3.
+
 # ESP32APRS LoRa Simple Project
 
 ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather(WX)/Telemetry(TLM) with LoRa RF network in that is implemented for Espressif ESP32,ESP32-S3,ESP32C3 processor support.
@@ -8,7 +10,7 @@ ESP32IAPRS LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weathe
 * Support GFSK9600(G3RUH) Modem for APRS(Test by Direwolf,VX8-DR,FTM-350,FTM-400DR TX Delay 100mS)
 * Support AIS (Automatic Identification System) RX Only, IGate by APRS-CB recommend.
 * Support APRS on AX.25 Protocol
-* Support hardware: TTGO_LoRa32,TTGO T-Beam V1.2,LILYGO T-Beam Supreme,T-Beam BPF,Heltec HTIT-Tracker,HT-CT62,TTGO T-Beam V1.2, TTGO LoRa32 (T3) V1.6, Heltec LoRa V3 and D.I.Y Mod GPIO
+* Support hardware: TTGO_LoRa32_V1,TTGO LoRa32(T3) V1.6,TTGO T-Beam V1.2,LILYGO T-Beam-S3 Supreme,T-Beam-S3 BPF,Heltec HTIT-Tracker,HT-CT62, Heltec LoRa V3 GPS,ESP32-Devkit and D.I.Y Mod GPIO
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
