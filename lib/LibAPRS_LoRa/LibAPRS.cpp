@@ -252,9 +252,6 @@ void radioRecvStatus()
 {
     if (config.rf_mode == RF_MODE_LoRa)
     {
-        uint32_t packetStatus = radioHal->getPacketStatus();
-    uint8_t rssiPkt = packetStatus & 0xFF;
-    return(-1.0 * rssiPkt/2.0);
         rssi = radioHal->getRSSI(true, false);
         snr = radioHal->getSNR();
         freqErr = radioHal->getFrequencyError();
