@@ -14,6 +14,9 @@
 #include "../../include/config.h"
 
 bool APRS_init(Configuration *cfg);
+#ifdef RF2
+bool APRS_init2(Configuration *cfg);
+#endif
 bool APRS_poll(void);
 
 // void APRS_setCallsign(char *call, int ssid);

@@ -94,6 +94,7 @@ typedef struct Config_Struct
 	char wifi_ap_ssid[32];
 	char wifi_ap_pass[63];
 
+#ifdef BLUETOOTH
 	//--Blue Tooth
 	bool bt_slave;
 	bool bt_master;
@@ -105,6 +106,7 @@ typedef struct Config_Struct
 	char bt_uuid[37];
 	char bt_uuid_rx[37];
 	char bt_uuid_tx[37];
+#endif
 #endif
 
 	//--RF Module
@@ -124,8 +126,9 @@ typedef struct Config_Struct
 	bool rf_ax25;
 	uint8_t rf_shaping;
 	uint8_t rf_encoding;
+	bool rf_rx_boost;
 
-#ifdef NAWS4
+#ifdef RF2
 	bool rf1_en;
 	uint8_t rf1_type;
 	uint8_t rf1_mode;
@@ -142,6 +145,7 @@ typedef struct Config_Struct
 	bool rf1_ax25;
 	uint8_t rf1_shaping;
 	uint8_t rf1_encoding;
+	bool rf1_rx_boost;
 #endif
 
 	// IGATE
@@ -179,6 +183,7 @@ typedef struct Config_Struct
 
 	// DIGI REPEATER
 	bool digi_en;
+	bool digi_auto;
 	bool digi_loc2rf;
 	bool digi_loc2inet;
 	bool digi_timestamp;
@@ -353,7 +358,7 @@ typedef struct Config_Struct
 	bool rf_reset_active = 0;
 	bool rf_nss_active = 0;
 
-#ifdef NAWS4
+#ifdef RF2
 	int8_t rf1_tx_gpio = -1; // LORA ANTENNA TX ENABLE
 	int8_t rf1_rx_gpio = -1;
 	int8_t rf1_dio1_gpio = 3;
@@ -483,6 +488,7 @@ typedef struct Config_Struct
 	uint8_t ppp_model = 0;
 	uint8_t ppp_flow_ctrl = 0;
 	bool ppp_gnss = false;
+	bool ppp_napt = true;
 
 	// MQTT Config
 	bool en_mqtt;

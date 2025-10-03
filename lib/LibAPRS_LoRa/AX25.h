@@ -40,7 +40,7 @@ typedef struct AX25Ctx {
 } AX25Ctx;
 
 typedef struct ax25header_struct{   
-    char addr[7];
+    char addr[8];
     char ssid;   
 }ax25header;
 

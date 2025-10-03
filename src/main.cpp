@@ -418,6 +418,7 @@ uint8_t Sleep_Activate = 0;
 unsigned long StandByTick = 0;
 
 bool lastHeard_Flag = 0;
+unsigned long lastHeardTimeout = 0;
 
 RTC_DATA_ATTR bool gps_mode;
 
@@ -464,7 +465,7 @@ void pushTxDisp(uint8_t ch, const char *name, char *info)
 #endif
 
 statusType status;
-RTC_DATA_ATTR igateTLMType igateTLM;
+//RTC_DATA_ATTR igateTLMType igateTLM;
 RTC_DATA_ATTR dataTLMType systemTLM;
 txQueueType *txQueue;
 RTC_DATA_ATTR double LastLat, LastLng;
@@ -620,7 +621,7 @@ bool setupPower()
         delay(500);
         PMU.setDLDO1Voltage(3300);           // Set DLDO1 voltage to 3300mV
         PMU.setDLDO2Voltage(3300);           // Set DLDO2 voltage to 3300mV
-        PMU.writeRegister(0x90, 0b00000000); // GPIO0
+        PMU.writeRegister(0x90, 0b00000001); // GPIO0 GSM_PWR
         PMU.writeRegister(0x91, 0b00000011); // GPIO1
         PMU.writeRegister(0x92, 0b00000011); // GPIO2
         //PMU.writeRegister(0x93, 0b00001000); // GPIO3
@@ -2300,6 +2301,7 @@ void defaultConfig()
     sprintf(config.wifi_ap_pass, "aprsthnetwork");
 
     // Blutooth
+#ifdef BLUETOOTH
     config.bt_slave = false;
     config.bt_master = false;
     config.bt_mode = 1; // 0-None,1-TNC2RAW,2-KISS
@@ -2311,6 +2313,7 @@ void defaultConfig()
     sprintf(config.bt_uuid, "00000001-ba2a-46c9-ae49-01b0961f68bb");
     sprintf(config.bt_uuid_rx, "00000002-ba2a-46c9-ae49-01b0961f68bb");
     sprintf(config.bt_uuid_tx, "00000003-ba2a-46c9-ae49-01b0961f68bb");
+#endif
 #endif
 
     //--RF Module
@@ -2331,6 +2334,7 @@ void defaultConfig()
     config.rf_dio2_gpio = -1;
     config.rf_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
     config.rf_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+    config.rf_rx_boost = true;
 
 #ifdef NAWS4
     config.rf_en = true;
@@ -2349,6 +2353,8 @@ void defaultConfig()
     config.rf_br = 9.7;
     config.rf_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
     config.rf_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+    config.rf_rx_boost = false;
+
 
     config.rf1_en = true;
     config.rf1_type = RF_SX1278;
@@ -2367,6 +2373,8 @@ void defaultConfig()
     config.rf1_br = 9.7;
     config.rf1_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
     config.rf1_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+    config.rf1_rx_boost = false;
+
 #endif
 
     // IGATE
@@ -2402,6 +2410,7 @@ void defaultConfig()
 
     // DIGI REPEATER
     config.digi_en = false;
+    config.digi_auto = false;
     config.digi_loc2rf = true;
     config.digi_loc2inet = false;
     config.digi_ssid = 3;
@@ -3367,6 +3376,7 @@ void defaultConfig()
     config.ppp_rst_delay = 1000;
     config.ppp_pwr_gpio = -1;
     config.ppp_pwr_active = 1;
+    config.ppp_napt = true;
 
     config.trk_mice_type = 7;
     config.trk_tlm_interval = 0;
@@ -3389,11 +3399,11 @@ void defaultConfig()
     sprintf(config.ppp_pin, "0000");
     config.ppp_serial = 1;
     config.ppp_serial_baudrate = 115200;
-    config.ppp_rx_gpio = 41;
-    config.ppp_tx_gpio = 42;
+    config.ppp_rx_gpio = 42;
+    config.ppp_tx_gpio = 41;
     config.ppp_rst_gpio = 8;
     config.ppp_rts_gpio = -1;
-    config.ppp_rst_active = 0;
+    config.ppp_rst_active = 1;
     config.ppp_dtr_gpio = 39;
     config.ppp_cts_gpio = -1;
     config.ppp_ri_gpio = 40;
@@ -3722,10 +3732,9 @@ uint16_t pkgType(const char *raw)
         type |= FILTER_QUERY;
         break;
     case ';':
-        if (body[28] == '_')
-            type |= FILTER_WX;
-        else
-            type |= FILTER_OBJECT;
+        type |= FILTER_OBJECT;
+        if (body[35] == '_')
+            type |= FILTER_WX;            
         break;
     case ')':
         type |= FILTER_ITEM;
@@ -3838,7 +3847,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
 
             for (int z = 0; z < 9 && body[z] != '!' && body[z] != '_'; z++)
             {
-                if (body[z] < 0x20 || body[z] > 0x7e)
+                if (body[z] < 0x30 || body[z] > 0x7A)
                 {
                     log_d("\titem name has unprintable characters");
                     break; /* non-printable */
@@ -3858,7 +3867,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             body += 2;
             for (int z = 0; z < 9; z++)
             {
-                if (body[z] < 0x20 || body[z] > 0x7e)
+                if (body[z] < 0x30 || body[z] > 0x7A)
                 {
                     log_d("\tobject name has unprintable characters");
                     break; // non-printable
@@ -3954,6 +3963,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             pkgList[i].freqErr = 0;
         }
         // strcpy(pkgList[i].calsign, callsign);
+        memset(pkgList[i].calsign, 0, sizeof(pkgList[i].calsign));
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
         len = strlen(raw);
         pkgList[i].length = len + 1;
@@ -3976,6 +3986,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     psramBusy = false;
     // event_lastHeard();
     lastHeard_Flag = true;
+    lastHeardTimeout = millis() + 1000;
     return i;
 }
 
@@ -4108,10 +4119,10 @@ bool pkgTxSend()
                         {
                             if (aprsClient.connected())
                             {
-                                if((config.aprs_port == 14580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
+                                if((config.aprs_port != 24580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
                                 {
                                     String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
-                                    aprsUDP.beginPacket("aprs.dprns.com", 24580); // Send packet to APRS-IS (udp)
+                                    aprsUDP.beginPacket("aprs.dprns.com", 8081); // Send packet to APRS-IS (udp)
                                     aprsUDP.write((const uint8_t *)packet.c_str(), packet.length()); // Send binary frame packet to APRS-IS (udp)
                                     aprsUDP.endPacket();
                                 }else{
@@ -4147,7 +4158,7 @@ bool pkgTxSend()
 
                                 // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
                                 APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);
-                                igateTLM.TX++;
+                                //igateTLM.TX++;
                                 // log_d("TX->RF: %s", info);
                                 if (config.trk_en)
                                 {
@@ -4204,6 +4215,8 @@ void aprs_msg_callback(struct AX25Msg *msg)
     memcpy(&pkg, msg, sizeof(AX25Msg));
     PacketBuffer.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
     status.rxCount++;
+    status.allCount++;
+    //igateTLM.RX++;
 }
 
 void printTime()
@@ -4337,6 +4350,8 @@ bool AFSKInitAct = false;
 unsigned long timeTask;
 void setup()
 {
+    pinMode(19,INPUT);
+    pinMode(20,INPUT);
     // byte *ptr;
     int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
@@ -4812,20 +4827,20 @@ void setup()
     }
     LED_Status(0, 0, 0);
 
-    if (config.uart0_enable)
+#if ARDUINO_USB_MODE
+        Serial.begin(115200);
+#endif
+    if(config.uart0_enable)
     {
-#ifndef CORE_DEBUG_LEVEL
-#if ARDUINO_USB_CDC_ON_BOOT
         Serial0.begin(config.uart0_baudrate, SERIAL_8N1, config.uart0_rx_gpio, config.uart0_tx_gpio);
-#else
-        Serial.begin(config.uart0_baudrate, SERIAL_8N1, config.uart0_rx_gpio, config.uart0_tx_gpio);
-#endif
-#endif
     }
     if (config.uart1_enable)
     {
         Serial1.begin(config.uart1_baudrate, SERIAL_8N1, config.uart1_rx_gpio, config.uart1_tx_gpio);
     }
+    #if SOC_UART_NUM > 2
+    Serial2.begin(config.uart2_baudrate, SERIAL_8N1, config.uart2_rx_gpio, config.uart2_tx_gpio);
+    #endif
 
     if (config.modbus_enable)
     {
@@ -4906,16 +4921,18 @@ void setup()
             {
                 if (config.gnss_channel == 1)
                 {
-#if ARDUINO_USB_CDC_ON_BOOT
                     Serial0.println(config.gnss_at_command);
-#else
-                    Serial.println(config.gnss_at_command);
-#endif
                 }
                 else if (config.gnss_channel == 2)
                 {
                     Serial1.println(config.gnss_at_command);
                 }
+                #if SOC_UART_NUM > 2
+                else if (config.gnss_channel == 3)
+                {
+                    Serial2.println(config.gnss_at_command);
+                }
+                #endif
             }
         }
     }
@@ -7145,7 +7162,7 @@ void sendTelemetry_0(char *raw, bool header)
 
         if (aprsClient.connected())
         {
-            status.txCount++;
+            //status.txCount++;
             aprsClient.printf("%s\r\n", str); // Send packet to Inet
             // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
         }
@@ -7747,20 +7764,18 @@ void taskGPS(void *pvParameters)
                     c = -1;
                     if (config.gnss_channel == 1)
                     {
-#if ARDUINO_USB_CDC_ON_BOOT
                         c = Serial0.read();
-#else
-                        c = Serial.read();
-#endif
                     }
                     else if (config.gnss_channel == 2)
                     {
                         c = Serial1.read();
                     }
+                    #if SOC_UART_NUM > 2
                     else if (config.gnss_channel == 3)
                     {
-                        // c = Serial2.read();
+                        c = Serial2.read();
                     }
+                    #endif
                     if (c > -1)
                     {
                         gps.encode((char)c);
@@ -7904,9 +7919,7 @@ void taskSerial(void *pvParameters)
         if (config.ext_tnc_channel == 1)
         {
 
-#if ARDUINO_USB_CDC_ON_BOOT
-            Serial0.setTimeout(10);
-#else
+#if ARDUINO_USB_MODE
             Serial.setTimeout(10);
 #endif
         }
@@ -7983,29 +7996,31 @@ void taskSerial(void *pvParameters)
             // }
         }
 
-        if (config.ext_tnc_enable && (config.ext_tnc_mode > 0 && config.ext_tnc_mode < 4))
+        if (config.ext_tnc_enable && (config.ext_tnc_mode > 0 && config.ext_tnc_mode < 5))
         {
             if (config.ext_tnc_mode == 1)
             { // KISS
-                // KISS MODE
+                // KISS MODE                
                 do
                 {
                     c = -1;
                     if (config.ext_tnc_channel == 1)
                     {
-#if ARDUINO_USB_CDC_ON_BOOT
                         c = Serial0.read();
-#else
-                        c = Serial.read();
-#endif
                     }
                     else if (config.ext_tnc_channel == 2)
                     {
                         c = Serial1.read();
                     }
+                    #if SOC_UART_NUM > 2
                     else if (config.ext_tnc_channel == 3)
                     {
-                        // c = Serial2.read();
+                        c = Serial2.read();
+                    }
+                    #endif
+                    else if (config.ext_tnc_channel == 4)
+                    {
+                        c = Serial.read();
                     }
 
                     if (c > -1)
@@ -8019,19 +8034,21 @@ void taskSerial(void *pvParameters)
                 raw.clear();
                 if (config.ext_tnc_channel == 1)
                 {
-#if ARDUINO_USB_CDC_ON_BOOT
-                    raw = Serial0.readStringUntil(0x0D);
-#else
-                    raw = Serial.readStringUntil(0x0D);
-#endif
+                    if(Serial0.available()) raw = Serial0.readStringUntil(0x0D);
                 }
                 else if (config.ext_tnc_channel == 2)
                 {
-                    raw = Serial1.readStringUntil(0x0D);
+                    if(Serial1.available()) raw = Serial1.readStringUntil(0x0D);
                 }
+                #if SOC_UART_NUM > 2
                 else if (config.ext_tnc_channel == 3)
                 {
-                    // raw = Serial2.readStringUntil(0x0D);
+                    if(Serial2.available()) raw = Serial2.readStringUntil(0x0D);
+                }
+                #endif
+                else if(config.ext_tnc_channel == 4)
+                {
+                    if(Serial.available()) raw = Serial.readStringUntil(0x0D);
                 }
 
                 log_d("Ext TNC2RAW RX:%s", raw.c_str());
@@ -8049,8 +8066,8 @@ void taskSerial(void *pvParameters)
                         aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
                         aprsClient.write("\r\n");                 // Send CR LF the end frame packet
                         status.rf2inet++;
-                        igateTLM.RF2INET++;
-                        igateTLM.RX++;
+                        //igateTLM.RF2INET++;
+                        //igateTLM.RX++;
                     }
                 }
             }
@@ -8059,19 +8076,21 @@ void taskSerial(void *pvParameters)
                 String info = "";
                 if (config.ext_tnc_channel == 1)
                 {
-#if ARDUINO_USB_CDC_ON_BOOT
-                    info = Serial0.readString();
-#else
-                    info = Serial.readString();
-#endif
+                    if(Serial0.available()) info = Serial0.readStringUntil(0x0D);
                 }
                 else if (config.ext_tnc_channel == 2)
                 {
-                    info = Serial1.readString();
+                    if(Serial1.available()) info = Serial1.readStringUntil(0x0D);
                 }
+                #if SOC_UART_NUM > 2
                 else if (config.ext_tnc_channel == 3)
                 {
-                    // info = Serial2.readString();
+                    if(Serial2.available()) info = Serial2.readStringUntil(0x0D);
+                }
+                #endif
+                else if(config.ext_tnc_channel == 4)
+                {
+                    if(Serial.available()) info = Serial.readStringUntil(0x0D);
                 }
 
                 //  log_d("Ext Yaesu Packet >> %s",info.c_str());
@@ -8125,8 +8144,8 @@ void taskSerial(void *pvParameters)
                                     aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
                                     aprsClient.write("\r\n");                 // Send CR LF the end frame packet
                                     status.rf2inet++;
-                                    igateTLM.RF2INET++;
-                                    igateTLM.RX++;
+                                    //igateTLM.RF2INET++;
+                                    //igateTLM.RX++;
                                 }
                             }
                         }
@@ -8163,9 +8182,12 @@ void taskAPRS(void *pvParameters)
     digitalWrite(16,HIGH);
     #endif
     APRS_init(&config);
+    #ifdef RF2
+    APRS_init2(&config);
+    #endif
     // APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
-    igateTLM.TeleTimeout = millis() + 60000; // 1Min
+    //igateTLM.TeleTimeout = millis() + 60000; // 1Min
 
     timeSlot = millis();
     timeAprs = 0;
@@ -8386,7 +8408,7 @@ void taskAPRS(void *pvParameters)
                 if (config.trk_tlm_interval > 0)
                 {
                     trkTlmInvCount++;
-                    if (trkTlmInvCount >= config.trk_tlm_interval)
+                    if ((trkTlmInvCount >= config.trk_tlm_interval) || (TLM_SEQ == 0))
                     {
                         trkTlmInvCount = 0;
                         if (config.trk_tlm_sensor[0] | config.trk_tlm_sensor[1] | config.trk_tlm_sensor[2] | config.trk_tlm_sensor[3] | config.trk_tlm_sensor[4])
@@ -8591,28 +8613,9 @@ void taskAPRS(void *pvParameters)
                     SendMode |= INET_CHANNEL;
                 pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
 
-                //                 if (config.trk_loc2rf)
-                //                 { // TRACKER SEND TO RF
-                //                     char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-                //                     memcpy(rawP, rawData.c_str(), rawData.length());
-                //                     // rawData.toCharArray(rawP, rawData.length());
-                //                     pkgTxPush(rawP, rawData.length(), 0);
-
 #if defined OLED || defined ST7735_160x80
                 pushTxDisp(TXCH_RF, name, sts);
 #endif
-                //                     free(rawP);
-                //                 }
-                //                 if (config.trk_loc2inet)
-                //                 { // TRACKER SEND TO APRS-IS
-                //                     if (aprsClient.connected())
-                //                     {
-                //                         aprsClient.println(rawData); // Send packet to Inet
-                // #if defined OLED || defined ST7735_160x80
-                //                         // pushTxDisp(TXCH_TCP, "TX TRACKER", sts);
-                // #endif
-                //                     }
-                //                 }
                 rawData.clear();
                 cmn.clear();
             }
@@ -8631,7 +8634,7 @@ void taskAPRS(void *pvParameters)
             newDigiPkg = true;
             if (config.ext_tnc_enable)
             {
-                if (config.ext_tnc_channel > 0 && config.ext_tnc_channel < 3)
+                if (config.ext_tnc_channel > 0 && config.ext_tnc_channel < 5)
                 {
                     if (config.ext_tnc_mode == 1)
                     {
@@ -8640,19 +8643,21 @@ void taskAPRS(void *pvParameters)
                         int sz = kiss_wrapper(pkg);
                         if (config.ext_tnc_channel == 1)
                         {
-#if ARDUINO_USB_CDC_ON_BOOT
                             Serial0.write(pkg, sz);
-#else
-                            Serial.write(pkg, sz);
-#endif
                         }
                         else if (config.ext_tnc_channel == 2)
                         {
                             Serial1.write(pkg, sz);
                         }
+                        #if SOC_UART_NUM > 2
                         else if (config.ext_tnc_channel == 3)
                         {
-                            // Serial2.write(pkg, sz);
+                            Serial2.write(pkg, sz);
+                        }
+                        #endif
+                        else if (config.ext_tnc_channel == 4)
+                        {
+                            Serial.write(pkg, sz);
                         }
                     }
                     else if (config.ext_tnc_mode == 2)
@@ -8660,19 +8665,21 @@ void taskAPRS(void *pvParameters)
                         // TNC2
                         if (config.ext_tnc_channel == 1)
                         {
-#if ARDUINO_USB_CDC_ON_BOOT
                             Serial0.println(tnc2);
-#else
-                            Serial.println(tnc2);
-#endif
                         }
                         else if (config.ext_tnc_channel == 2)
                         {
                             Serial1.println(tnc2);
                         }
+                        #if SOC_UART_NUM > 2
                         else if (config.ext_tnc_channel == 3)
                         {
-                            // Serial2.println(tnc2);
+                            Serial2.println(tnc2);
+                        }
+                        #endif
+                        else if (config.ext_tnc_channel == 4)
+                        {
+                            Serial.println(tnc2);
                         }
                     }
                 }
@@ -8749,7 +8756,6 @@ void taskAPRS(void *pvParameters)
             lastPkgRaw = tnc2;
             handle_ws();
             // ESP_BT.println(tnc2);
-            status.allCount++;
             tnc2.clear();
         }
 
@@ -8802,7 +8808,7 @@ void taskAPRS(void *pvParameters)
                         if (config.igate_tlm_interval > 0)
                         {
                             igateTlmInvCount++;
-                            if (igateTlmInvCount >= config.igate_tlm_interval)
+                            if ((igateTlmInvCount >= config.igate_tlm_interval) || (TLM_SEQ == 0))
                             {
                                 igateTlmInvCount = 0;
                                 if (config.igate_tlm_sensor[0] | config.igate_tlm_sensor[1] | config.igate_tlm_sensor[2] | config.igate_tlm_sensor[3] | config.igate_tlm_sensor[4])
@@ -8961,28 +8967,9 @@ void taskAPRS(void *pvParameters)
                         if (config.igate_loc2inet)
                             SendMode |= INET_CHANNEL;
                         pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
-//                         if (config.igate_loc2rf)
-//                         { // IGATE SEND POSITION TO RF
-//                             char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-//                             // rawData.toCharArray(rawP, rawData.length());
-//                             memcpy(rawP, rawData.c_str(), rawData.length());
-//                             pkgTxPush(rawP, rawData.length(), 0);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_RF, "TX IGATE", sts);
 #endif
-                        //                             free(rawP);
-                        //                         }
-                        //                         if (config.igate_loc2inet)
-                        //                         { // IGATE SEND TO APRS-IS
-                        //                             if (aprsClient.connected())
-                        //                             {
-                        //                                 status.txCount++;
-                        //                                 aprsClient.println(rawData); // Send packet to Inet
-                        // #if defined OLED || defined ST7735_160x80
-                        //                                 pushTxDisp(TXCH_TCP, "TX IGATE", sts);
-                        // #endif
-                        //                             }
-                        //                         }
                     }
                 }
             }
@@ -9001,20 +8988,19 @@ void taskAPRS(void *pvParameters)
                     if (ret == 0)
                     {
                         status.dropCount++;
-                        igateTLM.DROP++;
+                        //igateTLM.DROP++;
                     }
                     else
                     {
                         status.rf2inet++;
-                        igateTLM.RF2INET++;
-                        igateTLM.TX++;
+                        //igateTLM.RF2INET++;
                     }
                 }
             }
         }
 
         // Digi Repeater Process
-        if (config.digi_en)
+        if (config.digi_en || (config.digi_auto && (aprsClient.connected() == false)))
         {
             if (config.digi_sts_interval > 10)
             {
@@ -9062,7 +9048,7 @@ void taskAPRS(void *pvParameters)
                         if (config.digi_tlm_interval > 0)
                         {
                             digiTlmInvCount++;
-                            if (digiTlmInvCount >= config.digi_tlm_interval)
+                            if ((digiTlmInvCount >= config.digi_tlm_interval) || (TLM_SEQ == 0))
                             {
                                 digiTlmInvCount = 0;
                                 if (config.digi_tlm_sensor[0] | config.digi_tlm_sensor[1] | config.digi_tlm_sensor[2] | config.digi_tlm_sensor[3] | config.digi_tlm_sensor[4])
@@ -9221,28 +9207,9 @@ void taskAPRS(void *pvParameters)
                         if (config.digi_loc2inet)
                             SendMode |= INET_CHANNEL;
                         pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
-//                         if (config.digi_loc2rf)
-//                         { // DIGI SEND POSITION TO RF
-//                             char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-//                             // rawData.toCharArray(rawP, rawData.length());
-//                             memcpy(rawP, rawData.c_str(), rawData.length());
-//                             pkgTxPush(rawP, rawData.length(), 0);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
 #endif
-                        //                             free(rawP);
-                        //                         }
-                        //                         if (config.digi_loc2inet)
-                        //                         { // DIGI SEND TO APRS-IS
-                        //                             if (aprsClient.connected())
-                        //                             {
-                        //                                 status.txCount++;
-                        //                                 aprsClient.println(rawData); // Send packet to Inet
-                        // #if defined OLED || defined ST7735_160x80
-                        //                                 pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
-                        // #endif
-                        //                             }
-                        //                         }
                     }
                     rawData.clear();
                 }
@@ -9297,7 +9264,6 @@ void taskAPRS(void *pvParameters)
                         // memcpy(rawP, digiPkg.c_str(), digiPkg.length());
                         pkgTxPush(digiPkg.c_str(), digiPkg.length(), digiDelay, RF_CHANNEL);
                         digiPkg.clear();
-                        // pkgTxPush(rawP, digiPkg.length(), digiDelay, RF_CHANNEL);
                         sprintf(sts, "--src call--\n%s\nDelay: %dms.", incomingPacket.src.call, digiDelay);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_DIGI, "DIGI REPEAT", sts);
@@ -9350,29 +9316,10 @@ void taskAPRS(void *pvParameters)
                     if (config.wx_2inet)
                         SendMode |= INET_CHANNEL;
                     pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
-//                     if (config.wx_2rf)
-//                     { // WX SEND POSITION TO RF
-//                         char *rawP = (char *)calloc(rawData.length(), sizeof(char));
-//                         // rawData.toCharArray(rawP, rawData.length());
-//                         memcpy(rawP, rawData.c_str(), rawData.length());
-//                         pkgTxPush(rawP, rawData.length(), 0);
 #ifdef OLED
                     sprintf(sts, "--src call--\n%s\nDelay: %dms.", config.wx_mycall, (config.wx_interval * 1000));
                     pushTxDisp(TXCH_RF, "WX REPORT", sts);
 #endif
-                    //                         free(rawP);
-                    //                     }
-                    //                     if (config.wx_2inet)
-                    //                     { // WX SEND TO APRS-IS
-                    //                         if (aprsClient.connected())
-                    //                         {
-                    //                             status.txCount++;
-                    //                             aprsClient.println(rawData); // Send packet to Inet
-                    // #ifdef OLED
-                    //                             // pushTxDisp(TXCH_TCP, "WX REPORT", sts);
-                    // #endif
-                    //                         }
-                    //                     }
                 }
                 else
                 {
@@ -9492,10 +9439,17 @@ void taskAPRS(void *pvParameters)
 
 void taskAPRSPoll(void *pvParameters)
 {
+    // esp_task_wdt_config_t twdt_config = {
+    //     .timeout_ms = 10000,                             // 10 seconds
+    //     .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Bitmask of all cores
+    //     .trigger_panic = false,
+    // };
+    // esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+    // esp_task_wdt_add(taskAPRSPollHandle);
     for (;;)
     {
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        if ((config.rf_en == true) && (AFSKInitAct == true))
+        if (AFSKInitAct == true)
         {
             //esp_task_wdt_reset();
             if (APRS_poll())
@@ -9518,12 +9472,13 @@ uint8_t APStationNum = 0;
 
 #ifdef PPPOS
 pppType pppStatus;
+long int pppTimeout = 0;
 #endif
 
 IPAddress ap_ip(192, 168, 4, 1);
 IPAddress ap_mask(255, 255, 255, 0);
 IPAddress ap_leaseStart(192, 168, 4, 2);
-IPAddress ap_dns(8, 8, 4, 4);
+IPAddress ap_dns(8, 8, 8, 8);
 
 void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 {
@@ -9554,15 +9509,17 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         log_d("PPP IP: %s", IPAddress(pppStatus.ip).toString().c_str());
         log_d("PPP Gateway: %s", IPAddress(pppStatus.gateway).toString().c_str());
         log_d("PPP Subnet: %s", IPAddress(pppStatus.netmask).toString().c_str());
-        WiFi.AP.enableNAPT(true);
+        WiFi.AP.enableNAPT(config.ppp_napt);
         break;
     case ARDUINO_EVENT_PPP_LOST_IP:
         log_d("PPP Lost IP");
         WiFi.AP.enableNAPT(false);
+        pppTimeout = millis() + (60 * 1000);
         break;
     case ARDUINO_EVENT_PPP_DISCONNECTED:
         log_d("PPP Disconnected");
         WiFi.AP.enableNAPT(false);
+        pppTimeout = millis() + (60 * 1000);
         break;
     case ARDUINO_EVENT_PPP_STOP:
         log_d("PPP Stopped");
@@ -9618,7 +9575,6 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 }
 
 #ifdef PPPOS
-long int pppTimeout = 0;
 
 void PPPOS_Start()
 {
@@ -9634,8 +9590,22 @@ void PPPOS_Start()
         //  digitalWrite(39, HIGH); // Set GPIO39 to high to enable pull-up resistor
         delay(1000); // Wait for the modem to reset
 
+        PPP.setApn(config.ppp_apn);     // Set the APN for the modem
+        PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
         PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
-        PPP.begin(PPP_MODEM_MODEL, config.ppp_serial, 115200);
+        log_d("PPP Modem Init...");
+
+        if (PPP.begin(PPP_MODEM_MODEL, config.ppp_serial, 115200))
+        {
+            log_d("PPP started successfully");
+        }
+        else
+        {
+            log_d("PPP failed to start");
+            sprintf(pppStatus.manufacturer, "Not found modem");
+            sprintf(pppStatus.model, "N/A");
+            return;
+        }
 
         // Configure the modem
         if (config.ppp_gnss)
@@ -9648,8 +9618,7 @@ void PPPOS_Start()
             Serial.println(PPP.cmd("AT+QGPSCFG=\"apflash\",1", 10000));             // เปิดใช้งาน AP-Flash เพื่อการเริ่มต้นที่รวดเร็ว
             Serial.println(PPP.cmd("AT+QGPS=1", 10000));
         }
-
-        PPP.setApn("INTERNET");     // Set the APN for the modem
+        
         PPP.cmd("AT+CTZU=1", 1000); // Enable automatic time zone update
         // PPP.setUser(ppp_user);
         // PPP.setPass(ppp_pass);
@@ -9692,8 +9661,7 @@ void PPPOS_Start()
             pppStatus.rssi = PPP.RSSI();
             log_d("Operator: %s", pppStatus.oper);
             log_d("RSSI: %d dBm", pppStatus.rssi);
-            // log_d("RSSI: %i", PPP.RSSI());
-            //  PPP.started(); // Start the PPP connection
+            PPP.started(); // Start the PPP connection            
             //   if(PPP.sms("0984958488","Test SMS from ESP32")){
             //       log_d("SMS sent successfully!");
             //   } else {
@@ -9771,7 +9739,7 @@ void taskNetwork(void *pvParameters)
                 wifiMulti.addAP(config.wifi_sta[i].wifi_ssid, config.wifi_sta[i].wifi_pass);
             }
         }
-        WiFi.setHostname("ESP32APRS_LoRa");
+        WiFi.setHostname(config.host_name);
         if (wifiMulti.run() == WL_CONNECTED)
         {
             log_d("Wi-Fi CONNECTED!");
@@ -9808,12 +9776,18 @@ void taskNetwork(void *pvParameters)
     pingTimeout = millis() + 10000;
     unsigned long timeNetworkOld = millis();
     timeNetwork = 0;
-    if (config.wifi_mode & WIFI_AP_STA_FIX)
-        webService();
 
     #ifdef PPPOS
     PPPOS_Start(); // Start PPP connection if enabled
+    pppTimeout = millis() + (600 * 1000);
     #endif
+
+    #ifdef PPPOS
+    if (config.ppp_enable || (config.wifi_mode & WIFI_AP_STA_FIX))
+    #else
+    if (config.wifi_mode & WIFI_AP_STA_FIX)
+    #endif
+        webService();
 
     #ifdef BLUETOOTH
     bluetooth_init(); // Initialize Bluetooth if enabled
@@ -9825,7 +9799,7 @@ void taskNetwork(void *pvParameters)
         timeNetwork = now - timeNetworkOld;
         timeNetworkOld = now;
         // wdtNetworkTimer = millis();
-        // serviceHandle();
+        //serviceHandle();
         timerNetwork = micros() - timerNetwork_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerNetwork_old = micros();
@@ -9848,11 +9822,12 @@ void taskNetwork(void *pvParameters)
         #else
         if (WiFi.isConnected() == true || WiFi.softAPgetStationNum())
         #endif
-        {        
-            if (lastHeard_Flag)
+        {
+            if (lastHeard_Flag && (millis() > lastHeardTimeout))
             {
-                lastHeard_Flag = false;
-                event_lastHeard();
+                    lastHeard_Flag = false;
+                    lastHeardTimeout = millis() + 1000;
+                    event_lastHeard();                    
             }
         }
 
@@ -9862,7 +9837,11 @@ void taskNetwork(void *pvParameters)
             if (APStationNum > 0)
             {
                 // config.pwr_sleep_activate |= ACTIVATE_WIFI;
+                #ifdef PPPOS
+                if ((WiFi.isConnected() == false) && (PPP.connected() == false))
+                #else   
                 if (WiFi.isConnected() == false)
+                #endif
                 {
                     vTaskDelay(9 / portTICK_PERIOD_MS);
                     continue;
@@ -9907,8 +9886,14 @@ void taskNetwork(void *pvParameters)
                         //     log_d("Wireguard Connect Fail!");
                         if (!wireguard_active())
                         {
-                            log_d("Setup Wiregurad VPN!");
-                            wireguard_setup();
+                            log_d("Setup Wireguard VPN!");
+                            if(WiFi.isConnected()){
+                                wireguard_setup(NULL);
+                            }else{
+                                if(PPP.connected()){
+                                    wireguard_setup((netif *)PPP.netif());
+                                }
+                            }
                         }
                     }
                 }
@@ -9942,8 +9927,6 @@ void taskNetwork(void *pvParameters)
                             String msg_call = "::" + src_call;
 
                             status.allCount++;
-                            status.rxCount++;
-                            igateTLM.RX++;
 
                             log_d("INET: %s\n", line.c_str());
                             start_val = line.indexOf(":", 10); // Search of info in ax25
@@ -10014,7 +9997,7 @@ void taskNetwork(void *pvParameters)
                                                     pushTxDisp(TXCH_3PTY, "TX INET->RF", sts);
 #endif
                                                     status.inet2rf++;
-                                                    igateTLM.INET2RF++;
+                                                    //igateTLM.INET2RF++;
                                                     log_d("INET2RF: %s\n", line);
                                                     free(strtmp);
                                                 }
@@ -10045,68 +10028,98 @@ void taskNetwork(void *pvParameters)
             if (millis() > pingTimeout)
             {
                 pingTimeout = millis() + 60000;
-                // if(config.wifi_mode & WIFI_STA_FIX){
-                //     log_d("Ping GW to %s\n", WiFi.gatewayIP().toString().c_str());
-                //     if (ping_start(WiFi.gatewayIP(), 2, 0, 0, 5) == true)
-                //     {
-                //         log_d("GW Success!!\n");
-                //     }
-                //     else
-                //     {
-                //         log_d("GW Fail!\n");
-                //         WiFi.disconnect();
-                //         WiFi.persistent(false);
-                //         WiFi.mode(WIFI_OFF); // Switch WiFi off
+                if(config.wifi_mode & WIFI_STA_FIX)
+                {
+                    log_d("Ping WiFi to %s\n", WiFi.gatewayIP().toString().c_str());
+                    if (ping_start(ap_dns, 2, 0, 0, 5) == true)
+                    {
+                        log_d("Ping WiFi Success!!\n");
+                    }
+                    else
+                    {
+                        log_d("Ping WiFi Fail!\n");
+                        WiFi.disconnect();
+                        WiFi.persistent(false);
+                        WiFi.mode(WIFI_OFF); // Switch WiFi off
 
-                //         wifiTTL = 0;
-                //         delay(3000);
-                //         if (config.wifi_mode == WIFI_STA_FIX)
-                //         { /**< WiFi station mode */
-                //             WiFi.mode(WIFI_MODE_STA);
-                //             WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                //         }
-                //         else if (config.wifi_mode == WIFI_AP_FIX)
-                //         { /**< WiFi soft-AP mode */
-                //             WiFi.mode(WIFI_MODE_AP);
-                //             WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                //         }
-                //         else if (config.wifi_mode == WIFI_AP_STA_FIX)
-                //         { /**< WiFi station + soft-AP mode */
-                //             WiFi.mode(WIFI_MODE_APSTA);
-                //             WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                //         }
-                //         else
-                //         {
-                //             WiFi.mode(WIFI_MODE_NULL);
-                //         }
-                //         WiFi.reconnect();
-                //         wifiMulti.run(5000);
-                //     }
-                // }
+                        wifiTTL = 0;
+                        delay(3000);
+                        if (config.wifi_mode == WIFI_STA_FIX)
+                        { /**< WiFi station mode */
+                            WiFi.mode(WIFI_MODE_STA);
+                            WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                        }
+                        else if (config.wifi_mode == WIFI_AP_FIX)
+                        { /**< WiFi soft-AP mode */
+                            WiFi.mode(WIFI_MODE_AP);
+                            WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                        }
+                        else if (config.wifi_mode == WIFI_AP_STA_FIX)
+                        { /**< WiFi station + soft-AP mode */
+                            WiFi.mode(WIFI_MODE_APSTA);
+                            WiFi.setTxPower((wifi_power_t)config.wifi_power);
+                        }
+                        else
+                        {
+                            WiFi.mode(WIFI_MODE_NULL);
+                        }
+                        WiFi.reconnect();
+                        wifiMulti.run(5000);
+                    }
+                }
                 if (config.vpn)
                 {
                     if (!wireguard_active())
                     {
-                        log_d("Reconnection Wiregurad VPN!");
+                        log_d("Reconnection Wireguard VPN!");
                         wireguard_remove();
                         delay(1000);
-                        wireguard_setup();
+                        if(WiFi.isConnected()){
+                                wireguard_setup(NULL);
+                            }else{
+                                if(PPP.connected()){
+                                    wireguard_setup((netif *)PPP.netif());
+                                }
+                            }
                     }
-                    // IPAddress vpnIP;
-                    // vpnIP.fromString(String(config.wg_gw_address));
-                    // log_d("Ping VPN to %s", vpnIP.toString().c_str());
-                    // if (ping_start(vpnIP, 2, 0, 0, 10) == true)
-                    // {
-                    //     log_d("VPN Ping Success!!");
-                    // }
-                    // else
-                    // {
-                    //     log_d("VPN Ping Fail!");
-                    //     wireguard_remove();
-                    //     delay(3000);
-                    //     wireguard_setup();
-                    // }
+                    IPAddress vpnIP;
+                    vpnIP.fromString(String(config.wg_gw_address));
+                    log_d("Ping VPN to %s", vpnIP.toString().c_str());
+                    if (ping_start(vpnIP, 2, 0, 0, 30) == true)
+                    {
+                        log_d("VPN Ping Success!!");
+                    }
+                    else
+                    {
+                        log_d("VPN Ping Fail!");
+                        wireguard_remove();
+                        delay(1000);
+                        wireguard_setup(NULL);
+                            
+                    }
                 }
+                #ifdef PPPOS
+                if(config.ppp_enable)
+                {
+                    if (PPP.connected())
+                    {
+                        //IPAddress pppIP(pppStatus.ip);
+                        log_d("Ping PPP to %s", PPP.localIP().toString().c_str());
+                        if ((PPP.linkUp()==true)&&(ping_start(PPP.localIP(), 2, 0, 0, 30) == true))
+                        {
+                            log_d("PPP Ping Success!!");
+                        }
+                        else
+                        {
+                            log_d("PPP Ping Fail!");
+                            PPP.reset();                        
+                            delay(1000);
+                            PPPOS_Start();
+                            pppTimeout = millis() + (600 * 1000);
+                        }
+                    }
+                }
+                #endif
             }
         }
     } // for loop

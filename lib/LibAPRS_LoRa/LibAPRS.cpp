@@ -4,12 +4,10 @@
 #include "LibAPRSesp.h"
 #include "ais.h"
 #include <WiFiClient.h>
-
-// PhysicalLayer *lora; // TODO: Remove this
 #include "RadioHal.hpp"
 
 ICACHE_RAM_ATTR IRadioHal *radioHal;
-#ifdef NAWS4
+#ifdef RF2
 ICACHE_RAM_ATTR IRadioHal *radioHal1;
 #endif
 
@@ -31,8 +29,10 @@ extern Configuration config;
 extern WiFiClient aprsClient;
 
 // Radio::Radio()
-#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6 || CONFIG_IDF_TARGET_ESP32S3
+#if CONFIG_IDF_TARGET_ESP32C3
 SPIClass spi(FSPI);
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+SPIClass spi(HSPI);
 #else
 SPIClass spi(VSPI);
 #endif
@@ -40,6 +40,7 @@ SPIClass spi(VSPI);
 #define countof(a) sizeof(a) / sizeof(a[0])
 
 TaskHandle_t fifoTaskHandle;
+TaskHandle_t fifoTaskHandle1;
 
 unsigned long custom_preamble = 350UL;
 unsigned long custom_tail = 50UL;
@@ -103,7 +104,7 @@ size_t txBuf_len;
 int remLength;
 bool flagAddFifo = false;
 
-#ifdef NAWS4
+#ifdef RF2
 bool received1 = false;
 bool eInterrupt1 = true;
 bool noisyInterrupt1 = false;
@@ -251,11 +252,14 @@ void radioRecvStatus()
 {
     if (config.rf_mode == RF_MODE_LoRa)
     {
+        uint32_t packetStatus = radioHal->getPacketStatus();
+    uint8_t rssiPkt = packetStatus & 0xFF;
+    return(-1.0 * rssiPkt/2.0);
         rssi = radioHal->getRSSI(true, false);
         snr = radioHal->getSNR();
         freqErr = radioHal->getFrequencyError();
         // print RSSI (Received Signal Strength Indicator)
-        log_d("[LoRa] RSSI:%.0f dBm\tSNR:%.0f dBm\tFreqErr:%.0f Hz", rssi, snr, freqErr);
+        log_d("[LoRa] RSSI:%.1f dBm\tSNR:%.1f dBm\tFreqErr:%.1f Hz", rssi, snr, freqErr);
     }
     else
     {
@@ -267,7 +271,7 @@ void radioRecvStatus()
     afskSync = true;
 }
 
-#ifdef NAWS4
+#ifdef RF2
 ICACHE_RAM_ATTR void fifoAdd1(void)
 {
     if (ax25_stateTx && remLength > 0)
@@ -285,14 +289,14 @@ ICACHE_RAM_ATTR void fifoGet1(void)
 
 ICACHE_RAM_ATTR void setFlag1()
 {
-    // log_d("Interrupt DIO0 milis=%u", millis());
+    log_d("RF2 Interrupt DIO0 milis=%u", millis());
     if (received1 || !eInterrupt1)
         noisyInterrupt1 = true;
 
     if (!eInterrupt1)
         return;
 
-    received = true;
+    received1 = true;
 }
 
 ICACHE_RAM_ATTR void enableInterrupt1()
@@ -313,7 +317,7 @@ void radioSleep1()
 void startRx1()
 {
     received1 = false;
-    flagGetFifo = false;
+    flagGetFifo1 = false;
 
     if (rx1Buff == NULL)
     {
@@ -323,14 +327,14 @@ void startRx1()
     }
     else
     {
-        memset(rxBuff, 0, MAX_RFBUFF);
+        memset(rx1Buff, 0, MAX_RFBUFF);
         rx1BuffLen = 0;
     }
 
     if (config.rf1_mode == RF_MODE_G3RUH)
     {
         uint8_t syncWord[] = {0xd9};
-        radioHal->setSyncWord(syncWord, sizeof(syncWord));
+        radioHal1->setSyncWord(syncWord, sizeof(syncWord));
         rxTimeout1 = millis() + 60000;
     }
     else
@@ -338,7 +342,7 @@ void startRx1()
         rxTimeout1 = millis() + 900000;
     }
 
-    enableInterrupt();
+    enableInterrupt1();
     // put module back to listen mode
     radioHal1->startReceive();
 }
@@ -361,6 +365,51 @@ void radioRecvStatus1()
         // log_d("[GFSK] RSSI:%.0f dBm", rssi);
     }
     afskSync = true;
+}
+
+void taskADDFifo1(void *pvParameters)
+{
+    for (;;)
+    {
+        if (ax25_stateTx)
+        {
+            if (flagAddFifo1 && remLength > 0)
+            {
+
+                // portENTER_CRITICAL_ISR(&fifoMux); // ISR start
+                // flagAddFifo=false;
+                // portEXIT_CRITICAL_ISR(&fifoMux); // ISR end
+                // log_d("TX:%u remLen:%i",millis(),remLength);
+                radioHal1->fifoAdd(txBufPtr, txBuf_len, &remLength);
+                flagAddFifo = false;
+                continue;
+            }
+            vTaskDelay(pdTICKS_TO_MS(1));
+        }
+        else
+        {
+            if (flagGetFifo1)
+            {
+                // fifoLock = true;
+                if (rx1Buff == NULL)
+                {
+                    vTaskDelay(pdTICKS_TO_MS(10));
+                    continue;
+                }
+                if (rx1BuffLen == 0)
+                    radioRecvStatus();
+                if (radioHal1->fifoGet(rx1Buff, MAX_RFBUFF, &rx1BuffLen))
+                {
+                    received1 = true;
+                    // fifoLock = false;
+                    // radioRecvStatus();
+                }
+                flagGetFifo1 = false;
+                continue;
+            }
+            vTaskDelay(pdTICKS_TO_MS(1));
+        }
+    }
 }
 #endif
 
@@ -435,6 +484,12 @@ int APRS_getTNC2(String info)
     return sz;
 }
 
+void APRS_setFreq(float freq)
+{
+    // radioHal->setFrequency(freq);
+    // radioHal->startReceive();
+}
+
 bool APRS_init(Configuration *cfg)
 {
     bool ret = true;
@@ -454,14 +509,15 @@ bool APRS_init(Configuration *cfg)
 
     // SX126x,SX128x
     // setDio0Action->setDio1Action->getIRQ
-    spi.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio, config.rf_nss_gpio);
+    pinMode(config.rf_nss_gpio, OUTPUT);
+    spi.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio);
     if (config.rf_en)
     {
         log_d("[SX12xx] Initializing .. ");
         if (cfg->rf_type == RF_SX1278)
         {
             log_d("Init chip SX1278");
-            radioHal = new RadioHal<SX1278>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));          
+            radioHal = new RadioHal<SX1278>(new Module(config.rf_nss_gpio, config.rf_dio0_gpio, config.rf_reset_gpio, config.rf_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf_type == RF_SX1272)
         {
@@ -665,29 +721,36 @@ bool APRS_init(Configuration *cfg)
         {
             radioHal->setCurrentLimit(120);
         }
-
+        
         radioHal->setOutputPower(config.rf_power);
-
         startRx();
+        radioHal->setRxBoostedGainMode(config.rf_rx_boost);
 
-        if (config.igate_en || config.digi_en)
-        {
-            radioHal->setRxBoostedGainMode(true);
-        }
     }
 
-#ifdef NAWS4
+    ax25_init(&AX25, aprs_msg_callback);
+    return ret;
+}
+
+#ifdef RF2
+bool APRS_init2(Configuration *cfg)
+{
+    bool ret = true;
+    int state = -1;
+
+    pinMode(config.rf1_nss_gpio, OUTPUT);
+    spi.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio);
     if (config.rf1_en)
     {
         log_d("[SX12xx] Module 2 Initializing .. ");
         if (cfg->rf1_type == RF_SX1278)
         {
-            log_d("Init chip SX1278");
+            log_d("Init chip1 SX1278");
             radioHal1 = new RadioHal<SX1278>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1272)
         {
-            log_d("Init chip SX1272");
+            log_d("Init chip1 SX1272");
             radioHal1 = new RadioHal<SX1272>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1273)
@@ -697,22 +760,22 @@ bool APRS_init(Configuration *cfg)
         }
         else if (cfg->rf1_type == RF_SX1276)
         {
-            log_d("Init chip SX1276");
+            log_d("Init chip1 SX1276");
             radioHal1 = new RadioHal<SX1276>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1279)
         {
-            log_d("Init chip SX1279");
+            log_d("Init chip1 SX1279");
             radioHal1 = new RadioHal<SX1279>(new Module(config.rf1_nss_gpio, config.rf1_dio0_gpio, config.rf1_reset_gpio, config.rf1_dio1_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1268)
         {
-            log_d("Init chip SX1268");
+            log_d("Init chip1 SX1268");
             radioHal1 = new RadioHal<SX1268>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1261)
         {
-            log_d("Init chip SX1262");
+            log_d("Init chip1 SX1262");
             radioHal1 = new RadioHal<SX1261>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1262)
@@ -722,17 +785,17 @@ bool APRS_init(Configuration *cfg)
         }
         else if (cfg->rf1_type == RF_SX1280)
         {
-            log_d("Init chip SX1280");
+            log_d("Init chip1 SX1280");
             radioHal1 = new RadioHal<SX1280>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1281)
         {
-            log_d("Init chip SX1281");
+            log_d("Init chip1 SX1281");
             radioHal1 = new RadioHal<SX1281>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         else if (cfg->rf1_type == RF_SX1282)
         {
-            log_d("Init chip SX1282");
+            log_d("Init chip1 SX1282");
             radioHal1 = new RadioHal<SX1282>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
         // else if (cfg->rf1_type == RF_SX1231)
@@ -778,7 +841,7 @@ bool APRS_init(Configuration *cfg)
         }
         else
         {
-            state = radioHal1->begin(config.rf1_freq + (config.rf1_freq_offset / 1000000.0), config.rf1_bw, config.rf_sf, config.rf_cr, config.rf_sync, config.rf1_power, config.rf1_preamable, 1, 1.6);
+            state = radioHal1->begin(config.rf1_freq + (config.rf1_freq_offset / 1000000.0), config.rf1_bw, config.rf1_sf, config.rf1_cr, config.rf1_sync, config.rf1_power, config.rf1_preamable, 1, 1.6);
             if (state == RADIOLIB_ERR_NONE)
             {
                 ret = true;
@@ -815,24 +878,24 @@ bool APRS_init(Configuration *cfg)
             if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
             {
 
-                if (rxBuff == NULL)
+                if (rx1Buff == NULL)
                 {
-                    rxBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
-                    memset(rxBuff, 0, MAX_RFBUFF);
-                    rxBuffLen = 0;
+                    rx1Buff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    memset(rx1Buff, 0, MAX_RFBUFF);
+                    rx1BuffLen = 0;
                 }
                 if (config.rf1_dio1_gpio > -1)
                 { // Use DIO1 pin connected for fifo interrupt
-                    if (fifoTaskHandle == NULL)
+                    if (fifoTaskHandle1 == NULL)
                     {
                         xTaskCreatePinnedToCore(
-                            taskADDFifo,     /* Function to implement the task */
-                            "taskADDFifo",   /* Name of the task */
-                            2048,            /* Stack size in words */
-                            NULL,            /* Task input parameter */
-                            5,               /* Priority of the task */
-                            &fifoTaskHandle, /* Task handle. */
-                            0);              /* Core where the task should run */
+                            taskADDFifo1,     /* Function to implement the task */
+                            "taskADDFifo1",   /* Name of the task */
+                            2048,             /* Stack size in words */
+                            NULL,             /* Task input parameter */
+                            5,                /* Priority of the task */
+                            &fifoTaskHandle1, /* Task handle. */
+                            0);               /* Core where the task should run */
                     }
                     radioHal1->setFifoFullAction(fifoGet);
                     radioHal1->fixedPacketLengthMode(0);
@@ -840,21 +903,21 @@ bool APRS_init(Configuration *cfg)
                 else
                 {
                     radioHal1->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
-                    radioHal1->setDio0Action(setFlag);
+                    radioHal1->setDio0Action(setFlag1);
                 }
             }
             else if (config.rf1_type == RF_SX1261 || config.rf1_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
             {
-                if (fifoTaskHandle != NULL)
-                    vTaskDelete(fifoTaskHandle);
+                if (fifoTaskHandle1 != NULL)
+                    vTaskDelete(fifoTaskHandle1);
                 radioHal1->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
-                radioHal1->setDio0Action(setFlag);
+                radioHal1->setDio0Action(setFlag1);
             }
         }
         else if (config.rf1_mode == RF_MODE_AIS)
         {
-            if (fifoTaskHandle != NULL)
-                vTaskDelete(fifoTaskHandle);
+            if (fifoTaskHandle1 != NULL)
+                vTaskDelete(fifoTaskHandle1);
             // uint8_t syncWord[] = {0xcc, 0xcc, 0xcc, 0xfe}; // Flag HDLC 0x7EAAAAAA, 33,cc,99,
             uint8_t syncWord[] = {0xcc, 0xcc};
             radioHal1->setSyncWord(syncWord, 2);
@@ -872,11 +935,11 @@ bool APRS_init(Configuration *cfg)
             else
                 radioHal1->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
 
-            radioHal1->setDio0Action(setFlag);
+            radioHal1->setDio0Action(setFlag1);
         }
         else
         {
-            radioHal1->setDio0Action(setFlag);
+            radioHal1->setDio0Action(setFlag1);
         }
 
         if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
@@ -887,21 +950,17 @@ bool APRS_init(Configuration *cfg)
         {
             radioHal1->setCurrentLimit(120);
         }
-
+        
         radioHal1->setOutputPower(config.rf1_power);
-
         startRx1();
-
-        if (config.igate_en || config.digi_en)
-        {
-            radioHal1->setRxBoostedGainMode(true);
-        }
+        radioHal1->setRxBoostedGainMode(config.rf1_rx_boost);
+        
     }
-#endif
 
     ax25_init(&AX25, aprs_msg_callback);
     return ret;
 }
+#endif
 
 static inline int G3RUHScramble(uint32_t in, uint32_t *state)
 {
@@ -1135,63 +1194,162 @@ bool APRS_poll(void)
         APRS_init(&config);
     }
     // check if the flag is set
-    if (received)
+    if (config.rf_en)
     {
-        rxTimeout = millis() + 900000;
-        // disable the interrupt service routine while
-        // processing the data
-        disableInterrupt();
-
-        // LED_Status(0, 200, 0);
-
-        received = false;
-        uint8_t *byteArr = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
-        if (byteArr)
+        if (received)
         {
-            int numBytes = 0;
-            int state = -1;
-            if (config.rf_mode == RF_MODE_G3RUH)
+            rxTimeout = millis() + 900000;
+            // disable the interrupt service routine while
+            // processing the data
+            disableInterrupt();
+
+            // LED_Status(0, 200, 0);
+
+            received = false;
+            uint8_t *byteArr = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+            if (byteArr)
             {
-                rxTimeout = millis() + 30000;
-                uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
-                state = RADIOLIB_ERR_NULL_POINTER;
-                if (outputBuff)
+                int numBytes = 0;
+                int state = -1;
+                if (config.rf_mode == RF_MODE_G3RUH)
                 {
-                    if ((config.rf_dio1_gpio < 0) || config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+                    rxTimeout = millis() + 30000;
+                    uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    state = RADIOLIB_ERR_NULL_POINTER;
+                    if (outputBuff)
                     {
-                        radioRecvStatus();
-                        numBytes = radioHal->getPacketLength();
-                        memset(byteArr, 0, MAX_RFBUFF);
-                        state = radioHal->readData(&rxBuff[0], numBytes);
-                        // printHex(rxBuff, numBytes);
+                        if ((config.rf_dio1_gpio < 0) || config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+                        {
+                            radioRecvStatus();
+                            numBytes = radioHal->getPacketLength();
+                            memset(byteArr, 0, MAX_RFBUFF);
+                            state = radioHal->readData(&rxBuff[0], numBytes);
+                            // printHex(rxBuff, numBytes);
+                        }
+                        else
+                        {
+                            numBytes = rxBuffLen;
+                        }
+                        if (numBytes > MAX_RFBUFF)
+                            numBytes = MAX_RFBUFF;
+                        uint8_t *buff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
+                        if (buff)
+                        {
+                            flipBit(rxBuff, buff, numBytes);
+                            LED_Status(0, 200, 0);
+                            startRx();
+
+                            // printHex(rxBuff, rxBuffLen);
+                            // int s=0;
+                            int scn = numBytes;
+                            if (scn > 10)
+                                scn = 10;
+                            for (int s = 0; s < scn; s++)
+                            {
+                                memset(outputBuff, 0, MAX_RFBUFF);
+                                lfsr_descramble(&buff[s], outputBuff, numBytes - s);
+                                memset(byteArr, 0, MAX_RFBUFF);
+                                NRZIDecode(outputBuff, byteArr, numBytes - s);
+                                int num = numBytes - s;
+                                size_t frame_len = 0;
+                                int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], num);
+                                if (frame_len > 10)
+                                {
+                                    // LED_Status(0, 200, 0);
+                                    // printHex(buff, numBytes);
+                                    // printHex(byteArr, num);
+                                    rssi = fskRSSI;
+                                    fskRSSI = -130;
+                                    log_d("[GFSK] RSSI:%.0f dBm", rssi);
+                                    ax25_init(&AX25, aprs_msg_callback);
+                                    AX25.frame_len = frame_len;
+                                    memcpy(AX25.buf, outputBuff, frame_len);
+                                    ax25_decode(&AX25);
+                                    log_d("[GFSK] Received packet! %d Byte IDX:%d", frame_len, s);
+                                    received = false;
+                                    break;
+                                }
+                            }
+                            free(buff);
+                        }
+                        free(outputBuff);
                     }
-                    else
+                }
+                else if (config.rf_mode == RF_MODE_AIS)
+                {
+                    rxTimeout = millis() + 300000;
+                    numBytes = radioHal->getPacketLength();
+                    if (numBytes > 0)
                     {
-                        numBytes = rxBuffLen;
+                        uint8_t *rawBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
+                        if (rawBuff)
+                        {
+                            radioRecvStatus();
+                            memset(rawBuff, 0, numBytes);
+                            state = radioHal->readData(rawBuff, numBytes);
+                            if (state == RADIOLIB_ERR_NONE)
+                            {
+                                LED_Status(0, 200, 0);
+                                flipBit(rawBuff, byteArr, numBytes);
+                                NRZIDecode(byteArr, rawBuff, numBytes);
+                                // printHex(rawBuff, numBytes);
+                                size_t frame_len = 0;
+                                int idx = 0;
+                                do
+                                {
+                                    frame_len = 0;
+                                    idx = hdlcDecode(byteArr, frame_len, &rawBuff[idx], numBytes);
+                                    if (frame_len > 2)
+                                    {
+                                        status.rxCount++;
+                                        // rssi = fskRSSI;
+                                        // fskRSSI = -130;
+                                        frame_len -= 2; // remove FCS 2byte
+                                        char nmea[256];
+                                        ais_to_nmea((unsigned char *)byteArr, frame_len, nmea, sizeof(nmea));
+                                        log_d("AIS NMEA: %s", nmea);
+                                        String aisRaw = ais2aprs(nmea);
+                                        if (aisRaw.length() > 0)
+                                        {
+                                            // log_d("%s",aisRaw.c_str());
+                                            int size = APRS_getTNC2(aisRaw);
+                                        }
+                                    }
+                                    numBytes -= idx;
+                                } while (numBytes >= 10);
+                            }
+                            free(rawBuff);
+                        }
                     }
-                    if (numBytes > MAX_RFBUFF)
-                        numBytes = MAX_RFBUFF;
-                    uint8_t *buff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
-                    if (buff)
+                    startRx();
+                }
+                else if (config.rf_mode == RF_MODE_GFSK)
+                {
+                    uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    if (outputBuff)
                     {
-                        flipBit(rxBuff, buff, numBytes);
+                        if ((config.rf_dio1_gpio < 0) || config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+                        {
+                            radioRecvStatus();
+                            numBytes = radioHal->getPacketLength();
+                            memset(byteArr, 0, MAX_RFBUFF);
+                            state = radioHal->readData(&rxBuff[0], numBytes);
+                            // printHex(rxBuff, numBytes);
+                        }
+                        else
+                        {
+                            numBytes = rxBuffLen;
+                        }
+                        if (numBytes > MAX_RFBUFF)
+                            numBytes = MAX_RFBUFF;
+                        flipBit(rxBuff, byteArr, numBytes);
                         LED_Status(0, 200, 0);
                         startRx();
-
-                        // printHex(rxBuff, rxBuffLen);
-                        // int s=0;
-                        int scn = numBytes;
-                        if (scn > 10)
-                            scn = 10;
-                        for (int s = 0; s < scn; s++)
+                        if (config.rf_ax25)
                         {
-                            memset(outputBuff, 0, MAX_RFBUFF);
-                            lfsr_descramble(&buff[s], outputBuff, numBytes - s);
-                            memset(byteArr, 0, MAX_RFBUFF);
-                            NRZIDecode(outputBuff, byteArr, numBytes - s);
-                            int num = numBytes - s;
+                            // printHex(rxBuff, rxBuffLen);
                             size_t frame_len = 0;
-                            int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], num);
+                            int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], numBytes);
                             if (frame_len > 10)
                             {
                                 // LED_Status(0, 200, 0);
@@ -1204,255 +1362,214 @@ bool APRS_poll(void)
                                 AX25.frame_len = frame_len;
                                 memcpy(AX25.buf, outputBuff, frame_len);
                                 ax25_decode(&AX25);
-                                log_d("[GFSK] Received packet! %d Byte IDX:%d", frame_len, s);
-                                received = false;
-                                break;
+                                log_d("[GFSK AX.25] Received packet! %d Byte", frame_len);
                             }
                         }
-                        free(buff);
-                    }
-                    free(outputBuff);
-                }
-            }
-            else if (config.rf_mode == RF_MODE_AIS)
-            {
-                rxTimeout = millis() + 300000;
-                numBytes = radioHal->getPacketLength();
-                if (numBytes > 0)
-                {
-                    uint8_t *rawBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
-                    if (rawBuff)
-                    {
-                        radioRecvStatus();
-                        memset(rawBuff, 0, numBytes);
-                        state = radioHal->readData(rawBuff, numBytes);
-                        if (state == RADIOLIB_ERR_NONE)
+                        else
                         {
-                            LED_Status(0, 200, 0);
-                            flipBit(rawBuff, byteArr, numBytes);
-                            NRZIDecode(byteArr, rawBuff, numBytes);
-                            // printHex(rawBuff, numBytes);
-                            size_t frame_len = 0;
-                            int idx = 0;
-                            do
-                            {
-                                frame_len = 0;
-                                idx = hdlcDecode(byteArr, frame_len, &rawBuff[idx], numBytes);
-                                if (frame_len > 2)
-                                {
-                                    status.rxCount++;
-                                    // rssi = fskRSSI;
-                                    // fskRSSI = -130;
-                                    frame_len -= 2; // remove FCS 2byte
-                                    char nmea[256];
-                                    ais_to_nmea((unsigned char *)byteArr, frame_len, nmea, sizeof(nmea));
-                                    log_d("AIS NMEA: %s", nmea);
-                                    String aisRaw = ais2aprs(nmea);
-                                    if (aisRaw.length() > 0)
-                                    {
-                                        // log_d("%s",aisRaw.c_str());
-                                        int size = APRS_getTNC2(aisRaw);
-                                    }
-                                }
-                                numBytes -= idx;
-                            } while (numBytes >= 10);
-                        }
-                        free(rawBuff);
-                    }
-                }
-                startRx();
-            }
-            else if (config.rf_mode == RF_MODE_GFSK)
-            {
-                uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
-                if (outputBuff)
-                {
-                    if ((config.rf_dio1_gpio < 0) || config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
-                    {
-                        radioRecvStatus();
-                        numBytes = radioHal->getPacketLength();
-                        memset(byteArr, 0, MAX_RFBUFF);
-                        state = radioHal->readData(&rxBuff[0], numBytes);
-                        // printHex(rxBuff, numBytes);
-                    }
-                    else
-                    {
-                        numBytes = rxBuffLen;
-                    }
-                    if (numBytes > MAX_RFBUFF)
-                        numBytes = MAX_RFBUFF;
-                    flipBit(rxBuff, byteArr, numBytes);
-                    LED_Status(0, 200, 0);
-                    startRx();
-                    if (config.rf_ax25)
-                    {
-                        // printHex(rxBuff, rxBuffLen);
-                        size_t frame_len = 0;
-                        int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], numBytes);
-                        if (frame_len > 10)
-                        {
-                            // LED_Status(0, 200, 0);
-                            // printHex(buff, numBytes);
-                            // printHex(byteArr, num);
-                            rssi = fskRSSI;
-                            fskRSSI = -130;
-                            log_d("[GFSK] RSSI:%.0f dBm", rssi);
-                            ax25_init(&AX25, aprs_msg_callback);
-                            AX25.frame_len = frame_len;
-                            memcpy(AX25.buf, outputBuff, frame_len);
-                            ax25_decode(&AX25);
-                            log_d("[GFSK AX.25] Received packet! %d Byte", frame_len);
-                        }
-                    }
-                    else
-                    {
-                        String str = "";
-                        for (int i = 0; i < numBytes; i++)
-                        {
-                            str += String((char)byteArr[i]);
-                            // str.setCharAt(i,byteArr[i+3]);
-                        }
-                        int size = APRS_getTNC2(str);
-                        log_d("[GFSK] Received packet! %d Byte", size);
-                    }
-                    free(outputBuff);
-                }
-            }
-            else if (config.rf_mode == RF_MODE_LoRa)
-            {
-                LED_Status(0, 200, 0);
-                numBytes = radioHal->getPacketLength();
-                state = radioHal->readData(&byteArr[0], numBytes);
-                radioRecvStatus();
-                startRx();
-                if (state == RADIOLIB_ERR_NONE)
-                {
-                    log_d("[LoRa] Received packet! %d Byte\n", numBytes);
-                    // packet was successfully received
-                    // log_d("[LoRa] Received packet! %d Byte\n", numBytes);
-                    if (numBytes > 10)
-                    {
-                        // Check AX.25 protocol with HDLC 7E Flage
-                        if (byteArr[0] == 0x7E)
-                        {
-                            // parseBit(byteArr, numBytes);
-                            uint8_t *outputBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
-                            if (outputBuff)
-                            {
-                                size_t frame_len = 0;
-                                int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], numBytes);
-                                if (frame_len > 10)
-                                {
-                                    ax25_init(&AX25, aprs_msg_callback);
-                                    AX25.frame_len = frame_len;
-                                    memcpy(AX25.buf, outputBuff, frame_len);
-                                    ax25_decode(&AX25);
-                                    log_d("[LoRa AX.25] Packet size %d Byte", frame_len);
-                                }
-                                free(outputBuff);
-                            }
-                        }
-                        else if (byteArr[0] == '<' && byteArr[1] == 0xFF && byteArr[2] == 0x01)
-                        {
-                            // Get TNC2 Raw text
                             String str = "";
-                            for (int i = 0; i < numBytes - 3; i++)
+                            for (int i = 0; i < numBytes; i++)
                             {
-                                str += String((char)byteArr[i + 3]);
+                                str += String((char)byteArr[i]);
                                 // str.setCharAt(i,byteArr[i+3]);
                             }
                             int size = APRS_getTNC2(str);
-                            log_d("[LoRa TNC2] Packet size %d Byte", size);
+                            log_d("[GFSK] Received packet! %d Byte", size);
                         }
+                        free(outputBuff);
                     }
-                    ret = true;
                 }
-                else if (state == RADIOLIB_ERR_CRC_MISMATCH)
+                else if (config.rf_mode == RF_MODE_LoRa)
                 {
-                    // packet was received, but is malformed
-                    log_d("[LoRa] CRC error!");
-                }
-                else
-                {
-                    // some other error occurred
-                    log_d("[LoRa] Failed, code %d", state);
-                    // Serial.println(state);
-                }
-            }
-            free(byteArr);
-        }
-        LED_Status(0, 0, 0);
-    }
-    else
-    {
-        if (ax25_stateTx)
-        {
-            disableInterrupt();
-            LED_Status(200, 0, 0);
-            // flagTx = true;
-            // if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
-            // {
-            //     radioHal->setCurrentLimit(240);
-            // }
-            // else
-            // {
-            //     radioHal->setCurrentLimit(140);
-            // }
-
-            int byteArrLen = 300;
-            uint8_t *byteArr = (uint8_t *)calloc(byteArrLen, sizeof(uint8_t));
-            memset(byteArr, 0, byteArrLen);
-            if (byteArr)
-            {
-                // Serial.print("TX HEX: ");
-                int i;
-                memset(byteArr, 0, byteArrLen);
-                for (i = 0; i < byteArrLen; i++)
-                {
-                    if (config.rf_mode == RF_MODE_G3RUH)
+                    LED_Status(0, 200, 0);
+                    numBytes = radioHal->getPacketLength();
+                    state = radioHal->readData(&byteArr[0], numBytes);
+                    radioRecvStatus();
+                    startRx();
+                    if (state == RADIOLIB_ERR_NONE)
                     {
-                        if (i < 7)
+                        log_d("[LoRa] Received packet! %d Byte\n", numBytes);
+                        // packet was successfully received
+                        // log_d("[LoRa] Received packet! %d Byte\n", numBytes);
+                        if (numBytes > 10)
                         {
-                            byteArr[i] = 0x7E;
-                            continue;
+                            // Check AX.25 protocol with HDLC 7E Flage
+                            if (byteArr[0] == 0x7E)
+                            {
+                                // parseBit(byteArr, numBytes);
+                                uint8_t *outputBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
+                                if (outputBuff)
+                                {
+                                    size_t frame_len = 0;
+                                    int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], numBytes);
+                                    if (frame_len > 10)
+                                    {
+                                        ax25_init(&AX25, aprs_msg_callback);
+                                        AX25.frame_len = frame_len;
+                                        memcpy(AX25.buf, outputBuff, frame_len);
+                                        ax25_decode(&AX25);
+                                        log_d("[LoRa AX.25] Packet size %d Byte", frame_len);
+                                    }
+                                    free(outputBuff);
+                                }
+                            }
+                            else if (byteArr[0] == '<' && byteArr[1] == 0xFF && byteArr[2] == 0x01)
+                            {
+                                // Get TNC2 Raw text
+                                String str = "";
+                                for (int i = 0; i < numBytes - 3; i++)
+                                {
+                                    str += String((char)byteArr[i + 3]);
+                                    // str.setCharAt(i,byteArr[i+3]);
+                                }
+                                int size = APRS_getTNC2(str);
+                                log_d("[LoRa TNC2] Packet size %d Byte", size);
+                            }
                         }
+                        ret = true;
                     }
-
-                    int c = tx_getchar();
-                    if (c == -1)
+                    else if (state == RADIOLIB_ERR_CRC_MISMATCH)
                     {
-                        break;
+                        // packet was received, but is malformed
+                        log_d("[LoRa] CRC error!");
                     }
                     else
                     {
-                        byteArr[i] = (uint8_t)c;
+                        // some other error occurred
+                        log_d("[LoRa] Failed, code %d", state);
+                        // Serial.println(state);
+                    }
+                }
+                free(byteArr);
+            }
+            LED_Status(0, 0, 0);
+        }
+        else
+        {
+            if (ax25_stateTx)
+            {
+                disableInterrupt();
+                LED_Status(200, 0, 0);
+                // flagTx = true;
+                // if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+                // {
+                //     radioHal->setCurrentLimit(240);
+                // }
+                // else
+                // {
+                //     radioHal->setCurrentLimit(140);
+                // }
+
+                int byteArrLen = 300;
+                uint8_t *byteArr = (uint8_t *)calloc(byteArrLen, sizeof(uint8_t));
+                memset(byteArr, 0, byteArrLen);
+                if (byteArr)
+                {
+                    // Serial.print("TX HEX: ");
+                    int i;
+                    memset(byteArr, 0, byteArrLen);
+                    for (i = 0; i < byteArrLen; i++)
+                    {
+                        if (config.rf_mode == RF_MODE_G3RUH)
+                        {
+                            if (i < 7)
+                            {
+                                byteArr[i] = 0x7E;
+                                continue;
+                            }
+                        }
+
+                        int c = tx_getchar();
+                        if (c == -1)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            byteArr[i] = (uint8_t)c;
+                        }
+
+                        // Serial.printf("%0X ",byteArr[i]);
                     }
 
-                    // Serial.printf("%0X ",byteArr[i]);
-                }
-
-                if (config.rf_mode == RF_MODE_G3RUH)
-                {
-                    if (i > byteArrLen)
-                        i = byteArrLen;
-                    int sizeBuff = i;
-                    uint8_t *rawBuff = (uint8_t *)calloc(sizeBuff, sizeof(uint8_t));
-                    if (rawBuff)
+                    if (config.rf_mode == RF_MODE_G3RUH)
                     {
+                        if (i > byteArrLen)
+                            i = byteArrLen;
+                        int sizeBuff = i;
+                        uint8_t *rawBuff = (uint8_t *)calloc(sizeBuff, sizeof(uint8_t));
+                        if (rawBuff)
+                        {
 
-                        memset(rawBuff, 0, sizeBuff);
-                        NRZIEncode(byteArr, rawBuff, i);
-                        memset(byteArr, 0, byteArrLen);
-                        lfsr_scramble(rawBuff, byteArr, i);
-                        free(rawBuff);
+                            memset(rawBuff, 0, sizeBuff);
+                            NRZIEncode(byteArr, rawBuff, i);
+                            memset(byteArr, 0, byteArrLen);
+                            lfsr_scramble(rawBuff, byteArr, i);
+                            free(rawBuff);
 
+                            txBufPtr = (uint8_t *)calloc(i, sizeof(uint8_t));
+                            if (txBufPtr)
+                            {
+                                memset(txBufPtr, 0, i);
+                                flipBit(byteArr, txBufPtr, i); // Flip bit send LSB->MSB
+                                radioHal->setCRC(0);
+                                radioHal->fixedPacketLengthMode(i);
+                                if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+                                {
+                                    if (i > RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK)
+                                    {
+                                        flagAddFifo = false;
+                                        txBuf_len = i;
+                                        remLength = i;
+                                        fifoTxLock = false;
+                                        radioHal->setFifoFullAction(fifoAdd);
+                                        // radioHal->setFifoEmptyAction(fifoAdd);
+                                        delay(10);
+                                    }
+                                }
+                                // printHex(txBuff, i);
+                                //  Send 7E flag after nrzi->scramble->flipLSB 0xc2,0x80,0x20,0x0,0x52,0xd6,0xdf,0xd5
+                                // uint8_t syncWord[] = {0xab, 0xfb, 0x6b, 0x4a, 0x0, 0x4, 0x1, 0x43};
+                                // uint8_t syncWordTX[] = {0x1, 0xe, 0x91, 0x6f, 0x5f, 0x43, 0x5a, 0x95};
+                                uint8_t syncWordTX[] = {0xf5, 0xd4, 0xd9, 0x59, 0x7, 0xc2, 0x1, 0x3f};
+                                radioHal->setSyncWord(syncWordTX, 8);
+                                radioHal->transmit(txBufPtr, i);
+                                delay(100);
+                                free(txBufPtr);
+
+                                syncWordTX[0] = 0xd9;
+                                radioHal->setSyncWord(syncWordTX, 1);
+                                if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
+                                {
+                                    if (config.rf_dio1_gpio > -1)
+                                    { // Use DIO1 for fifo interrupt
+                                        radioHal->setFifoFullAction(fifoGet);
+                                        radioHal->fixedPacketLengthMode(0);
+                                    }
+                                    else
+                                    {
+                                        radioHal->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+                                        radioHal->setDio0Action(setFlag);
+                                    }
+                                }
+                                else if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
+                                {
+                                    radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+                                    radioHal->setDio0Action(setFlag);
+                                }
+                                // log_d("FiFo Timer = %i,%i,%i",fifoTimer[1]-fifoTimer[0],fifoTimer[2]-fifoTimer[1],fifoTimer[3]-fifoTimer[2]);
+                            }
+                        }
+                    }
+                    else if (config.rf_mode == RF_MODE_GFSK)
+                    {
                         txBufPtr = (uint8_t *)calloc(i, sizeof(uint8_t));
                         if (txBufPtr)
                         {
                             memset(txBufPtr, 0, i);
                             flipBit(byteArr, txBufPtr, i); // Flip bit send LSB->MSB
-                            radioHal->setCRC(0);
                             radioHal->fixedPacketLengthMode(i);
+                            radioHal->setCRC(1);
                             if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
                             {
                                 if (i > RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK)
@@ -1462,22 +1579,15 @@ bool APRS_poll(void)
                                     remLength = i;
                                     fifoTxLock = false;
                                     radioHal->setFifoFullAction(fifoAdd);
-                                    // radioHal->setFifoEmptyAction(fifoAdd);
                                     delay(10);
                                 }
                             }
-                            // printHex(txBuff, i);
-                            //  Send 7E flag after nrzi->scramble->flipLSB 0xc2,0x80,0x20,0x0,0x52,0xd6,0xdf,0xd5
-                            // uint8_t syncWord[] = {0xab, 0xfb, 0x6b, 0x4a, 0x0, 0x4, 0x1, 0x43};
-                            // uint8_t syncWordTX[] = {0x1, 0xe, 0x91, 0x6f, 0x5f, 0x43, 0x5a, 0x95};
-                            uint8_t syncWordTX[] = {0xf5, 0xd4, 0xd9, 0x59, 0x7, 0xc2, 0x1, 0x3f};
-                            radioHal->setSyncWord(syncWordTX, 8);
+                            uint8_t syncWordTX[] = {0x84, 0xB5, 0x12, 0xAD};
+                            radioHal->setSyncWord(syncWordTX, 4);
                             radioHal->transmit(txBufPtr, i);
                             delay(100);
                             free(txBufPtr);
 
-                            syncWordTX[0] = 0xd9;
-                            radioHal->setSyncWord(syncWordTX, 1);
                             if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
                             {
                                 if (config.rf_dio1_gpio > -1)
@@ -1496,76 +1606,448 @@ bool APRS_poll(void)
                                 radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
                                 radioHal->setDio0Action(setFlag);
                             }
-                            // log_d("FiFo Timer = %i,%i,%i",fifoTimer[1]-fifoTimer[0],fifoTimer[2]-fifoTimer[1],fifoTimer[3]-fifoTimer[2]);
                         }
                     }
-                }
-                else if (config.rf_mode == RF_MODE_GFSK)
-                {
-                    txBufPtr = (uint8_t *)calloc(i, sizeof(uint8_t));
-                    if (txBufPtr)
+                    else
                     {
-                        memset(txBufPtr, 0, i);
-                        flipBit(byteArr, txBufPtr, i); // Flip bit send LSB->MSB
-                        radioHal->fixedPacketLengthMode(i);
-                        radioHal->setCRC(1);
-                        if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
-                        {
-                            if (i > RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK)
-                            {
-                                flagAddFifo = false;
-                                txBuf_len = i;
-                                remLength = i;
-                                fifoTxLock = false;
-                                radioHal->setFifoFullAction(fifoAdd);
-                                delay(10);
-                            }
-                        }
-                        uint8_t syncWordTX[] = {0x84, 0xB5, 0x12, 0xAD};
-                        radioHal->setSyncWord(syncWordTX, 4);
-                        radioHal->transmit(txBufPtr, i);
-                        delay(100);
-                        free(txBufPtr);
-
-                        if (config.rf_type == RF_SX1272 || config.rf_type == RF_SX1273 || config.rf_type == RF_SX1276 || config.rf_type == RF_SX1278 || config.rf_type == RF_SX1279)
-                        {
-                            if (config.rf_dio1_gpio > -1)
-                            { // Use DIO1 for fifo interrupt
-                                radioHal->setFifoFullAction(fifoGet);
-                                radioHal->fixedPacketLengthMode(0);
-                            }
-                            else
-                            {
-                                radioHal->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
-                                radioHal->setDio0Action(setFlag);
-                            }
-                        }
-                        else if (config.rf_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf_type == RF_SX1268 || config.rf_type == RF_SX126x)
-                        {
-                            radioHal->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
-                            radioHal->setDio0Action(setFlag);
-                        }
+                        radioHal->transmit(byteArr, i);
                     }
+                    free(byteArr);
+                    ret = true;
                 }
-                else
-                {
-                    radioHal->transmit(byteArr, i);
-                }
-                free(byteArr);
-                ret = true;
+                LED_Status(0, 0, 0);
+                ax25_stateTx = false;
+                startRx();
             }
-            LED_Status(0, 0, 0);
-            ax25_stateTx = false;
-            startRx();
-        }
-        else
-        {
-            // ax25_poll(&AX25);
-            //  size_t pkgLen = radioHal->getPacketLength();
-            //  if(pkgLen>30) fifoGet();
-            //  if(pkgLen>0) log_d("PKG Len %i Byte",pkgLen);
+            else
+            {
+                // ax25_poll(&AX25);
+                //  size_t pkgLen = radioHal->getPacketLength();
+                //  if(pkgLen>30) fifoGet();
+                //  if(pkgLen>0) log_d("PKG Len %i Byte",pkgLen);
+            }
         }
     }
+
+#ifdef RF2
+    if (config.rf1_en)
+    {
+        if (received1)
+        {
+            rxTimeout1 = millis() + 900000;
+            // disable the interrupt service routine while
+            // processing the data
+            disableInterrupt1();
+
+            log_d("RF2 Received");
+
+            // LED_Status(0, 200, 0);
+
+            received1 = false;
+            uint8_t *byteArr = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+            if (byteArr)
+            {
+                int numBytes = 0;
+                int state = -1;
+                if (config.rf1_mode == RF_MODE_G3RUH)
+                {
+                    rxTimeout1 = millis() + 30000;
+                    uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    state = RADIOLIB_ERR_NULL_POINTER;
+                    if (outputBuff)
+                    {
+                        if ((config.rf1_dio1_gpio < 0) || config.rf1_type == RF_SX1261 || config.rf_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
+                        {
+                            radioRecvStatus1();
+                            numBytes = radioHal->getPacketLength();
+                            memset(byteArr, 0, MAX_RFBUFF);
+                            state = radioHal1->readData(&rx1Buff[0], numBytes);
+                            // printHex(rx1Buff, numBytes);
+                        }
+                        else
+                        {
+                            numBytes = rx1BuffLen;
+                        }
+                        if (numBytes > MAX_RFBUFF)
+                            numBytes = MAX_RFBUFF;
+                        uint8_t *buff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
+                        if (buff)
+                        {
+                            flipBit(rx1Buff, buff, numBytes);
+                            LED_Status(0, 200, 0);
+                            startRx1();
+
+                            // printHex(rx1Buff, rx1BuffLen);
+                            // int s=0;
+                            int scn = numBytes;
+                            if (scn > 10)
+                                scn = 10;
+                            for (int s = 0; s < scn; s++)
+                            {
+                                memset(outputBuff, 0, MAX_RFBUFF);
+                                lfsr_descramble(&buff[s], outputBuff, numBytes - s);
+                                memset(byteArr, 0, MAX_RFBUFF);
+                                NRZIDecode(outputBuff, byteArr, numBytes - s);
+                                int num = numBytes - s;
+                                size_t frame_len = 0;
+                                int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], num);
+                                if (frame_len > 10)
+                                {
+                                    // LED_Status(0, 200, 0);
+                                    // printHex(buff, numBytes);
+                                    // printHex(byteArr, num);
+                                    rssi = fskRSSI;
+                                    fskRSSI = -130;
+                                    log_d("[GFSK] RSSI:%.0f dBm", rssi);
+                                    ax25_init(&AX25, aprs_msg_callback);
+                                    AX25.frame_len = frame_len;
+                                    memcpy(AX25.buf, outputBuff, frame_len);
+                                    ax25_decode(&AX25);
+                                    log_d("[GFSK] Received packet! %d Byte IDX:%d", frame_len, s);
+                                    received = false;
+                                    break;
+                                }
+                            }
+                            free(buff);
+                        }
+                        free(outputBuff);
+                    }
+                }
+                else if (config.rf1_mode == RF_MODE_AIS)
+                {
+                    rxTimeout1 = millis() + 300000;
+                    numBytes = radioHal1->getPacketLength();
+                    if (numBytes > 0)
+                    {
+                        uint8_t *rawBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
+                        if (rawBuff)
+                        {
+                            radioRecvStatus1();
+                            memset(rawBuff, 0, numBytes);
+                            state = radioHal1->readData(rawBuff, numBytes);
+                            if (state == RADIOLIB_ERR_NONE)
+                            {
+                                LED_Status(0, 200, 0);
+                                flipBit(rawBuff, byteArr, numBytes);
+                                NRZIDecode(byteArr, rawBuff, numBytes);
+                                // printHex(rawBuff, numBytes);
+                                size_t frame_len = 0;
+                                int idx = 0;
+                                do
+                                {
+                                    frame_len = 0;
+                                    idx = hdlcDecode(byteArr, frame_len, &rawBuff[idx], numBytes);
+                                    if (frame_len > 2)
+                                    {
+                                        status.rxCount++;
+                                        // rssi = fskRSSI;
+                                        // fskRSSI = -130;
+                                        frame_len -= 2; // remove FCS 2byte
+                                        char nmea[256];
+                                        ais_to_nmea((unsigned char *)byteArr, frame_len, nmea, sizeof(nmea));
+                                        log_d("AIS NMEA: %s", nmea);
+                                        String aisRaw = ais2aprs(nmea);
+                                        if (aisRaw.length() > 0)
+                                        {
+                                            // log_d("%s",aisRaw.c_str());
+                                            int size = APRS_getTNC2(aisRaw);
+                                        }
+                                    }
+                                    numBytes -= idx;
+                                } while (numBytes >= 10);
+                            }
+                            free(rawBuff);
+                        }
+                    }
+                    startRx1();
+                }
+                else if (config.rf1_mode == RF_MODE_GFSK)
+                {
+                    uint8_t *outputBuff = (uint8_t *)calloc(MAX_RFBUFF, sizeof(uint8_t));
+                    if (outputBuff)
+                    {
+                        if ((config.rf1_dio1_gpio < 0) || config.rf1_type == RF_SX1261 || config.rf1_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
+                        {
+                            radioRecvStatus1();
+                            numBytes = radioHal1->getPacketLength();
+                            memset(byteArr, 0, MAX_RFBUFF);
+                            state = radioHal1->readData(&rx1Buff[0], numBytes);
+                            // printHex(rx1Buff, numBytes);
+                        }
+                        else
+                        {
+                            numBytes = rx1BuffLen;
+                        }
+                        if (numBytes > MAX_RFBUFF)
+                            numBytes = MAX_RFBUFF;
+                        flipBit(rx1Buff, byteArr, numBytes);
+                        LED_Status(0, 200, 0);
+                        startRx1();
+                        if (config.rf1_ax25)
+                        {
+                            // printHex(rx1Buff, rxBuffLen);
+                            size_t frame_len = 0;
+                            int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], numBytes);
+                            if (frame_len > 10)
+                            {
+                                // LED_Status(0, 200, 0);
+                                // printHex(buff, numBytes);
+                                // printHex(byteArr, num);
+                                rssi = fskRSSI;
+                                fskRSSI = -130;
+                                log_d("[GFSK] RSSI:%.0f dBm", rssi);
+                                ax25_init(&AX25, aprs_msg_callback);
+                                AX25.frame_len = frame_len;
+                                memcpy(AX25.buf, outputBuff, frame_len);
+                                ax25_decode(&AX25);
+                                log_d("[GFSK AX.25] Received packet! %d Byte", frame_len);
+                            }
+                        }
+                        else
+                        {
+                            String str = "";
+                            for (int i = 0; i < numBytes; i++)
+                            {
+                                str += String((char)byteArr[i]);
+                                // str.setCharAt(i,byteArr[i+3]);
+                            }
+                            int size = APRS_getTNC2(str);
+                            log_d("[GFSK] Received packet! %d Byte", size);
+                        }
+                        free(outputBuff);
+                    }
+                }
+                else if (config.rf1_mode == RF_MODE_LoRa)
+                {
+                    LED_Status(0, 200, 0);
+                    numBytes = radioHal1->getPacketLength();
+                    state = radioHal1->readData(&byteArr[0], numBytes);
+                    radioRecvStatus1();
+                    startRx1();
+                    if (state == RADIOLIB_ERR_NONE)
+                    {
+                        log_d("[LoRa1] Received packet! %d Byte\n", numBytes);
+                        // packet was successfully received
+                        // log_d("[LoRa] Received packet! %d Byte\n", numBytes);
+                        if (numBytes > 10)
+                        {
+                            // Check AX.25 protocol with HDLC 7E Flage
+                            if (byteArr[0] == 0x7E)
+                            {
+                                // parseBit(byteArr, numBytes);
+                                uint8_t *outputBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
+                                if (outputBuff)
+                                {
+                                    size_t frame_len = 0;
+                                    int idx = hdlcDecodeAX25(outputBuff, frame_len, &byteArr[0], numBytes);
+                                    if (frame_len > 10)
+                                    {
+                                        ax25_init(&AX25, aprs_msg_callback);
+                                        AX25.frame_len = frame_len;
+                                        memcpy(AX25.buf, outputBuff, frame_len);
+                                        ax25_decode(&AX25);
+                                        log_d("[LoRa1 AX.25] Packet size %d Byte", frame_len);
+                                    }
+                                    free(outputBuff);
+                                }
+                            }
+                            else if (byteArr[0] == '<' && byteArr[1] == 0xFF && byteArr[2] == 0x01)
+                            {
+                                // Get TNC2 Raw text
+                                String str = "";
+                                for (int i = 0; i < numBytes - 3; i++)
+                                {
+                                    str += String((char)byteArr[i + 3]);
+                                    // str.setCharAt(i,byteArr[i+3]);
+                                }
+                                int size = APRS_getTNC2(str);
+                                log_d("[LoRa TNC2] Packet size %d Byte", size);
+                            }
+                        }
+                        ret = true;
+                    }
+                    else if (state == RADIOLIB_ERR_CRC_MISMATCH)
+                    {
+                        // packet was received, but is malformed
+                        log_d("[LoRa1] CRC error!");
+                    }
+                    else
+                    {
+                        // some other error occurred
+                        log_d("[LoRa1] Failed, code %d", state);
+                        // Serial.println(state);
+                    }
+                }
+                free(byteArr);
+            }
+            LED_Status(0, 0, 0);
+        }
+    }
+// else
+// {
+//     if (ax25_stateTx)
+//     {
+//         disableInterrupt1();
+//         LED_Status(200, 0, 0);
+
+//         int byteArrLen = 300;
+//         uint8_t *byteArr = (uint8_t *)calloc(byteArrLen, sizeof(uint8_t));
+//         memset(byteArr, 0, byteArrLen);
+//         if (byteArr)
+//         {
+//             // Serial.print("TX HEX: ");
+//             int i;
+//             memset(byteArr, 0, byteArrLen);
+//             for (i = 0; i < byteArrLen; i++)
+//             {
+//                 if (config.rf1_mode == RF_MODE_G3RUH)
+//                 {
+//                     if (i < 7)
+//                     {
+//                         byteArr[i] = 0x7E;
+//                         continue;
+//                     }
+//                 }
+
+//                 int c = tx_getchar();
+//                 if (c == -1)
+//                 {
+//                     break;
+//                 }
+//                 else
+//                 {
+//                     byteArr[i] = (uint8_t)c;
+//                 }
+
+//                 // Serial.printf("%0X ",byteArr[i]);
+//             }
+
+//             if (config.rf1_mode == RF_MODE_G3RUH)
+//             {
+//                 if (i > byteArrLen)
+//                     i = byteArrLen;
+//                 int sizeBuff = i;
+//                 uint8_t *rawBuff = (uint8_t *)calloc(sizeBuff, sizeof(uint8_t));
+//                 if (rawBuff)
+//                 {
+
+//                     memset(rawBuff, 0, sizeBuff);
+//                     NRZIEncode(byteArr, rawBuff, i);
+//                     memset(byteArr, 0, byteArrLen);
+//                     lfsr_scramble(rawBuff, byteArr, i);
+//                     free(rawBuff);
+
+//                     txBufPtr = (uint8_t *)calloc(i, sizeof(uint8_t));
+//                     if (txBufPtr)
+//                     {
+//                         memset(txBufPtr, 0, i);
+//                         flipBit(byteArr, txBufPtr, i); // Flip bit send LSB->MSB
+//                         radioHal1->setCRC(0);
+//                         radioHal1->fixedPacketLengthMode(i);
+//                         if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf_type == RF_SX1279)
+//                         {
+//                             if (i > RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK)
+//                             {
+//                                 flagAddFifo = false;
+//                                 txBuf_len = i;
+//                                 remLength = i;
+//                                 fifoTxLock = false;
+//                                 radioHal1->setFifoFullAction(fifoAdd);
+//                                 // radioHal->setFifoEmptyAction(fifoAdd);
+//                                 delay(10);
+//                             }
+//                         }
+//                         // printHex(txBuff, i);
+//                         uint8_t syncWordTX[] = {0xf5, 0xd4, 0xd9, 0x59, 0x7, 0xc2, 0x1, 0x3f};
+//                         radioHal1->setSyncWord(syncWordTX, 8);
+//                         radioHal1->transmit(txBufPtr, i);
+//                         delay(100);
+//                         free(txBufPtr);
+
+//                         syncWordTX[0] = 0xd9;
+//                         radioHal1->setSyncWord(syncWordTX, 1);
+//                         if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
+//                         {
+//                             if (config.rf1_dio1_gpio > -1)
+//                             { // Use DIO1 for fifo interrupt
+//                                 radioHal1->setFifoFullAction(fifoGet);
+//                                 radioHal1->fixedPacketLengthMode(0);
+//                             }
+//                             else
+//                             {
+//                                 radioHal1->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+//                                 radioHal1->setDio0Action(setFlag);
+//                             }
+//                         }
+//                         else if (config.rf_type == RF_SX1261 || config.rf1_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
+//                         {
+//                             radioHal1->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+//                             radioHal1->setDio0Action(setFlag);
+//                         }
+//                         // log_d("FiFo Timer = %i,%i,%i",fifoTimer[1]-fifoTimer[0],fifoTimer[2]-fifoTimer[1],fifoTimer[3]-fifoTimer[2]);
+//                     }
+//                 }
+//             }
+//             else if (config.rf1_mode == RF_MODE_GFSK)
+//             {
+//                 txBufPtr = (uint8_t *)calloc(i, sizeof(uint8_t));
+//                 if (txBufPtr)
+//                 {
+//                     memset(txBufPtr, 0, i);
+//                     flipBit(byteArr, txBufPtr, i); // Flip bit send LSB->MSB
+//                     radioHal1->fixedPacketLengthMode(i);
+//                     radioHal1->setCRC(1);
+//                     if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
+//                     {
+//                         if (i > RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK)
+//                         {
+//                             flagAddFifo = false;
+//                             txBuf_len = i;
+//                             remLength = i;
+//                             fifoTxLock = false;
+//                             radioHal1->setFifoFullAction(fifoAdd);
+//                             delay(10);
+//                         }
+//                     }
+//                     uint8_t syncWordTX[] = {0x84, 0xB5, 0x12, 0xAD};
+//                     radioHal1->setSyncWord(syncWordTX, 4);
+//                     radioHal1->transmit(txBufPtr, i);
+//                     delay(100);
+//                     free(txBufPtr);
+
+//                     if (config.rf1_type == RF_SX1272 || config.rf1_type == RF_SX1273 || config.rf1_type == RF_SX1276 || config.rf1_type == RF_SX1278 || config.rf1_type == RF_SX1279)
+//                     {
+//                         if (config.rf1_dio1_gpio > -1)
+//                         { // Use DIO1 for fifo interrupt
+//                             radioHal1->setFifoFullAction(fifoGet);
+//                             radioHal1->fixedPacketLengthMode(0);
+//                         }
+//                         else
+//                         {
+//                             radioHal1->fixedPacketLengthMode(RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
+//                             radioHal1->setDio0Action(setFlag);
+//                         }
+//                     }
+//                     else if (config.rf1_type == RF_SX1261 || config.rf1_type == RF_SX1262 || config.rf1_type == RF_SX1268 || config.rf1_type == RF_SX126x)
+//                     {
+//                         radioHal1->fixedPacketLengthMode(RADIOLIB_SX126X_MAX_PACKET_LENGTH);
+//                         radioHal1->setDio0Action(setFlag);
+//                     }
+//                 }
+//             }
+//             else
+//             {
+//                 radioHal1->transmit(byteArr, i);
+//             }
+//             free(byteArr);
+//             ret = true;
+//         }
+//         LED_Status(0, 0, 0);
+//         ax25_stateTx = false;
+//         startRx1();
+//     }
+// }
+#endif
     return ret;
 }
 

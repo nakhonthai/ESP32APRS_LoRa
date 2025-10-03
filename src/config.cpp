@@ -70,7 +70,8 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["rfBR"] = config.rf_br;
     doc["rfShaping"] = config.rf_shaping;
     doc["rfEncoding"] = config.rf_encoding;
-#ifdef NAWS4
+    doc["rfRxBoost"] = config.rf_rx_boost;
+#ifdef RF2
     doc["rf1Enable"] = config.rf1_en;
     doc["rf1Type"] = config.rf1_type;
     doc["rf1Freq"] = config.rf1_freq;
@@ -87,6 +88,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["rf1BR"] = config.rf1_br;
     doc["rf1Shaping"] = config.rf1_shaping;
     doc["rf1Encoding"] = config.rf1_encoding;
+    doc["rf1RxBoost"] = config.rf1_rx_boost;
 #endif
 
     // IGate group
@@ -144,6 +146,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     }
     // Digi group
     doc["digiEn"] = config.digi_en;
+    doc["digiAuto"] = config.digi_auto;
     doc["digiPos2rf"] = config.digi_loc2rf;
     doc["digiPos2inet"] = config.digi_loc2inet;
     doc["digiTime"] = config.digi_timestamp;
@@ -444,6 +447,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["pwrIO"] = config.pwr_gpio;
     doc["pwrIOAct"] = config.pwr_active;
 
+#ifdef BLUETOOTH
     doc["btSlave"] = config.bt_slave;
     doc["btMaster"] = config.bt_master;
     doc["btMode"] = config.bt_mode;
@@ -455,6 +459,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["btUUID"] = config.bt_uuid;
     doc["btUUIDRx"] = config.bt_uuid_rx;
     doc["btUUIDTx"] = config.bt_uuid_tx;
+#endif
 #endif
 
     doc["logFile"] = config.log;
@@ -495,6 +500,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["pppModel"] = config.ppp_model;
     doc["pppFlow"] = config.ppp_flow_ctrl;
     doc["pppGNSS"] = config.ppp_gnss;
+    doc["pppNAPT"] = config.ppp_napt;
 
     doc["mqttEnable"] = config.en_mqtt;
     doc["mqttHost"] = config.mqtt_host;
@@ -585,8 +591,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.rf_br = doc["rfBR"];
         config.rf_shaping = doc["rfShaping"];
         config.rf_encoding = doc["rfEncoding"];
+        config.rf_rx_boost = doc["rfRxBoost"];
 
-#ifdef NAWS4
+#ifdef RF2
         config.rf1_en = doc["rf1Enable"];
         config.rf1_type = doc["rf1Type"];
         config.rf1_freq = doc["rf1Freq"];
@@ -603,6 +610,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.rf1_br = doc["rf1BR"];
         config.rf1_shaping = doc["rf1Shaping"];
         config.rf1_encoding = doc["rf1Encoding"];
+        config.rf1_rx_boost = doc["rf1RxBoost"];
 #endif
 
         // IGate group
@@ -653,6 +661,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         }
         // Digi group
         config.digi_en = doc["digiEn"];
+        config.digi_auto = doc["digiAuto"];
         config.digi_loc2rf = doc["digiPos2rf"];
         config.digi_loc2inet = doc["digiPos2inet"];
         config.digi_timestamp = doc["digiTime"];
@@ -856,7 +865,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.rf_rx_active = doc["rfRxAct"];
         config.rf_reset_active = doc["rfRSTAct"];
         config.rf_nss_active = doc["rfNSSAct"];
-#ifdef NAWS4
+#ifdef RF2
         config.rf1_tx_gpio = doc["rf1Tx"];
         config.rf1_rx_gpio = doc["rf1Rx"];
         config.rf1_reset_gpio = doc["rf1RST"];
@@ -930,6 +939,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.pwr_gpio = doc["pwrIO"];
         config.pwr_active = doc["pwrIOAct"];
 
+#ifdef BLUETOOTH
         config.bt_slave = doc["btSlave"];
         config.bt_master = doc["btMaster"];
         config.bt_mode = doc["btMode"];
@@ -941,6 +951,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         strlcpy(config.bt_uuid, doc["btUUID"] | "", sizeof(config.bt_uuid));
         strlcpy(config.bt_uuid_rx, doc["btUUIDRx"] | "", sizeof(config.bt_uuid_rx));
         strlcpy(config.bt_uuid_tx, doc["btUUIDTx"] | "", sizeof(config.bt_uuid_tx));
+#endif
 #endif
 
         config.log = doc["logFile"];
@@ -980,6 +991,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.ppp_model = doc["pppModel"];
         config.ppp_flow_ctrl = doc["pppFlowCtrl"];
         config.ppp_gnss = doc["pppGNSS"];
+        config.ppp_napt = doc["pppNAPT"];
 
         config.en_mqtt = doc["mqttEnable"];
         strlcpy(config.mqtt_host, doc["mqttHost"] | "", sizeof(config.mqtt_host));

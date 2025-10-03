@@ -91,7 +91,7 @@ https://www.espressif.com/en/support/download/other-tools
 
 ## Credits & Reference
 
-- Thank you for support device hardware (LiLyGo T-Beam-S3 Supreme,T-Beam-S3 BPF,HTIT-Tracker) chakphanu [E24OUW](https://github.com/chakphanu)
+- Thank you for support device hardware (LiLyGo T-Beam-S3 Supreme,T-Beam-S3 BPF,HTIT-Tracker,NiceRF Module) by Mr.Chakphanu [E24OUW](https://github.com/chakphanu)
 - Thank you for all library from github
 
 ## HITH

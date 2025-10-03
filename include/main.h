@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.6"
-#define VERSION_BUILD 'b'
+#define VERSION_BUILD 'e'
 
 #include <Arduino.h>
 // #include "ModbusMaster.h"
@@ -372,7 +372,7 @@ const char RF_TYPE[14][7] = {"NONE", "SX1231", "SX1233", "SX1261", "SX1262", "SX
 const unsigned long baudrate[] = {2400, 4800, 9600, 19200, 2880, 38400, 57600, 76800, 115200, 230400, 460800, 576000, 921600};
 const char RF_MODE[5][11] = {"NONE", "LoRa", "GFSK_G3RUH", "AIS", "(G)FSK"};
 const char GNSS_PORT[5][6] = {"NONE", "UART0", "UART1", "UART2", "TCP"};
-const char TNC_PORT[4][6] = {"NONE", "UART0", "UART1", "UART2"};
+const char TNC_PORT[5][6] = {"NONE", "UART0", "UART1", "UART2", "USB"};
 const char TNC_MODE[4][6] = {"NONE", "KISS", "TNC2", "YAESU"};
 const char WX_PORT[7][11] = {"NONE", "UART0_CSV", "UART1_CSV", "UART2_CSV", "MODBUS", "SENSOR", "TCP/UDP"};
 const char MODEM_TYPE[2][10] = {"AFSK_300", "AFSK_1200"};

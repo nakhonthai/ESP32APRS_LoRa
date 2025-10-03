@@ -41,7 +41,7 @@ int16_t RadioHal<SX1278>::begin(float freq, float bw, uint8_t sf, uint8_t cr, ui
 { 
     
     if (power>=17) radio->setCurrentLimit(150);
-    radio->setDIOMapping(5,0x00);
+    //radio->setDIOMapping(5,0x00);
     //radio->setDIOMapping(5,0x07);    
     return radio->begin(freq, bw, sf, cr, syncWord, power, preambleLength, gain);
 }
@@ -1357,19 +1357,19 @@ int16_t RadioHal<SX1279>::setRxBoostedGainMode(bool rxbgm)
 template<>
 int16_t RadioHal<SX1268>::setRxBoostedGainMode(bool rxbgm)
 {
-    return radio->setRxBoostedGainMode(true);
+    return radio->setRxBoostedGainMode(rxbgm);
 }
 
 template<>
 int16_t RadioHal<SX1262>::setRxBoostedGainMode(bool rxbgm)
 {
-    return radio->setRxBoostedGainMode(true);
+    return radio->setRxBoostedGainMode(rxbgm);
 }
 
 template<>
 int16_t RadioHal<SX1261>::setRxBoostedGainMode(bool rxbgm)
 {
-    return radio->setRxBoostedGainMode(true);
+    return radio->setRxBoostedGainMode(rxbgm);
 }
 
 template<>

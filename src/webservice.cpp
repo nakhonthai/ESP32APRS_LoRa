@@ -27,6 +27,8 @@ AsyncWebSocket ws_gnss("/ws_gnss");
 extern PubSubClient clientMQTT;
 #endif
 
+extern unsigned long lastHeardTimeout;
+
 #ifdef PPPOS
 extern pppType pppStatus;
 #endif
@@ -196,7 +198,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "</html>";
 	request->send(200, "text/html", webString); // send to someones browser when asked
 	// event_lastHeard();
-	lastHeard_Flag = true;
+	//lastHeard_Flag = true;
 }
 
 ////////////////////////////////////////////////////////////
@@ -286,6 +288,50 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "</tr>\n";
 	webString += "</table>\n";
 	webString += "\n";
+
+	#ifdef RF2
+	webString += "<table>\n";
+	webString += "<tr>\n";
+	webString += "<th colspan=\"2\">Radio#2 Info</th>\n";
+	webString += "</tr>\n";
+	webString += "<tr>\n";
+	webString += "<td>Frequency</td>\n";
+	webString += "<td style=\"background: #ffffff;\">" + String(config.rf1_freq, 3) + " MHz</td>\n";
+	webString += "</tr>\n";
+	webString += "<tr>\n";
+	webString += "<td>Modem Mode</td>\n";
+	webString += "<td style=\"background: #ffffff;\">" + String(RF_MODE[config.rf1_mode]) + "</td>\n";
+	webString += "</tr>\n";
+	webString += "<tr>\n";
+	webString += "<td>Band Width</td>\n";
+	webString += "<td style=\"background: #ffffff;\">" + String(config.rf1_bw, 1) + " Khz</td>\n";
+	webString += "</tr>\n";
+	if (config.rf_mode == RF_MODE_LoRa)
+	{
+		webString += "<tr>\n";
+		webString += "<td>SF/CR</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.rf1_sf) + "/" + String(config.rf1_cr) + "</td>\n";
+		webString += "</tr>\n";
+	}
+	else
+	{
+		webString += "<tr>\n";
+		webString += "<td>Baud Rate</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.rf1_br, 1) + " Kbps</td>\n";
+		webString += "</tr>\n";
+	}
+
+	webString += "<tr>\n";
+	webString += "<td>TX Power</td>\n";
+	if (config.rf1_power >= 0)
+		webString += "<td style=\"background: #ffffff;\">+" + String(config.rf1_power) + " dBm</td>\n";
+	else
+		webString += "<td style=\"background: #ffffff;\">-" + String(config.rf1_power) + " dBm</td>\n";
+	webString += "</tr>\n";
+	webString += "</table>\n";
+	webString += "\n";
+	#endif
+
 	if (config.igate_en)
 	{
 		webString += "<br />\n";
@@ -302,7 +348,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 		webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_port) + "</td>\n";
 		webString += "</tr>\n";
 		webString += "</table>\n";
-	}
+	}	
 	webString += "<br />\n";
 	webString += "<table>\n";
 	webString += "<tr>\n";
@@ -389,6 +435,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString.clear();
 	// event_lastHeard();
 	lastHeard_Flag = true;
+	lastHeardTimeout=0;
 }
 
 void handle_sidebar(AsyncWebServerRequest *request)
@@ -457,11 +504,11 @@ void handle_sidebar(AsyncWebServerRequest *request)
 	html += "<th colspan=\"2\">STATISTICS</th>\n";
 	html += "</tr>\n";
 	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">PACKET RX:</td>\n";
+	html += "<td style=\"width: 60px;text-align: right;\">RF RX:</td>\n";
 	html += "<td style=\"background: #ffffff;\">" + String(status.rxCount) + "</td>\n";
 	html += "</tr>\n";
 	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">PACKET TX:</td>\n";
+	html += "<td style=\"width: 60px;text-align: right;\">RF TX:</td>\n";
 	html += "<td style=\"background: #ffffff;\">" + String(status.txCount) + "</td>\n";
 	html += "</tr>\n";
 	html += "<tr>\n";
@@ -892,10 +939,12 @@ void event_lastHeard()
 
 	struct pbuf_t aprs;
 	ParseAPRS aprsParse;
-	struct tm tmstruct;
+	struct tm tmstruct,tmNow;
 
 	String html = "";
-	sort(pkgList, PKGLISTSIZE);
+	//sort(pkgList, PKGLISTSIZE);
+	time_t timen = time(NULL);
+	localtime_r(&timen, &tmNow);
 
 	html = "<table>\n";
 	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[Live Feed]</a></th>\n";
@@ -980,10 +1029,14 @@ void event_lastHeard()
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
-					time_t tm = pkg.time;
+					//time_t tm = pkg.time;
 					localtime_r(&pkg.time, &tmstruct);
 					char strTime[10];
-					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+					//sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+					if(tmNow.tm_mday==tmstruct.tm_mday)
+						sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+					else	
+						sprintf(strTime, "%dd %02d:%02d", tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min);
 					// String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
 
 					html += "<tr><td>" + String(strTime) + "</td>";
@@ -1387,9 +1440,12 @@ void handle_radio(AsyncWebServerRequest *request)
 	// bool noiseEn=false;
 	bool radioEnable = false;
 	bool ax25Enable = false;
-#ifdef NAWS4
+	bool rxBoost = false;
+	
+#ifdef RF2
 	bool radioEnable1 = false;
 	bool ax25Enable1 = false;
+	bool rxBoost1 = false;
 #endif
 	if (request->hasArg("commitRadio"))
 	{
@@ -1409,6 +1465,27 @@ void handle_radio(AsyncWebServerRequest *request)
 					}
 				}
 			}
+
+			if (request->argName(i) == "rxBoost")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						rxBoost = true;
+					}
+				}
+			}
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						radioEnable = true;
+					}
+				}
+			}
+
 
 			if (request->argName(i) == "ax25En")
 			{
@@ -1551,7 +1628,28 @@ void handle_radio(AsyncWebServerRequest *request)
 				}
 			}
 
-#ifdef NAWS4
+
+		}
+		// config.noise=noiseEn;
+		// config.agc=agcEn;
+		config.rf_en = radioEnable;
+		config.rf_ax25 = ax25Enable;
+		config.rf_rx_boost = rxBoost;
+
+		String html = "OK";
+		if(APRS_init(&config)){
+			html = "Setup completed successfully";
+			saveConfiguration("/default.cfg", config);
+		}else{
+			html = "Setup failed";
+		}		
+		request->send(200, "text/html", html); // send to someones browser when asked
+	}
+	#ifdef RF2
+	else if (request->hasArg("commitRadio1"))
+	{
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
 			if (request->argName(i) == "radioEnable1")
 			{
 				if (request->arg(i) != "")
@@ -1559,6 +1657,17 @@ void handle_radio(AsyncWebServerRequest *request)
 					if (String(request->arg(i)) == "OK")
 					{
 						radioEnable1 = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "rxBoost1")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						rxBoost1 = true;
 					}
 				}
 			}
@@ -1703,30 +1812,20 @@ void handle_radio(AsyncWebServerRequest *request)
 					}
 				}
 			}
-#endif
 		}
-		// config.noise=noiseEn;
-		// config.agc=agcEn;
-		config.rf_en = radioEnable;
-		config.rf_ax25 = ax25Enable;
-#ifdef NAWS4
 		config.rf1_en = radioEnable1;
 		config.rf1_ax25 = ax25Enable1;
-#endif
+		config.rf1_rx_boost = rxBoost1;
 		String html = "OK";
-		APRS_init(&config);
-		// if (APRS_init(&config))
-		// {
-		html = "Setup completed successfully";
-		saveConfiguration("/default.cfg", config);
+		if(APRS_init2(&config)){
+			html = "Setup completed successfully";
+			saveConfiguration("/default.cfg", config);
+		}else{
+			html = "Setup failed";
+		}		
 		request->send(200, "text/html", html); // send to someones browser when asked
-											   // }
-											   // else
-											   // {
-											   // 	html = "Setup failed.";
-											   // 	request->send(400, "text/html", html); // send to someones browser when asked
-											   // }
 	}
+	#endif
 	else
 	{
 		String html = "<script type=\"text/javascript\">\n";
@@ -1734,7 +1833,10 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "e.preventDefault();\n";
 		html += "var data = new FormData(e.currentTarget);\n";
 		html += "if(e.currentTarget.id===\"formRadio\") document.getElementById(\"submitRadio\").disabled=true;\n";
+		#ifdef RF2
+		html += "if(e.currentTarget.id===\"formRadio1\") document.getElementById(\"submitRadio1\").disabled=true;\n";
 		// html += "if(e.currentTarget.id===\"formTNC\") document.getElementById(\"submitTNC\").disabled=true;\n";
+		#endif
 		html += "$.ajax({\n";
 		html += "url: '/radio',\n";
 		html += "type: 'POST',\n";
@@ -1822,7 +1924,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "}\n}\n";
 		html += "}\n";
 
-#ifdef NAWS4
+#ifdef RF2
 
 		html += "function loraVHF1(){\n";
 		html += "const rf1type=Number(document.querySelector('#rf1_type').value);";
@@ -1954,7 +2056,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "step=\"1\" value=\"" + String(config.rf_freq_offset) + "\" /> Hz   <i>[SX1276:137-175Mhz,410-525Mhz,862-1020Mhz]</i></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>RF Power:</b></td>\n";
+		html += "<td align=\"right\"><b>TX Power:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"rf_power\" id=\"rf_power\">\n";
 		int pwrMax = 23;
@@ -1970,6 +2072,13 @@ void handle_radio(AsyncWebServerRequest *request)
 		}
 		html += "</select>\n";
 		html += " dBm</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>RX Boost:</b></td>\n";
+		String boostEnFlag = "";
+		if (config.rf_rx_boost)
+			boostEnFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"rxBoost\" value=\"OK\" " + boostEnFlag + "><span class=\"slider round\"></span></label> *<i>Support for SX126x only.</i></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Preamble Length:</b></td>\n";
@@ -2150,7 +2259,8 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "</form></br />";
 
 // Radio Module Configuration 2
-#ifdef NAWS4
+#ifdef RF2
+		html += "<form id='formRadio1' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
 		html += "<table>\n";
 		html += "<th colspan=\"2\"><span><b>Radio Module 2</b></span></th>\n";
 		html += "<tr>\n";
@@ -2216,7 +2326,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "step=\"1\" value=\"" + String(config.rf1_freq_offset) + "\" /> Hz   <i>[SX1276:137-175Mhz,410-525Mhz,862-1020Mhz]</i></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
-		html += "<td align=\"right\"><b>RF Power:</b></td>\n";
+		html += "<td align=\"right\"><b>TX Power:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"rf1_power\" id=\"rf1_power\">\n";
 		int pwr1Max = 23;
@@ -2232,6 +2342,13 @@ void handle_radio(AsyncWebServerRequest *request)
 		}
 		html += "</select>\n";
 		html += " dBm</td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>RX Boost:</b></td>\n";
+		String boostEnFlag1 = "";
+		if (config.rf1_rx_boost)
+			boostEnFlag1 = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"rxBoost1\" value=\"OK\" " + boostEnFlag1 + "><span class=\"slider round\"></span></label></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Preamble Length:</b></td>\n";
@@ -2406,8 +2523,8 @@ void handle_radio(AsyncWebServerRequest *request)
 
 		// html += "</table>\n";
 		html += "<tr><td colspan=\"2\" align=\"right\">\n";
-		html += "<div><button class=\"button\" type='submit' id='submitRadio'  name=\"commitRadio\"> Apply Change </button></div>\n";
-		html += "<input type=\"hidden\" name=\"commitRadio\"/>\n";
+		html += "<div><button class=\"button\" type='submit' id='submitRadio1'  name=\"commitRadio1\"> Apply Change </button></div>\n";
+		html += "<input type=\"hidden\" name=\"commitRadio1\"/>\n";
 		html += "</td></tr></table><br />\n";
 		html += "</form>";
 #endif
@@ -3295,6 +3412,7 @@ void handle_mod(AsyncWebServerRequest *request)
 	{
 		bool pppEn = false;
 		bool pppGnss = false;
+		bool pppNapt = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
 			if (request->argName(i) == "pppEn")
@@ -3315,6 +3433,17 @@ void handle_mod(AsyncWebServerRequest *request)
 					if (String(request->arg(i)) == "OK")
 					{
 						pppGnss = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "pppNapt")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						pppNapt = true;
 					}
 				}
 			}
@@ -3399,6 +3528,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 		config.ppp_enable = pppEn;
 		config.ppp_gnss = pppGnss;
+		config.ppp_napt = pppNapt;
 		if (config.ppp_enable)
 		{
 			if (config.ppp_serial == 0)
@@ -3981,7 +4111,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "<td align=\"right\"><b>PORT:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"channel\" id=\"channel\">\n";
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 5; i++)
 		{
 			if (config.ext_tnc_channel == i)
 				html += "<option value=\"" + String(i) + "\" selected>" + String(TNC_PORT[i]) + " </option>\n";
@@ -4034,6 +4164,13 @@ void handle_mod(AsyncWebServerRequest *request)
 		if (config.ppp_gnss)
 			pppEnFlag = "checked";
 		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"pppGnss\" value=\"OK\" " + pppEnFlag + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>NAPT:</b></td>\n";
+		pppEnFlag = "";
+		if (config.ppp_napt)
+			pppEnFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"pppNapt\" value=\"OK\" " + pppEnFlag + "><span class=\"slider round\"></span></label> *WiFi NAT</td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>APN:</b></td>\n";
@@ -4542,6 +4679,7 @@ void handle_system(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+	#ifdef LOG_FILE
 	else if (request->hasArg("commitLOG"))
 	{
 		bool PwrEn = false;
@@ -4611,6 +4749,8 @@ void handle_system(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+	#endif
+	#if defined OLED || defined ST7735_160x80
 	else if (request->hasArg("commitDISP"))
 	{
 		bool dispRX = false;
@@ -4837,6 +4977,7 @@ void handle_system(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+	#endif
 	else
 	{
 		struct tm tmstruct;
@@ -6317,6 +6458,7 @@ void handle_digi(AsyncWebServerRequest *request)
 	StandByTick = millis() + (config.pwr_stanby_delay * 1000);
 
 	bool digiEn = false;
+	bool digiAuto = false;
 	bool posGPS = false;
 	bool bcnEN = false;
 	bool pos2RF = false;
@@ -6334,6 +6476,14 @@ void handle_digi(AsyncWebServerRequest *request)
 				{
 					if (String(request->arg(i)) == "OK")
 						digiEn = true;
+				}
+			}
+			if (request->argName(i) == "digiAuto")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						digiAuto = true;
 				}
 			}
 			if (request->argName(i) == "myCall")
@@ -6629,6 +6779,7 @@ void handle_digi(AsyncWebServerRequest *request)
 			}
 		}
 		config.digi_en = digiEn;
+		config.digi_auto = digiAuto;
 		config.digi_gps = posGPS;
 		config.digi_bcn = bcnEN;
 		config.digi_loc2rf = pos2RF;
@@ -6716,6 +6867,13 @@ void handle_digi(AsyncWebServerRequest *request)
 		if (config.digi_en)
 			digiEnFlag = "checked";
 		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiEnable\" value=\"OK\" " + digiEnFlag + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>Auto Enable:</b></td>\n";
+		String digiAutoFlag = "";
+		if (config.digi_auto)
+			digiAutoFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiAuto\" value=\"OK\" " + digiAutoFlag + "><span class=\"slider round\"></span></label> <i>*Automatic enable when APRS-IS disconnected</i></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Station Callsign:</b></td>\n";
@@ -9808,11 +9966,11 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<tr><td align=\"right\"><b>RSSI:</b></td>\n";
 	webString += "<td align=\"left\">" + String(pppStatus.rssi) + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>IP:</b></td>\n";
-	webString += "<td align=\"left\">" + String(IPAddress(pppStatus.ip)) + "</td></tr>\n";
+	webString += "<td align=\"left\">" + String(IPAddress(pppStatus.ip).toString().c_str()) + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>Gateway:</b></td>\n";
-	webString += "<td align=\"left\">" + String(IPAddress(pppStatus.gateway)) + "</td></tr>\n";
+	webString += "<td align=\"left\">" + String(IPAddress(pppStatus.gateway).toString().c_str()) + "</td></tr>\n";
 	// webString += "<tr><td align=\"right\"><b>DNS:</b></td>\n";
-	// webString += "<td align=\"left\">" + String(IPAddress(pppStatus.dns)) + "</td></tr>\n";
+	// webString += "<td align=\"left\">" + String(IPAddress(pppStatus.dns).toString().c_str()) + "</td></tr>\n";
 	#else
 		webString += "<th colspan=\"2\"><span><b>PPPoS Disable</b></span></th>\n";
 	webString += "<tr><td align=\"right\" width=\"30%\"><b>Manufacturer:</b></td>\n";
@@ -10063,14 +10221,13 @@ void webService()
 					disableLoopWDT();
 					disableCore0WDT();
 					// disableCore1WDT();
-					// esp_task_wdt_delete(taskAPRSPollHandle); // Delete watchdog task
+					//esp_task_wdt_delete(taskAPRSPollHandle); // Delete watchdog task
 					// disableCore1WDT();
-					//   vTaskSuspend(taskAPRSPollHandle);
-					//   vTaskSuspend(taskAPRSHandle);
-					//   vTaskSuspend(taskSensorHandle);
-					//   vTaskSuspend(taskSerialHandle);
-					//   vTaskSuspend(taskGPSHandle);
-					//   vTaskSuspend(taskSensorHandle);
+					//vTaskSuspend(taskAPRSPollHandle);
+					//vTaskSuspend(taskAPRSHandle);
+					//vTaskSuspend(taskSensorHandle);
+					//vTaskSuspend(taskSerialHandle);
+					//vTaskSuspend(taskGPSHandle);
 				}
 			}
 			if (!Update.hasError())

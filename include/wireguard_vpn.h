@@ -22,14 +22,14 @@ extern "C" {
 
 #define WG_LOCAL_ADDRESS        IPADDR4_INIT_BYTES(192, 168, 44, 202)
 #define WG_LOCAL_NETMASK        IPADDR4_INIT_BYTES(255, 255, 255, 255)
-#define WG_GATEWAY_ADDRESS      IPADDR4_INIT_BYTES(192, 168, 44, 195)
+#define WG_GATEWAY_ADDRESS      IPADDR4_INIT_BYTES(44, 63, 31, 193)
 #define WG_CLIENT_PRIVATE_KEY   "gH2YqDa+St6x5eFhomVQDwtV1F0YMQd3HtOElPkZgVY="
 //#define WG_CLIENT_PRIVATE_KEY   "sHueMvT+zVP7Pm/zoRptYcDkCERaBoJc/oUi9n0bmGE="
 #define WG_CLIENT_PORT          51821
 
 #define WG_PEER_PUBLIC_KEY      "ZEFr+/B/T5+k0DhVG/GOTvAOjeOiuFKmwtu/cy23xVs="
 #define WG_PEER_PORT            51820
-#define WG_PEER_ADDRESS         IPADDR4_INIT_BYTES(203, 150, 19, 23)
+#define WG_PEER_ADDRESS         IPADDR4_INIT_BYTES(203, 150, 19, 25)
 
 //==============================================================================
 //  Exported types
@@ -44,7 +44,7 @@ extern "C" {
 //==============================================================================
 bool wireguard_active();
 void wireguard_remove();
-void wireguard_setup();
+void wireguard_setup(netif *ppp_netif);
 
 bool wireguard_up();
 

@@ -770,7 +770,7 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
     unsigned int i, p, j;
     char num[5];
     hdr->ssid = 0;
-    memset(hdr->addr, 0, 7);
+    memset(hdr->addr, 0, 8);
     memset(&num[0], 0, sizeof(num));
 
     p = strpos(txt, '-');
@@ -848,27 +848,29 @@ char ax25_encode(ax25frame &frame, char *txt, int size)
             convPath(&frame.header[0], &txt[p2 + 1], j - p2 - 1); // Get callsign dest
                                                                   // if(j<p){
             p3 = 0;
-            for (i = j; i < size; i++)
-            { // copy path to origin
-                if (txt[i] == ':')
-                {
-                    for (; i < size; i++)
-                        txt[p3++] = 0x00;
-                    break;
+            if ((j > p2) && (j < p)) { //Check PATH
+                for (i = j; i < size; i++)
+                { // copy path to origin
+                    if (txt[i] == ':')
+                    {
+                        for (; i < size; i++)
+                            txt[p3++] = 0x00;
+                        break;
+                    }
+                    txt[p3++] = txt[i];
                 }
-                txt[p3++] = txt[i];
-            }
-            // printf("Path:%s\r\n",txt);
-            token = strtok(txt, ",");
-            j = 0;
-            while (token != NULL)
-            {
-                ptr = token;
-                convPath(&frame.header[j + 2], ptr, strlen(ptr));
-                token = strtok(NULL, ",");
-                j++;
-                if (j > 7)
-                    break;
+                // printf("Path:%s\r\n",txt);
+                token = strtok(txt, ",");
+                j = 0;
+                while (token != NULL)
+                {
+                    ptr = token;
+                    convPath(&frame.header[j + 2], ptr, strlen(ptr));
+                    token = strtok(NULL, ",");
+                    j++;
+                    if (j > 7)
+                        break;
+                }
             }
 
             for (i = 0; i < 10; i++)

@@ -9,6 +9,7 @@
 #include "main.h"
 #include <esp_wireguard.h>
 
+
 //ใช้ตัวแปรโกลบอลในไฟล์ main.cpp
 extern Configuration config;
 
@@ -124,14 +125,14 @@ void wireguard_remove()
 }
 
 
-void wireguard_setup()
+void wireguard_setup(netif *ppp_netif)
 {
     struct wireguardif_init_data wg;
     struct wireguardif_peer peer;
-    ip_addr_t ipaddr = WG_LOCAL_ADDRESS;
-    ip_addr_t netmask = WG_LOCAL_NETMASK;
-    ip_addr_t gateway = WG_GATEWAY_ADDRESS;
-    ip_addr_t peer_address = WG_PEER_ADDRESS;
+    ip_addr_t ipaddr;
+    ip_addr_t netmask;
+    ip_addr_t gateway;
+    ip_addr_t peer_address;
 
     ipaddr_aton(config.wg_local_address,&ipaddr);
     ipaddr_aton(config.wg_netmask_address,&netmask);
@@ -143,6 +144,8 @@ void wireguard_setup()
     // wg.listen_port = WG_CLIENT_PORT;
     wg.private_key = config.wg_private_key;
     wg.listen_port = config.wg_port+1;
+    log_d("WireGuard ppp netif: %p",ppp_netif);
+    //log_d("PPP Gateway: %s",IPAddress(&ppp_netif->gw).toString().c_str());
     wg.bind_netif = NULL; // NB! not working on ESP32 even if set!
 
     if(wg_netif==NULL){

@@ -780,7 +780,7 @@ String ais2aprs(char *info)
 	if((lat==G_UNKNOWN)||(lon==G_UNKNOWN)) return tnc2Raw;
 	
 	int lat_dd, lat_mm, lat_ss, lon_dd, lon_mm, lon_ss;
-	char strtmp[300]; //, loc[100];
+	char strtmp[300];
 	char lon_ew = 'E';
 	char lat_ns = 'N';
 	if (lat < 0)
