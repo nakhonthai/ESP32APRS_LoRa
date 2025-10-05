@@ -80,14 +80,26 @@
 #define FILTER_THIRDPARTY (1 << 10) // packet is 3rd-party packet from INET2RF
 
 #define RF_NONE 0
-#define RF_SA868_VHF 1 // G-NiceRF SA818,SA868 VHF band 134~174 MHz
-#define RF_SA868_UHF 2 // G-NiceRF SA818,SA868 UHF band 400~470 MHz
-#define RF_SA868_350 3 // G-NiceRF SA818,SA868 350 band frequency：320-400MHz
-#define RF_SR_1WV 4	   // SUNRISE SR110V,FRS-1WV VHF band 136~174 MHz
-#define RF_SR_1WU 5	   // SUNRISE SR110U,FRS-1WU UHF band 400~470 MHz
-#define RF_SR_1W350 6  // SUNRISE SR350P 350 band frequency：350-390MHz
-#define RF_SR_2WVS 7   // SUNRISE SR120V,SR_2WVS VHF band 136~174 MHz
-#define RF_SR_2WUS 8   // SUNRISE SR120U,SR_2WUS UHF band 400~470 MHz
+
+#ifdef MQTT
+#define MQTT_TOPIC_NONE 0
+#define MQTT_TOPIC_TNC (1 << 0)
+#define MQTT_TOPIC_WX (1 << 1)
+#define MQTT_TOPIC_SENSOR (1 << 2)
+#define MQTT_TOPIC_TELEMETRY (1 << 3)
+#define MQTT_TOPIC_STATUS (1 << 4)
+#define MQTT_TOPIC_IGATE (1 << 5)
+#define MQTT_TOPIC_DIGI (1 << 6)
+#define MQTT_TOPIC_TRACKER (1 << 7)
+#define MQTT_TOPIC_MESSAGE (1 << 8)
+#define MQTT_TOPIC_ALL 0xFFFF
+
+#define MQTT_SUBSCRIBE_NONE 0
+#define MQTT_SUBSCRIBE_CMD (1 << 0)
+#define MQTT_SUBSCRIBE_TNC (1 << 1)
+#define MQTT_SUBSCRIBE_MESSAGE (1 << 2)
+#define MQTT_SUBSCRIBE_ALL 0xFFFF
+#endif
 
 #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 

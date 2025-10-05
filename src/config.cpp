@@ -502,11 +502,15 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["pppGNSS"] = config.ppp_gnss;
     doc["pppNAPT"] = config.ppp_napt;
 
+    #ifdef MQTT
     doc["mqttEnable"] = config.en_mqtt;
     doc["mqttHost"] = config.mqtt_host;
     doc["mqttTopic"] = config.mqtt_topic;
     doc["mqttSub"] = config.mqtt_subscribe;
     doc["mqttPort"] = config.mqtt_port;
+    doc["mqttUser"] = config.mqtt_user;
+    doc["mqttPass"] = config.mqtt_pass;
+    #endif
 
     doc["trkMicEType"] = config.trk_mice_type;
     doc["trkTlmInv"] = config.trk_tlm_interval;
@@ -993,11 +997,15 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.ppp_gnss = doc["pppGNSS"];
         config.ppp_napt = doc["pppNAPT"];
 
+        #ifdef MQTT
         config.en_mqtt = doc["mqttEnable"];
         strlcpy(config.mqtt_host, doc["mqttHost"] | "", sizeof(config.mqtt_host));
         strlcpy(config.mqtt_topic, doc["mqttTopic"] | "", sizeof(config.mqtt_topic));
         strlcpy(config.mqtt_subscribe, doc["mqttSub"] | "", sizeof(config.mqtt_subscribe));
         config.mqtt_port = doc["mqttPort"];
+        strlcpy(config.mqtt_user, doc["mqttUser"] | "", sizeof(config.mqtt_user));
+        strlcpy(config.mqtt_pass, doc["mqttPass"] | "", sizeof(config.mqtt_pass));
+        #endif
 
         config.trk_mice_type = doc["trkMicEType"];
         config.trk_tlm_interval = doc["trkTlmInv"];

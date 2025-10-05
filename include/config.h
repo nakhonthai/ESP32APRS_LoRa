@@ -491,11 +491,17 @@ typedef struct Config_Struct
 	bool ppp_napt = true;
 
 	// MQTT Config
+#ifdef MQTT	
 	bool en_mqtt;
 	char mqtt_host[63];
 	char mqtt_topic[63];
 	char mqtt_subscribe[63];
+	char mqtt_user[32];
+	char mqtt_pass[63];
 	uint16_t mqtt_port;
+	uint16_t mqtt_topic_flag;
+	uint16_t mqtt_subscribe_flag;
+#endif
 
 	uint8_t trk_mice_type;
 	uint8_t trk_tlm_interval;

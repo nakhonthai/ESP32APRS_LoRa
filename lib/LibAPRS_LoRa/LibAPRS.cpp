@@ -359,6 +359,14 @@ void radioRecvStatus1()
         rssi = radioHal1->getRSSI(true, false);
         snr = radioHal1->getSNR();
         freqErr = radioHal1->getFrequencyError();
+        if ((config.rf1_type == RF_SX1261) || (config.rf1_type == RF_SX1262) || (config.rf1_type == RF_SX1268) || (config.rf1_type == RF_SX126x))
+        {
+            // SX126x RSSI is not reliable, so we estimate it
+            if((int)rssi == -127){
+                float noiseFloor = -174 + 10*log10(config.rf1_bw*1000.0) + 6; // dBm, BW=125kHz, NF=6dB
+                rssi = noiseFloor+snr;
+            }
+        }
         // print RSSI (Received Signal Strength Indicator)
         log_d("[LoRa1] RSSI:%.0f dBm\tSNR:%.0f dBm\tFreqErr:%.0f Hz", rssi, snr, freqErr);
     }

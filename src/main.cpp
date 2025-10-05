@@ -3358,6 +3358,8 @@ void defaultConfig()
     sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
     sprintf(config.mqtt_topic, "/APRS/TNC2");
     sprintf(config.mqtt_subscribe, "/APRS/CTL");
+    config.mqtt_user[0]=0;
+    config.mqtt_pass[0]=0;
     config.mqtt_port = 1883;
 
     config.ppp_enable = false;
@@ -3390,8 +3392,8 @@ void defaultConfig()
     config.ppp_gnss = false;
     config.en_mqtt = true;
     sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
-    sprintf(config.mqtt_topic, "/NW0017/WEATHER/sample");
-    sprintf(config.mqtt_subscribe, "/NW0017/ctl");
+    sprintf(config.mqtt_topic, "/NAWS4/WEATHER/sample");
+    sprintf(config.mqtt_subscribe, "/NAWS4/ctl");
     config.mqtt_port = 1883;
 
     config.ppp_enable = true;
@@ -5172,19 +5174,25 @@ void mqtt_reconnect()
             strcat(idMqtt, "_");
             strcat(idMqtt, config.wx_object);
         }
-        if (clientMQTT.connect(idMqtt))
+        bool res=false;
+        if(config.mqtt_user[0]!=0){
+            res=clientMQTT.connect(idMqtt, config.mqtt_user, config.mqtt_pass);
+        }else{
+            res=clientMQTT.connect(idMqtt);
+        }
+        if (res)
         {
             log_d("MQTT Connected");
             // Once connected, publish an announcement...
             char payload[20];
-            char topic[50];
-            if (strlen(config.wx_object) > 3)
-                sprintf(topic, "/%s/status", config.wx_object);
-            else
-                sprintf(topic, "/%s/status", config.wx_mycall);
+            // char topic[50];
+            // if (strlen(config.wx_object) > 3)
+            //     sprintf(topic, "/%s/status", config.wx_object);
+            // else
+            //     sprintf(topic, "/%s/status", config.wx_mycall);
             sprintf(payload, "Connected");
 
-            clientMQTT.publish(topic, payload);
+            clientMQTT.publish(config.mqtt_topic, payload);
             // ... and resubscribe
             clientMQTT.subscribe(config.mqtt_subscribe);
         }
@@ -7449,7 +7457,7 @@ bool getBits(int ch)
             val = 0;
         break;
     case 8: // MQTT
-#if defined(MQTT_ENABLE)
+#if defined(MQTT)
         if (clientMQTT.connected())
             val = 1;
         else
@@ -8718,6 +8726,14 @@ void taskAPRS(void *pvParameters)
             }
 #endif
 
+#ifdef MQTT
+                if (config.en_mqtt && clientMQTT.connected() && (config.mqtt_topic_flag & MQTT_TOPIC_TNC))
+                {
+                    log_d("Publish MQTT Topic: %s Payload: %s", config.mqtt_topic, tnc2.c_str());
+                    clientMQTT.publish(config.mqtt_topic, tnc2.c_str());
+                }
+#endif
+
             log_d("RX: %s", tnc2.c_str());
 
             // SerialBT.println(tnc2);
@@ -9326,7 +9342,7 @@ void taskAPRS(void *pvParameters)
                     WxInterval = millis() + (10 * 1000);
                 }
 #ifdef MQTT
-                if (clientMQTT.connected() && config.en_mqtt)
+                if (config.en_mqtt && clientMQTT.connected() && (config.mqtt_topic_flag & MQTT_TOPIC_WX))
                 {
                     char payload[500];
                     getWxJson(&payload[0]);
