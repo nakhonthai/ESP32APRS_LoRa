@@ -41,6 +41,8 @@
 
 #include <ModbusMaster.h>
 
+#include "handleATCommand.h"
+
 // #include <EEPROM.h>
 
 // #include "IP5306_I2C.h"
@@ -5205,15 +5207,26 @@ void mqtt_reconnect()
 
 void mqtt_callback(char *topic, byte *payload, unsigned int length)
 {
+    byte *payload_ptr=(byte *)calloc(1,length+1);
+    if(payload_ptr==NULL){
+        log_d("MQTT No memory");
+        return;
+    }
+    memset(payload_ptr,0,length+1);
+    memcpy(payload_ptr, payload, length);
     log_d("MQTT Message arrived on topic [%s] with length %d", topic, length);
-    if (payload[0] == 'A' && payload[1] == 'T' && payload[2] == '-')
+    if (payload_ptr[0] == 'A' && payload_ptr[1] == 'T')
     {
-        log_d("AT-Command received: %s", payload);
+        log_d("AT-Command received: %s", payload_ptr);
+        String ret = handleATCommand(String((char *)payload_ptr));
+        log_d("AT-Command response: %s", ret.c_str());
+        clientMQTT.publish(config.mqtt_topic, ret.c_str());        
     }
     else
     {
-        pkgTxPush((const char *)payload, length, 0, RF_CHANNEL);
+        pkgTxPush((const char *)payload_ptr, length, 0, RF_CHANNEL);
     }
+    free(payload_ptr);
 }
 
 #endif // MQTT
