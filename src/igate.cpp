@@ -144,23 +144,23 @@ int igateProcess(AX25Msg &Packet)
 
     if (strlen((const char *)config.igate_object) >= 3)
     {
-        header += "," + String(config.aprs_mycall);
-        if (config.aprs_ssid > 0)
-        {
-            header += String(F("-"));
-            header += String(config.aprs_ssid);
-        }
-        header += "*,qAO," + String(config.igate_object);
+        // header += "," + String(config.igate_mycall);
+        // if (config.igate_ssid > 0)
+        // {
+        //     header += String(F("-"));
+        //     header += String(config.igate_ssid);
+        // }
+        header += ",qAR," + String(config.igate_object);
     }
     else
     {
         // Add qAR,callSSID: qAR - Packet is placed on APRS-IS by an IGate from RF
         header += String(F(",qAR,"));
-        header += String(config.aprs_mycall);
-        if (config.aprs_ssid > 0)
+        header += String(config.igate_mycall);
+        if (config.igate_ssid > 0)
         {
             header += String(F("-"));
-            header += String(config.aprs_ssid);
+            header += String(config.igate_ssid);
         }
     }
 

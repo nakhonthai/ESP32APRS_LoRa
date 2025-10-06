@@ -101,12 +101,12 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["rf2inetFilter"] = config.rf2inetFilter;
     doc["inet2rfFiltger"] = config.inet2rfFilter;
 
-    doc["igateSSID"] = config.aprs_ssid;
+    doc["igateSSID"] = config.igate_ssid;
     doc["igatePort"] = config.aprs_port;
-    doc["igateMycall"] = config.aprs_mycall;
-    doc["igateHost"] = config.aprs_host;
+    doc["igateMycall"] = config.igate_mycall;
+    doc["igateHost"] = config.igate_host;
     // doc["igatePassCode"]=config.aprs_passcode;
-    doc["igateFilter"] = config.aprs_filter;
+    doc["igateFilter"] = config.igate_filter;
     doc["igateGPS"] = config.igate_gps;
     doc["igateLAT"] = config.igate_lat;
     doc["igateLON"] = config.igate_lon;
@@ -517,6 +517,12 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["digiTlmInv"] = config.digi_tlm_interval;
     doc["igateTlmInv"] = config.igate_tlm_interval;
     doc["hostName"] = config.host_name;
+    doc["resetTimeout"] = config.reset_timeout;
+
+    doc["cmdOnMqtt"] = config.at_cmd_mqtt;
+    doc["cmdOnMsg"] = config.at_cmd_msg;
+    doc["cmdOnBluetooth"] = config.at_cmd_bluetooth;
+    doc["cmdOnUart"] = config.at_cmd_uart;
 
     // Serialize JSON to file
     if (serializeJson(doc, file) == 0)
@@ -627,11 +633,11 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.rf2inetFilter = doc["rf2inetFilter"];
         config.inet2rfFilter = doc["inet2rfFiltger"];
 
-        config.aprs_ssid = doc["igateSSID"];
+        config.igate_ssid = doc["igateSSID"];
         config.aprs_port = doc["igatePort"];
-        strlcpy(config.aprs_mycall, doc["igateMycall"] | "NOCALL", sizeof(config.aprs_mycall));
-        strlcpy(config.aprs_host, doc["igateHost"] | "", sizeof(config.aprs_host));
-        strlcpy(config.aprs_filter, doc["igateFilter"] | "", sizeof(config.aprs_filter));
+        strlcpy(config.igate_mycall, doc["igateMycall"] | "NOCALL", sizeof(config.igate_mycall));
+        strlcpy(config.igate_host, doc["igateHost"] | "", sizeof(config.igate_host));
+        strlcpy(config.igate_filter, doc["igateFilter"] | "", sizeof(config.igate_filter));
         config.igate_gps = doc["igateGPS"];
         config.igate_lat = doc["igateLAT"];
         config.igate_lon = doc["igateLON"];
@@ -1012,6 +1018,11 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.digi_tlm_interval = doc["digiTlmInv"];
         config.igate_tlm_interval = doc["igateTlmInv"];
         strlcpy(config.host_name, doc["hostName"] | "", sizeof(config.host_name));
+        config.reset_timeout = doc["resetTimeout"];
+        config.at_cmd_mqtt = doc["cmdOnMqtt"];
+        config.at_cmd_msg = doc["cmdOnMsg"];
+        config.at_cmd_bluetooth = doc["cmdOnBluetooth"];
+        config.at_cmd_uart = doc["cmdOnUart"];
 
         // Close the file (Curiously, File's destructor doesn't close the file)
         // f.close();

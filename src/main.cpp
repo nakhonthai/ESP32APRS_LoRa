@@ -441,6 +441,8 @@ float freqErr = 0;
 
 long timeNetwork, timeAprs, timeGui;
 
+long autoResetTimeout = 0;
+
 cppQueue PacketBuffer(sizeof(AX25Msg), 5, IMPLEMENTATION); // Instantiate queue
 #if defined OLED || defined ST7735_160x80
 cppQueue dispBuffer(300, 3, IMPLEMENTATION);
@@ -2389,13 +2391,13 @@ void defaultConfig()
     config.rf2inetFilter = 0xFFF; // All
     config.inet2rfFilter = config.digiFilter = FILTER_OBJECT | FILTER_ITEM | FILTER_MESSAGE | FILTER_MICE | FILTER_POSITION | FILTER_WX;
     //--APRS-IS
-    config.aprs_ssid = 1;
+    config.igate_ssid = 1;
     config.aprs_port = 14580;
-    sprintf(config.aprs_mycall, "NOCALL");
-    sprintf(config.aprs_host, "aprs.dprns.com");
-    memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
-    sprintf(config.aprs_moniCall, "%s-%d", config.aprs_mycall, config.aprs_ssid);
-    sprintf(config.aprs_filter, "m/0");
+    sprintf(config.igate_mycall, "NOCALL");
+    sprintf(config.igate_host, "aprs.dprns.com");
+    //memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
+    sprintf(config.igate_moniCall, "%s-%d", config.igate_mycall, config.igate_ssid);
+    sprintf(config.igate_filter, "m/0");
     //--Position
     config.igate_gps = false;
     config.igate_lat = 13.7555;
@@ -2597,6 +2599,12 @@ void defaultConfig()
     config.gnss_tcp_port = 8080;
     sprintf(config.gnss_tcp_host, "192.168.0.1");
     memset(config.gnss_at_command, 0, sizeof(config.gnss_at_command));
+
+    config.reset_timeout = 0;
+    config.at_cmd_mqtt = true;
+    config.at_cmd_msg = true;
+    config.at_cmd_bluetooth = true;
+    config.at_cmd_uart = 4;
 
     config.sensor[0].enable = false;
     config.sensor[0].port = 0;
@@ -3436,7 +3444,7 @@ void defaultConfig()
     config.trk_timestamp = false;
     config.igate_en = true;
     config.aprs_port = 24580;
-    sprintf(config.aprs_mycall, "CBBT0");
+    sprintf(config.igate_mycall, "CBBT0");
     sprintf(config.trk_mycall, "CBBT0");
     memset(config.trk_item, 0, 10);
     // sprintf(config.trk_item, "BTL0");
@@ -4276,7 +4284,7 @@ boolean APRSConnect()
     // Serial.println(con);
     if (con <= 0)
     {
-        if (!aprsClient.connect(config.aprs_host, config.aprs_port)) // เชื่อมต่อกับเซิร์ฟเวอร์ TCP
+        if (!aprsClient.connect(config.igate_host, config.aprs_port)) // เชื่อมต่อกับเซิร์ฟเวอร์ TCP
         {
             // Serial.print(".");
             delay(100);
@@ -4289,15 +4297,15 @@ boolean APRSConnect()
         if (strlen(config.igate_object) >= 3)
         {
             uint16_t passcode = aprsParse.passCode(config.igate_object);
-            login = "user " + String(config.igate_object) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
+            login = "user " + String(config.igate_object) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.igate_filter);
         }
         else
         {
-            uint16_t passcode = aprsParse.passCode(config.aprs_mycall);
-            if (config.aprs_ssid == 0)
-                login = "user " + String(config.aprs_mycall) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
+            uint16_t passcode = aprsParse.passCode(config.igate_mycall);
+            if (config.igate_ssid == 0)
+                login = "user " + String(config.igate_mycall) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.igate_filter);
             else
-                login = "user " + String(config.aprs_mycall) + "-" + String(config.aprs_ssid) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.aprs_filter);
+                login = "user " + String(config.igate_mycall) + "-" + String(config.igate_ssid) + " pass " + String(passcode, DEC) + " vers ESP32APRS_LoRa V" + String(VERSION) + String(VERSION_BUILD) + " filter " + String(config.igate_filter);
         }
         aprsClient.println(login);
         // Serial.println(login);
@@ -5035,6 +5043,7 @@ void setup()
 #endif
 
     timeTask = millis() + 10000;
+    autoResetTimeout = millis() + ((long)config.reset_timeout * 60000);
 
     if (config.gnss_enable)
         curTab = 0;
@@ -5217,10 +5226,12 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length)
     log_d("MQTT Message arrived on topic [%s] with length %d", topic, length);
     if (payload_ptr[0] == 'A' && payload_ptr[1] == 'T')
     {
-        log_d("AT-Command received: %s", payload_ptr);
-        String ret = handleATCommand(String((char *)payload_ptr));
-        log_d("AT-Command response: %s", ret.c_str());
-        clientMQTT.publish(config.mqtt_topic, ret.c_str());        
+        if(config.at_cmd_mqtt){
+            log_d("AT-Command received: %s", payload_ptr);
+            String ret = handleATCommand(String((char *)payload_ptr));
+            log_d("AT-Command response: %s", ret.c_str());
+            clientMQTT.publish(config.mqtt_topic, ret.c_str());        
+        }
     }
     else
     {
@@ -5836,10 +5847,10 @@ String igate_position(double lat, double lon, double alt, String comment)
     if (strtmp)
     {
         memset(strtmp, 0, 300);
-        if (config.aprs_ssid == 0)
-            sprintf(strtmp, "%s>APE32L", config.aprs_mycall);
+        if (config.igate_ssid == 0)
+            sprintf(strtmp, "%s>APE32L", config.igate_mycall);
         else
-            sprintf(strtmp, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
+            sprintf(strtmp, "%s-%d>APE32L", config.igate_mycall, config.igate_ssid);
         tnc2Raw = String(strtmp);
         free(strtmp);
     }
@@ -5950,10 +5961,10 @@ void igate_status(char *text)
 {
     char name[50];
     memset(name, 0, 50);
-    if (config.aprs_ssid > 0)
-        sprintf(name, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
+    if (config.igate_ssid > 0)
+        sprintf(name, "%s-%d>APE32L", config.igate_mycall, config.igate_ssid);
     else
-        sprintf(name, "%s>APE32L", config.aprs_mycall);
+        sprintf(name, "%s>APE32L", config.igate_mycall);
 
     String tnc2Raw = String(name);
     if (config.igate_path < 5)
@@ -6423,6 +6434,17 @@ void loop()
         //     log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableDLDO2() ? "+" : "-", PMU.getDLDO2Voltage());
         //     log_d("===========================================================================");
         // }
+
+        if((config.reset_timeout > 0) && (millis() > autoResetTimeout)){
+            autoResetTimeout=millis() + (config.reset_timeout*60000);
+            log_d("Auto Reset System");
+            vTaskSuspendAll();
+            WiFi.disconnect(true); // Disconnect from the network
+            WiFi.persistent(false);
+            WiFi.mode(WIFI_OFF); // Switch WiFi off
+            PowerOff();
+            esp_restart();
+        }
 
         // Automatic Restart when heap memory not enough
         if (ESP.getFreeHeap() < 60000)
@@ -7025,14 +7047,14 @@ String sendIsAckMsg(String toCallSign, int msgId)
     char call[11];
     int i;
     memset(&call[0], 0, 11);
-    sprintf(call, "%s-%d", config.aprs_mycall, config.aprs_ssid);
+    sprintf(call, "%s-%d", config.igate_mycall, config.igate_ssid);
     strcpy(&call[0], toCallSign.c_str());
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
     memset(&str[0], 0, 250);
 
-    sprintf(str, "%s-%d>APE32L%s::%s:ack%d", config.aprs_mycall, config.aprs_ssid, VERSION, call, msgId);
+    sprintf(str, "%s-%d>APE32L%s::%s:ack%d", config.igate_mycall, config.igate_ssid, VERSION, call, msgId);
     //	client.println(str);
     return String(str);
 }
@@ -7040,7 +7062,7 @@ String sendIsAckMsg(String toCallSign, int msgId)
 void sendIsPkg(char *raw)
 {
     char str[300];
-    sprintf(str, "%s-%d>APE32L%s:%s", config.aprs_mycall, config.aprs_ssid, VERSION, raw);
+    sprintf(str, "%s-%d>APE32L%s:%s", config.igate_mycall, config.igate_ssid, VERSION, raw);
     // client.println(str);
     String tnc2Raw = String(str);
     if (aprsClient.connected())
@@ -7055,18 +7077,18 @@ void sendIsPkgMsg(char *raw)
     char call[11];
     int i;
     memset(&call[0], 0, 11);
-    if (config.aprs_ssid == 0)
-        sprintf(call, "%s", config.aprs_mycall);
+    if (config.igate_ssid == 0)
+        sprintf(call, "%s", config.igate_mycall);
     else
-        sprintf(call, "%s-%d", config.aprs_mycall, config.aprs_ssid);
+        sprintf(call, "%s-%d", config.igate_mycall, config.igate_ssid);
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
 
-    if (config.aprs_ssid == 0)
-        sprintf(str, "%s>APE32L::%s:%s", config.aprs_mycall, call, raw);
+    if (config.igate_ssid == 0)
+        sprintf(str, "%s>APE32L::%s:%s", config.igate_mycall, call, raw);
     else
-        sprintf(str, "%s-%d>APE32L::%s:%s", config.aprs_mycall, config.aprs_ssid, call, raw);
+        sprintf(str, "%s-%d>APE32L::%s:%s", config.igate_mycall, config.igate_ssid, call, raw);
 
     String tnc2Raw = String(str);
     if (aprsClient.connected())
@@ -7275,27 +7297,27 @@ void sendTelemetry_igate(char *raw, int dly_ms)
     }
     else
     {
-        if (config.aprs_ssid == 0)
-            sprintf(call, "%s", config.aprs_mycall);
+        if (config.igate_ssid == 0)
+            sprintf(call, "%s", config.igate_mycall);
         else
-            sprintf(call, "%s-%d", config.aprs_mycall, config.aprs_ssid);
+            sprintf(call, "%s-%d", config.igate_mycall, config.igate_ssid);
     }
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
 
-    if (config.aprs_ssid == 0)
+    if (config.igate_ssid == 0)
     {
         if (config.igate_path < 5)
         {
             if (config.igate_path > 0)
-                sprintf(str, "%s>APE32L-%d::%s:%s ", config.aprs_mycall, config.igate_path, call, raw);
+                sprintf(str, "%s>APE32L-%d::%s:%s ", config.igate_mycall, config.igate_path, call, raw);
             else
-                sprintf(str, "%s>APE32L::%s:%s ", config.aprs_mycall, call, raw);
+                sprintf(str, "%s>APE32L::%s:%s ", config.igate_mycall, call, raw);
         }
         else
         {
-            sprintf(str, "%s>APE32L,%s::%s:%s ", config.aprs_mycall, getPath(config.igate_path).c_str(), call, raw);
+            sprintf(str, "%s>APE32L,%s::%s:%s ", config.igate_mycall, getPath(config.igate_path).c_str(), call, raw);
         }
     }
     else
@@ -7303,13 +7325,13 @@ void sendTelemetry_igate(char *raw, int dly_ms)
         if (config.igate_path < 5)
         {
             if (config.igate_path > 0)
-                sprintf(str, "%s-%d>APE32L-%d::%s:%s ", config.aprs_mycall, config.aprs_ssid, config.igate_path, call, raw);
+                sprintf(str, "%s-%d>APE32L-%d::%s:%s ", config.igate_mycall, config.igate_ssid, config.igate_path, call, raw);
             else
-                sprintf(str, "%s-%d>APE32L::%s:%s ", config.aprs_mycall, config.aprs_ssid, call, raw);
+                sprintf(str, "%s-%d>APE32L::%s:%s ", config.igate_mycall, config.igate_ssid, call, raw);
         }
         else
         {
-            sprintf(str, "%s-%d>APE32L,%s::%s:%s ", config.aprs_mycall, config.aprs_ssid, getPath(config.igate_path).c_str(), call, raw);
+            sprintf(str, "%s-%d>APE32L,%s::%s:%s ", config.igate_mycall, config.igate_ssid, getPath(config.igate_path).c_str(), call, raw);
         }
     }
 
@@ -8015,7 +8037,7 @@ void taskSerial(void *pvParameters)
             // else if(config.wx_channel == 4){
             //     bool result=getM702Modbus(modbus);
             // }
-        }
+        }        
 
         if (config.ext_tnc_enable && (config.ext_tnc_mode > 0 && config.ext_tnc_mode < 5))
         {
@@ -8175,6 +8197,47 @@ void taskSerial(void *pvParameters)
             }
             //}
         }
+
+        if(config.at_cmd_uart>0){
+            if(config.at_cmd_uart == 1){ // UART0
+                if(Serial0.available()){
+                    String cmd=Serial0.readStringUntil('\n');
+                    cmd.trim();
+                    String ret = handleATCommand(String((char *)cmd.c_str()));
+                    if(ret!="") Serial0.println(ret);
+                    log_d("AT-Command response: %s", ret.c_str());
+                }
+            }
+            else if(config.at_cmd_uart == 2){ // UART1
+                if(Serial1.available()){
+                    String cmd=Serial1.readStringUntil('\n');
+                    cmd.trim();
+                    String ret = handleATCommand(String((char *)cmd.c_str()));
+                    if(ret!="") Serial1.println(ret);
+                    log_d("AT-Command response: %s", ret.c_str());
+                }
+            }
+            #if SOC_UART_NUM > 2
+            else if(config.at_cmd_uart == 3){ // UART2
+                if(Serial2.available()){
+                    String cmd=Serial2.readStringUntil('\n');
+                    cmd.trim();
+                    String ret = handleATCommand(String((char *)cmd.c_str()));
+                    if(ret!="") Serial2.println(ret);
+                    log_d("AT-Command response: %s", ret.c_str());
+                }
+            }
+            #endif
+            else if(config.at_cmd_uart == 4){ // USB-CDC
+                if(Serial.available()){
+                    String cmd=Serial.readStringUntil('\n');
+                    cmd.trim();
+                    String ret = handleATCommand(String((char *)cmd.c_str()));
+                    if(ret!="") Serial.println(ret);
+                    log_d("AT-Command response: %s", ret.c_str());
+                }
+            }
+        }
     }
 }
 
@@ -8206,7 +8269,7 @@ void taskAPRS(void *pvParameters)
     #ifdef RF2
     APRS_init2(&config);
     #endif
-    // APRS_setCallsign(config.aprs_mycall, config.aprs_ssid);
+    // APRS_setCallsign(config.igate_mycall, config.igate_ssid);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
     //igateTLM.TeleTimeout = millis() + 60000; // 1Min
 
@@ -8274,6 +8337,14 @@ void taskAPRS(void *pvParameters)
                         kiss_serial((uint8_t)NuSerial.read());
                     }
                 }
+                else if (config.bt_mode == 3)
+                { // AT COMMAND
+                        String cmd=NuSerial.readStringUntil('\n');
+                        cmd.trim();
+                        String ret = handleATCommand(String((char *)cmd.c_str()));
+                        if(ret!="") NuSerial.println(ret);
+                        log_d("AT-Command response: %s", ret.c_str());
+                }
             }
         }
 #else
@@ -8298,6 +8369,14 @@ void taskAPRS(void *pvParameters)
                 {
                     kiss_serial((uint8_t)SerialBT.read());
                 }
+            }
+            else if (config.bt_mode == 3)
+            { // AT COMMAND
+                String cmd=SerialBT.readStringUntil('\n');
+                cmd.trim();
+                String ret = handleATCommand(String((char *)cmd.c_str()));
+                if(ret!="") SerialBT.println(ret);
+                log_d("AT-Command response: %s", ret.c_str());
             }
         }
 #endif
@@ -8709,7 +8788,7 @@ void taskAPRS(void *pvParameters)
             if (config.bt_master)
             { // Output TNC2RAW to BT Serial
               // SerialBT.println(tnc2);
-                if (config.bt_mode == 1)
+                if (config.bt_mode == 1 || config.bt_mode ==3)
                 {
                     char *rawP = (char *)malloc(tnc2.length());
                     memcpy(rawP, tnc2.c_str(), tnc2.length());
@@ -10011,10 +10090,10 @@ void taskNetwork(void *pvParameters)
                                                 if (strtmp)
                                                 {
                                                     memset(strtmp, 0, 350);
-                                                    if (config.aprs_ssid == 0)
-                                                        sprintf(strtmp, "%s>APE32L", config.aprs_mycall);
+                                                    if (config.igate_ssid == 0)
+                                                        sprintf(strtmp, "%s>APE32L", config.igate_mycall);
                                                     else
-                                                        sprintf(strtmp, "%s-%d>APE32L", config.aprs_mycall, config.aprs_ssid);
+                                                        sprintf(strtmp, "%s-%d>APE32L", config.igate_mycall, config.igate_ssid);
                                                     tnc2Raw = String(strtmp);
                                                     tnc2Raw += ",RFONLY"; // fix path to rf only not send loop to inet
                                                     tnc2Raw += ":}";      // 3rd-party frame
@@ -10879,10 +10958,10 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     // strncpy(&text[0], aprs.dstname, aprs.dstname_len);
                     // display.print(text);
                     // String mycall = "";
-                    // if (config.aprs_ssid > 0)
-                    //     mycall = String(config.aprs_mycall) + String("-") + String(config.aprs_ssid, DEC);
+                    // if (config.igate_ssid > 0)
+                    //     mycall = String(config.igate_mycall) + String("-") + String(config.igate_ssid, DEC);
                     // else
-                    //     mycall = String(config.aprs_mycall);
+                    //     mycall = String(config.igate_mycall);
                     // if (strcmp(mycall.c_str(), text) == 0)
                     // {
                     //     display.setCursor(2, 54);
@@ -11441,10 +11520,10 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     strncpy(&text[0], aprs.dstname, aprs.dstname_len);
                     display.print(text);
                     String mycall = "";
-                    if (config.aprs_ssid > 0)
-                        mycall = String(config.aprs_mycall) + String("-") + String(config.aprs_ssid, DEC);
+                    if (config.igate_ssid > 0)
+                        mycall = String(config.igate_mycall) + String("-") + String(config.igate_ssid, DEC);
                     else
-                        mycall = String(config.aprs_mycall);
+                        mycall = String(config.igate_mycall);
                     // if (strcmp(mycall.c_str(), text) == 0)
                     // {
                     //     display.setCursor(2, 54);
@@ -12023,10 +12102,10 @@ void dispWindow(String line, uint8_t mode, bool filter)
                     strncpy(&text[0], aprs.dstname, aprs.dstname_len);
                     display.print(text);
                     String mycall = "";
-                    if (config.aprs_ssid > 0)
-                        mycall = String(config.aprs_mycall) + String("-") + String(config.aprs_ssid, DEC);
+                    if (config.igate_ssid > 0)
+                        mycall = String(config.igate_mycall) + String("-") + String(config.igate_ssid, DEC);
                     else
-                        mycall = String(config.aprs_mycall);
+                        mycall = String(config.igate_mycall);
                     memset(text, 0, sizeof(text));
                     strncpy(&text[0], aprs.msg.body, aprs.msg.body_len);
                     display.setCursor(2, 40);

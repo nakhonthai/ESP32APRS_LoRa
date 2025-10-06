@@ -29,6 +29,7 @@
 #define ACTIVATE_STATUS (1 << 6)	// packet is status
 #define ACTIVATE_WIFI (1 << 7)		// packet is wifi
 
+
 // #include <FS.h>
 // #include <SD.h>
 // #include <SPIFFS.h>
@@ -157,13 +158,13 @@ typedef struct Config_Struct
 	uint16_t rf2inetFilter;
 	uint16_t inet2rfFilter;
 	//--APRS-IS
-	uint8_t aprs_ssid;
+	uint8_t igate_ssid;
 	uint16_t aprs_port;
-	char aprs_mycall[10];
-	char aprs_host[20];
-	char aprs_passcode[6];
-	char aprs_moniCall[10];
-	char aprs_filter[30];
+	char igate_mycall[10];
+	char igate_host[20];
+	//char igate_passcode[6];
+	char igate_moniCall[10];
+	char igate_filter[30];
 	//--Position
 	bool igate_bcn;
 	bool igate_gps;
@@ -279,20 +280,20 @@ typedef struct Config_Struct
 	uint8_t tml0_data_channel[13];
 
 	// Telemetry 1
-	bool tlm1_en;
-	bool tlm1_2rf;
-	bool tlm1_2inet;
-	uint8_t tlm1_ssid;
-	char tlm1_mycall[10];
-	uint8_t tlm1_path;
-	uint16_t tlm1_data_interval;
-	uint16_t tlm1_info_interval;
-	char tlm1_PARM[13][10];
-	char tlm1_UNIT[13][8];
-	float tlm1_EQNS[5][3];
-	uint8_t tlm1_BITS_Active;
-	char tlm1_comment[COMMENT_SIZE];
-	uint8_t tml1_data_channel[13];
+	// bool tlm1_en;
+	// bool tlm1_2rf;
+	// bool tlm1_2inet;
+	// uint8_t tlm1_ssid;
+	// char tlm1_mycall[10];
+	// uint8_t tlm1_path;
+	// uint16_t tlm1_data_interval;
+	// uint16_t tlm1_info_interval;
+	// char tlm1_PARM[13][10];
+	// char tlm1_UNIT[13][8];
+	// float tlm1_EQNS[5][3];
+	// uint8_t tlm1_BITS_Active;
+	// char tlm1_comment[COMMENT_SIZE];
+	// uint8_t tml1_data_channel[13];
 
 	// OLED DISPLAY
 	bool oled_enable;
@@ -509,7 +510,11 @@ typedef struct Config_Struct
 	uint8_t igate_tlm_interval;
 	uint8_t wx_tlm_interval;
 	char host_name[32];
-
+	uint16_t reset_timeout; // minute
+	bool at_cmd_mqtt;
+	bool at_cmd_msg;
+	bool at_cmd_bluetooth;
+	uint8_t at_cmd_uart;
 } Configuration;
 
 bool saveConfiguration(const char *filename, const Configuration &config);

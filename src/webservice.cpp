@@ -348,7 +348,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 		webString += "</tr>\n";
 		webString += "<tr>\n";
 		webString += "<td>HOST</td>\n";
-		webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_host) + "</td>\n";
+		webString += "<td style=\"background: #ffffff;\">" + String(config.igate_host) + "</td>\n";
 		webString += "</tr>\n";
 		webString += "<tr>\n";
 		webString += "<td>PORT</td>\n";
@@ -419,6 +419,10 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	else if (config.bt_mode == 2)
 	{
 		btMode = "KISS";
+	}
+	else if (config.bt_mode == 3)
+	{
+		btMode = "AT COMMAND";
 	}
 	else
 	{
@@ -1525,7 +1529,7 @@ void handle_radio(AsyncWebServerRequest *request)
 						config.rf_mode = request->arg(i).toInt();
 						if (config.rf_mode == RF_MODE_AIS)
 						{
-							sprintf(config.aprs_host, "aprs.dprns.com");
+							sprintf(config.igate_host, "aprs.dprns.com");
 							config.aprs_port = 24580;
 						}
 					}
@@ -1710,7 +1714,7 @@ void handle_radio(AsyncWebServerRequest *request)
 						config.rf1_mode = request->arg(i).toInt();
 						if (config.rf1_mode == RF_MODE_AIS)
 						{
-							sprintf(config.aprs_host, "aprs.dprns.com");
+							sprintf(config.igate_host, "aprs.dprns.com");
 							config.aprs_port = 24580;
 						}
 					}
@@ -2998,17 +3002,17 @@ void handle_mqtt(AsyncWebServerRequest *request)
 		html += "<tr style=\"background:unset;\">";
 
 		String subFlageEn = "";
-		if (config.mqtt_topic_flag & MQTT_SUBSCRIBE_CMD)
+		if (config.mqtt_subscribe_flag& MQTT_SUBSCRIBE_CMD)
 			subFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"subCMD\" type=\"checkbox\" value=\"OK\" " + subFlageEn + "/>Command</td>\n";
+		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"subCMD\" type=\"checkbox\" value=\"OK\" " + subFlageEn + "/>AT-Command</td>\n";
 
 		subFlageEn = "";
-		if (config.mqtt_topic_flag & MQTT_SUBSCRIBE_TNC)
+		if (config.mqtt_subscribe_flag & MQTT_SUBSCRIBE_TNC)
 			subFlageEn = "checked";
 		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"subTNC\" type=\"checkbox\" value=\"OK\" " + subFlageEn + "/>TNC</td>\n";
 
 		subFlageEn = "";
-		if (config.mqtt_topic_flag & MQTT_SUBSCRIBE_MESSAGE)
+		if (config.mqtt_subscribe_flag & MQTT_SUBSCRIBE_MESSAGE)
 			subFlageEn = "checked";
 		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"subMsg\" type=\"checkbox\" value=\"OK\" " + subFlageEn + "/>Message</td>\n";
 		
@@ -3705,6 +3709,72 @@ void handle_mod(AsyncWebServerRequest *request)
 			html = "Save config failed.";
 			request->send(501, "text/html", html); // Not Implemented
 		}
+	}
+	else if (request->hasArg("commitCMD"))
+	{
+		bool mqtt = false;
+		bool msg = false;
+		bool bluetooth = false;
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			if (request->argName(i) == "mqtt")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						mqtt = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "msg")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						msg = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "bluetooth")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+					{
+						bluetooth = true;
+					}
+				}
+			}
+
+			if (request->argName(i) == "uart")
+			{
+				if (request->arg(i) != "")
+				{
+					if (isValidNumber(request->arg(i)))
+						config.at_cmd_uart = request->arg(i).toInt();
+				}
+			}
+
+		}
+		config.at_cmd_mqtt = mqtt;
+		config.at_cmd_msg = msg;
+		config.at_cmd_bluetooth = bluetooth;
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
+
 	}
 	else if (request->hasArg("commitPPPoS"))
 	{
@@ -4445,6 +4515,53 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		html += "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;vertical-align:top\"><td width=\"50%\" style=\"border:unset;vertical-align:top\">";
 
+		/************************ AT-COMMAND **************************/
+		html += "<form id='formATCommand' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
+		html += "<table>\n";
+		html += "<th colspan=\"2\"><span><b>AT-COMMAND CHANNEL</b></span></th>\n";
+		html += "<tr>\n";
+		html += "<td width=\"150\" align=\"right\"><b>MQTT:</b></td>\n";
+		String cmdFlag = "";
+		if (config.at_cmd_mqtt)
+			cmdFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"mqtt\" value=\"OK\" " + cmdFlag + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>MESSAGE:</b></td>\n";		
+		cmdFlag = "";
+		if (config.at_cmd_msg)
+			cmdFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"msg\" value=\"OK\" " + cmdFlag + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>BLUETOOTH:</b></td>\n";
+		cmdFlag = "";
+		if (config.at_cmd_bluetooth)
+			cmdFlag = "checked";
+		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"bluetooth\" value=\"OK\" " + cmdFlag + "><span class=\"slider round\"></span></label></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
+		html += "<td align=\"right\"><b>UART PORT:</b></td>\n";
+		html += "<td style=\"text-align: left;\">\n";
+		html += "<select name=\"uart\" id=\"cmdUart\">\n";
+		for (int i = 0; i < 5; i++)
+		{
+			if (config.at_cmd_uart == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(TNC_PORT[i]) + " </option>\n";
+			else
+				html += "<option value=\"" + String(i) + "\" >" + String(TNC_PORT[i]) + " </option>\n";
+		}
+		html += "</select>\n";
+		html += "</td>\n";
+		html += "</tr>\n";
+
+		html += "<tr><td colspan=\"2\" align=\"right\">\n";
+		html += "<div><button class=\"button\" type='submit' id='submitCMD'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "<input type=\"hidden\" name=\"commitCMD\"/>\n";
+		html += "</td></tr></table><br />\n";
+		html += "</form><br />";
+
 		/************************ PPPoS **************************/
 
 		html += "<form id='formPPPoS' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
@@ -4663,6 +4780,33 @@ void handle_system(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+	else if (request->hasArg("updateAutoReset"))
+	{
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+
+			if (request->argName(i) == "SetAutoReset")
+			{
+				if (request->arg(i) != "")
+				{
+					config.reset_timeout = request->arg(i).toInt();
+				}
+				break;
+			}
+		}
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
+	}
+			
 	else if (request->hasArg("updateTime"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
@@ -5343,6 +5487,14 @@ void handle_system(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 
 		html += "<tr>\n";
+		html += "<td style=\"text-align: right;\">Auto REBOOT:</td>\n";
+		html += "<td style=\"text-align: left;\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formAutoReset\" method=\"post\"><input  min=\"0\" max=\"65535\"  name=\"SetAutoReset\" type=\"number\" value=\"" + String(config.reset_timeout) + "\" /> Minutes\n";
+		html += "<button type='submit' id='updateAutoReset'  name=\"commit\"> Update </button> *<i>0=No reset</i>\n";
+		html += "<input type=\"hidden\" name=\"updateAutoReset\"/></form>\n</td>\n";
+		// html += "<input class=\"button\" id=\"updateTimeNtp\" name=\"updateTimeNtp\" type=\"submit\" value=\"NTP Update\" maxlength=\"80\"/></td>\n";
+		html += "</tr>\n";
+
+		html += "<tr>\n";
 		html += "<td style=\"text-align: right;\">Time Zone:</td>\n";
 		html += "<td style=\"text-align: left;\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formTimeZone\" method=\"post\">\n";
 		html += "<select name=\"SetTimeZone\" id=\"SetTimeZone\">\n";
@@ -5805,7 +5957,7 @@ void handle_igate(AsyncWebServerRequest *request)
 					String name = request->arg(i);
 					name.trim();
 					name.toUpperCase();
-					strcpy(config.aprs_mycall, name.c_str());
+					strcpy(config.igate_mycall, name.c_str());
 				}
 			}
 			if (request->argName(i) == "igateObject")
@@ -5826,9 +5978,9 @@ void handle_igate(AsyncWebServerRequest *request)
 				if (request->arg(i) != "")
 				{
 					if (isValidNumber(request->arg(i)))
-						config.aprs_ssid = request->arg(i).toInt();
-					if (config.aprs_ssid > 15)
-						config.aprs_ssid = 13;
+						config.igate_ssid = request->arg(i).toInt();
+					if (config.igate_ssid > 15)
+						config.igate_ssid = 13;
 				}
 			}
 			if (request->argName(i) == "igatePosInv")
@@ -5899,7 +6051,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.aprs_host, request->arg(i).c_str());
+					strcpy(config.igate_host, request->arg(i).c_str());
 				}
 			}
 			if (request->argName(i) == "aprsPort")
@@ -5914,7 +6066,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.aprs_filter, request->arg(i).c_str());
+					strcpy(config.igate_filter, request->arg(i).c_str());
 				}
 			}
 			if (request->argName(i) == "igatePath")
@@ -6351,7 +6503,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Station Callsign:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"" + String(config.aprs_mycall) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"" + String(config.igate_mycall) + "\" /></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Station SSID:</b></td>\n";
@@ -6359,7 +6511,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "<select name=\"mySSID\" id=\"mySSID\">\n";
 		for (uint8_t ssid = 0; ssid <= 15; ssid++)
 		{
-			if (config.aprs_ssid == ssid)
+			if (config.igate_ssid == ssid)
 			{
 				html += "<option value=\"" + String(ssid) + "\" selected>" + String(ssid) + "</option>\n";
 			}
@@ -6403,7 +6555,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Host:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"20\" size=\"20\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.aprs_host) + "\" /> *APRS-IS by T2THAI at <a href=\"http://aprs.dprns.com:14501\" target=\"_t2thai\">aprs.dprns.com:14580</a>,CBAPRS at <a href=\"http://aprs.dprns.com:24501\" target=\"_t2thai\">aprs.dprns.com:24580</a></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"20\" size=\"20\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"" + String(config.igate_host) + "\" /> *APRS-IS by T2THAI at <a href=\"http://aprs.dprns.com:14501\" target=\"_t2thai\">aprs.dprns.com:14580</a>,CBAPRS at <a href=\"http://aprs.dprns.com:24501\" target=\"_t2thai\">aprs.dprns.com:24580</a></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Port:</b></td>\n";
@@ -6411,7 +6563,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Server Filter:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"30\" size=\"30\" id=\"aprsFilter\" name=\"aprsFilter\" type=\"text\" value=\"" + String(config.aprs_filter) + "\" /> *Filter: <a target=\"_blank\" href=\"http://www.aprs-is.net/javAPRSFilter.aspx\">http://www.aprs-is.net/javAPRSFilter.aspx</a></td>\n";
+		html += "<td style=\"text-align: left;\"><input maxlength=\"30\" size=\"30\" id=\"aprsFilter\" name=\"aprsFilter\" type=\"text\" value=\"" + String(config.igate_filter) + "\" /> *Filter: <a target=\"_blank\" href=\"http://www.aprs-is.net/javAPRSFilter.aspx\">http://www.aprs-is.net/javAPRSFilter.aspx</a></td>\n";
 		html += "</tr>\n";
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
@@ -9813,6 +9965,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		String btModeOff = "";
 		String btModeTNC2 = "";
 		String btModeKISS = "";
+		String btModeATCommand = "";
 		if (config.bt_mode == 1)
 		{
 			btModeTNC2 = "selected";
@@ -9821,6 +9974,10 @@ void handle_wireless(AsyncWebServerRequest *request)
 		{
 			btModeKISS = "selected";
 		}
+		else if (config.bt_mode == 3)
+		{
+			btModeATCommand = "selected";
+		}
 		else
 		{
 			btModeOff = "selected";
@@ -9828,6 +9985,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		html += "<option value=\"0\" " + btModeOff + ">NONE</option>\n";
 		html += "<option value=\"1\" " + btModeTNC2 + ">TNC2</option>\n";
 		html += "<option value=\"2\" " + btModeKISS + ">KISS</option>\n";
+		html += "<option value=\"3\" " + btModeATCommand + ">CMD</option>\n";
 		html += "</select></td>\n";
 
 		// html += "<label style=\"font-size: 8pt;text-align: right;\">*See the following for generating UUIDs: <a href=\"https://www.uuidgenerator.net\" target=\"_blank\">https://www.uuidgenerator.net</a></label></td>\n";
@@ -10060,7 +10218,7 @@ void handle_test(AsyncWebServerRequest *request)
 	webString += "</head><body>\n<table>\n";
 	// webString += "<tr><td><form accept-charset=\"UTF-8\" action=\"/test\" class=\"form-horizontal\" id=\"test_form\" method=\"post\">\n";
 	// webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"btn btn-danger\" name=\"sendBeacon\" value='SEND BEACON'></div><br />\n";
-	// webString += "<div style=\"margin-left: 20px;\">TNC2 RAW: <input id=\"raw\" name=\"raw\" type=\"text\" size=\"60\" value=\"" + String(config.aprs_mycall) + ">APE32I,WIDE1-1:>Test Status\"/></div>\n";
+	// webString += "<div style=\"margin-left: 20px;\">TNC2 RAW: <input id=\"raw\" name=\"raw\" type=\"text\" size=\"60\" value=\"" + String(config.igate_mycall) + ">APE32I,WIDE1-1:>Test Status\"/></div>\n";
 	// webString += "<div style=\"margin-left: 20px;\"><input type='submit' class=\"button\" name=\"sendRaw\" value='SEND RAW'></div> <br />\n";
 	// webString += "</form></td></tr>\n";
 	// webString += "<tr><td><hr width=\"80%\" /></td></tr>\n";
