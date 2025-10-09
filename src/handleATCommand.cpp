@@ -6,6 +6,7 @@ extern Configuration config;
 
   String handleATCommand(String cmd) {
     cmd.trim();
+    if(!cmd.startsWith("AT")) return "";
     if (cmd == "AT") return "OK";
 
   if (cmd == "AT+TIMEZONE?") return String(config.timeZone, 6);

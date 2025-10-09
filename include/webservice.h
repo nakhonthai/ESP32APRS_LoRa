@@ -134,5 +134,6 @@ void handle_ws();
 void handle_ws_gnss(char *nmea);
 void handle_ws_gnss(char *nmea, size_t size);
 void event_lastHeard();
+String event_chatMessage();
 
 #endif

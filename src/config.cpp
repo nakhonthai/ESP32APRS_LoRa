@@ -524,6 +524,16 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["cmdOnBluetooth"] = config.at_cmd_bluetooth;
     doc["cmdOnUart"] = config.at_cmd_uart;
 
+    doc["msgEnable"] = config.msg_enable;
+    doc["msgMycall"] = config.msg_mycall;
+    doc["msgRf"] = config.msg_rf;
+    doc["msgInet"] = config.msg_inet;
+    doc["msgPath"] = config.msg_path;
+    doc["msgEncrypt"] = config.msg_encrypt;
+    doc["msgAESKey"] = config.msg_key;
+    doc["msgRetry"] = config.msg_retry;
+    doc["msgInterval"] = config.msg_interval;
+
     // Serialize JSON to file
     if (serializeJson(doc, file) == 0)
     {
@@ -1023,6 +1033,16 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.at_cmd_msg = doc["cmdOnMsg"];
         config.at_cmd_bluetooth = doc["cmdOnBluetooth"];
         config.at_cmd_uart = doc["cmdOnUart"];
+
+        config.msg_enable = doc["msgEnable"];
+        config.msg_path = doc["msgPath"];
+        config.msg_rf = doc["msgRf"];
+        config.msg_inet = doc["msgInet"];
+        config.msg_encrypt = doc["msgEncrypt"];
+        config.msg_retry = doc["msgRetry"];
+        config.msg_interval = doc["msgInterval"];
+        strlcpy(config.msg_key, doc["msgAESKey"] | "", sizeof(config.msg_key));
+        strlcpy(config.msg_mycall, doc["msgMycall"] | "", sizeof(config.msg_mycall));
 
         // Close the file (Curiously, File's destructor doesn't close the file)
         // f.close();

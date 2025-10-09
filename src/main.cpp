@@ -23,6 +23,7 @@
 #include "cppQueue.h"
 #include "digirepeater.h"
 #include "igate.h"
+#include "message.h"
 #include "wireguardif.h"
 #include "wireguard.h"
 #include "driver/pcnt.h"
@@ -476,6 +477,8 @@ RTC_DATA_ATTR double LastLat, LastLng;
 RTC_DATA_ATTR time_t lastTimeStamp;
 RTC_DATA_ATTR uint32_t COUNTER0_RAW;
 RTC_DATA_ATTR uint32_t COUNTER1_RAW;
+
+extern msgType *msgQueue;
 
 extern RTC_DATA_ATTR uint8_t digiCount;
 
@@ -4373,6 +4376,7 @@ void setup()
         pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
         Telemetry = (TelemetryType *)ps_malloc(sizeof(TelemetryType) * TLMLISTSIZE);
         txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
+        msgQueue = (msgType *)ps_malloc(sizeof(msgType) * PKGLISTSIZE);
         // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
     }
     else
@@ -4380,17 +4384,20 @@ void setup()
         pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
         Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
         txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
+        msgQueue = (msgType *)malloc(sizeof(msgType) * PKGLISTSIZE);
     }
 #else
     pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
     txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
+    msgQueue = (msgType *)malloc(sizeof(msgType) * PKGLISTSIZE);
     // TNC2Raw = (int *)malloc(sizeof(int) * PKGTXSIZE);
 #endif
 
     memset(pkgList, 0, sizeof(pkgListType) * PKGLISTSIZE);
     memset(Telemetry, 0, sizeof(TelemetryType) * TLMLISTSIZE);
     memset(txQueue, 0, sizeof(txQueueType) * PKGTXSIZE);
+    memset(msgQueue, 0, sizeof(msgType) * PKGLISTSIZE);
 
     // pinMode(9, INPUT_PULLUP); // BOOT Button
     if (LED_RX > -1)
@@ -8244,10 +8251,12 @@ void taskSerial(void *pvParameters)
 long timeSlot;
 unsigned long iGatetickInterval;
 unsigned long WxInterval;
+unsigned long msgInterval;
 bool initInterval = true;
 int trkTlmInvCount = 0;
 int igateTlmInvCount = 0;
 int digiTlmInvCount = 0;
+
 void taskAPRS(void *pvParameters)
 {
     char sts[50];
@@ -8277,6 +8286,8 @@ void taskAPRS(void *pvParameters)
     timeAprs = 0;
 
     timeSlot = millis();
+
+    msgInterval=millis()+30000;
 
     tx_interval = config.trk_interval;
     initInterval = true;
@@ -8310,6 +8321,12 @@ void taskAPRS(void *pvParameters)
         timerAPRS = micros() - timerAPRS_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerAPRS_old = micros();
+
+        if(now>msgInterval)
+        {
+            msgInterval=millis()+config.msg_interval;
+            sendAPRSMessageRetry();
+        }
 
 #ifdef BLUETOOTH
 #if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
@@ -8859,6 +8876,10 @@ void taskAPRS(void *pvParameters)
 #endif
                     free(rawP);
                 }
+            }
+            if(type & FILTER_MESSAGE)
+            {
+                handleIncomingAPRS(tnc2);
             }
             lastPkg = true;
             lastPkgRaw = tnc2;
@@ -10049,6 +10070,10 @@ void taskNetwork(void *pvParameters)
                                     memcpy(raw, info.c_str(), info.length());
 
                                     uint16_t type = pkgType(&raw[0]);
+                                    if(type & FILTER_MESSAGE)
+                                    {
+                                        handleIncomingAPRS(line);
+                                    }
                                     int start_dstssid = line.indexOf("-", 1); // get SSID -
                                     if (start_dstssid < 0)
                                         start_dstssid = line.indexOf(" ", 1); // get ssid space

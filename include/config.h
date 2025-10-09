@@ -515,6 +515,18 @@ typedef struct Config_Struct
 	bool at_cmd_msg;
 	bool at_cmd_bluetooth;
 	uint8_t at_cmd_uart;
+
+	//Message
+	bool msg_enable;
+	char msg_mycall[10];
+	uint8_t msg_path;
+	bool msg_rf;
+	bool msg_inet;
+	bool msg_encrypt;
+	char msg_key[33];
+	uint8_t msg_retry;
+	uint16_t msg_interval;
+
 } Configuration;
 
 bool saveConfiguration(const char *filename, const Configuration &config);
