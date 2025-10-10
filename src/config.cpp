@@ -1034,15 +1034,27 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.at_cmd_bluetooth = doc["cmdOnBluetooth"];
         config.at_cmd_uart = doc["cmdOnUart"];
 
-        config.msg_enable = doc["msgEnable"];
-        config.msg_path = doc["msgPath"];
-        config.msg_rf = doc["msgRf"];
-        config.msg_inet = doc["msgInet"];
-        config.msg_encrypt = doc["msgEncrypt"];
-        config.msg_retry = doc["msgRetry"];
-        config.msg_interval = doc["msgInterval"];
-        strlcpy(config.msg_key, doc["msgAESKey"] | "", sizeof(config.msg_key));
-        strlcpy(config.msg_mycall, doc["msgMycall"] | "", sizeof(config.msg_mycall));
+        if(doc["msgEnable"].isNull()){ //old version compatibility
+            config.msg_enable = true;
+            config.msg_encrypt = false;
+            config.msg_rf = true;
+            config.msg_inet = true;
+            config.msg_retry = 3;
+            config.msg_interval = 30000;
+            config.msg_path = 1;
+            sprintf(config.msg_key, "8EC8233E91D59B0164C24E771BA66307");
+            sprintf(config.msg_mycall, "NOCALL");
+        }else{
+            config.msg_enable = doc["msgEnable"];
+            config.msg_path = doc["msgPath"];
+            config.msg_rf = doc["msgRf"];
+            config.msg_inet = doc["msgInet"];
+            config.msg_encrypt = doc["msgEncrypt"];
+            config.msg_retry = doc["msgRetry"];
+            config.msg_interval = doc["msgInterval"];
+            strlcpy(config.msg_key, doc["msgAESKey"] | "", sizeof(config.msg_key));
+            strlcpy(config.msg_mycall, doc["msgMycall"] | "", sizeof(config.msg_mycall));
+        }
 
         // Close the file (Curiously, File's destructor doesn't close the file)
         // f.close();

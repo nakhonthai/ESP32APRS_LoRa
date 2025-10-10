@@ -210,8 +210,6 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "</body>\n";
 	webString += "</html>";
 	request->send(200, "text/html", webString); // send to someones browser when asked
-												// event_lastHeard();
-												// lastHeard_Flag = true;
 }
 
 ////////////////////////////////////////////////////////////
@@ -250,6 +248,21 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "setTimeout(reloadSidebarInfo, 200);\n";
 	webString += "$(window).trigger('resize');\n";
 
+	webString += "if (!!window.EventSource) {";
+	webString += "var source = new EventSource('/eventHeard');";
+
+	webString += "source.addEventListener('open', function(e) {";
+	webString += "console.log(\"Events Connected\");";
+	webString += "}, false);";
+	webString += "source.addEventListener('error', function(e) {";
+	webString += "if (e.target.readyState != EventSource.OPEN) {";
+	webString += "console.log(\"Events Disconnected\");";
+	webString += "}\n}, false);";
+	webString += "source.addEventListener('lastHeard', function(e) {";
+	// webString += "console.log(\"lastHeard\", e.data);";
+	webString += "var lh=document.getElementById(\"lastHeard\");";
+	webString += "if(lh != null) {lh.innerHTML = e.data;}";
+	webString += "}, false);\n}";
 	webString += "</script>\n";
 
 	webString += "<div id=\"sysInfo\">\n";
@@ -777,8 +790,6 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 				aprs.dstcall_end = &aprs.data[end_ssid];
 				aprs.srccall_end = &aprs.data[start_dst];
 
-				// Serial.println(aprs.info_start);
-				// aprsParse.parse_aprs(&aprs);
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
@@ -948,11 +959,11 @@ void handle_lastHeard(AsyncWebServerRequest *request)
 	// html.clear();
 }
 
-void event_lastHeard()
+String event_lastHeard()
 {
 	// log_d("Event count: %d",lastheard_events.count());
-	if (lastheard_events.count() == 0)
-		return;
+	//if (lastheard_events.count() == 0)
+	//	return "NO Count";
 
 	struct pbuf_t aprs;
 	ParseAPRS aprsParse;
@@ -1041,8 +1052,6 @@ void event_lastHeard()
 				aprs.dstcall_end = &aprs.data[end_ssid];
 				aprs.srccall_end = &aprs.data[start_dst];
 
-				// Serial.println(aprs.info_start);
-				// aprsParse.parse_aprs(&aprs);
 				if (aprsParse.parse_aprs(&aprs))
 				{
 					pkg.calsign[10] = 0;
@@ -1198,10 +1207,11 @@ void event_lastHeard()
 	if (info)
 	{
 		html.toCharArray(info, len, 0);
-		html.clear();
+		// html.clear();
 		lastheard_events.send(info, "lastHeard", millis(), 10000);
 		free(info);
 	}
+	return html;
 	// lastheard_events.send(html.c_str(), "lastHeard", millis());
 }
 
@@ -1211,50 +1221,13 @@ String event_chatMessage()
 	// if (message_events.count() == 0)
 	//	return "NO";
 
-	// struct pbuf_t aprs;
-	// ParseAPRS aprsParse;
 	struct tm tmstruct, tmNow;
 
 	String html = "";
 
 	time_t timen = time(NULL);
 	localtime_r(&timen, &tmNow);
-	// String html = "<script type=\"text/javascript\">\n";
-	// html += "$(document).ready(function () {";
-	// 	html += "const sendMessageButton = document.getElementById('sendMessageButton');";
-	// 	//html += "const formMessage = document.getElementById('formMsg');";
-	// 	html += "const callSign = document.getElementById('toCall);";
-	// 	html += "const msgInput = document.getElementById('msg);";
 
-	// 	html += "sendMessageButton.addEventListener('click', () => {\n";
-
-	// html += "e.preventDefault();\n";
-	// html += "var data = new FormData(formMessage);\n";
-	// html += "console.log(data);";
-	// 		html += "var formData = {\n";
-	//       html += "toCall: $(\"#toCall\").val(),";
-	//       html += "msg: $(\"#msg\").val(),commitChat:\"\"\n};";
-	// html += "console.log(formData);";
-	// 		//html += "if(e.currentTarget.id===\"formVPN\") document.getElementById(\"submitMSG\").disabled=true;\n";
-	// 		html += "$.ajax({\n";
-	// 		html += "url: '/msg',\n";
-	// 		html += "type: 'POST',\n";
-	// 		html += "data: formData,\n";
-	// 		html += "contentType: false,\n";
-	// 		html += "processData: false,\n";
-	// 		html += "success: function (data) {\n";
-	// 		html += "alert(\"Submited Successfully\");\n";
-	// 		html += "},\n";
-	// 		html += "error: function (data) {\n";
-	// 		html += "alert(\"An error occurred.\");\n";
-	// 		html += "}\n";
-	// 		html += "});\n";
-	// 		html += "});\n";
-	// 		html += "});\n";
-	// 		html += "</script>\n";
-
-	// html += "<table width=\"90%\">\n";
-	// html += "<th colspan=\"5\" style=\"background-color: #070ac2;\">CHAT MESSAGE</th>\n";
 	html += "<tr>\n";
 	html += "<th style=\"width:60pt\"><span><b>Time (";
 	if (config.timeZone >= 0)
@@ -1264,12 +1237,12 @@ String event_chatMessage()
 		html += String((int)config.timeZone) + ")</b></span></th>\n";
 	else
 		html += String(config.timeZone, 1) + ")</b></span></th>\n";
-	//html += "<th style=\"min-width:16px\">ICON</th>\n";
+	// html += "<th style=\"min-width:16px\">ICON</th>\n";
 
-		html += "<th style=\"width:70pt\">Callsign</th>\n";
-		html += "<th>Message</th>\n";
-		html += "<th style=\"width:10pt\">ACK</th>\n";
-		html += "<th style=\"width:20pt\">msgID</th>\n";
+	html += "<th style=\"width:70pt\">Callsign</th>\n";
+	html += "<th>Message</th>\n";
+	html += "<th style=\"width:10pt\">ACK</th>\n";
+	html += "<th style=\"width:20pt\">msgID</th>\n";
 	html += "</tr>\n";
 
 	for (int i = 0; i < PKGLISTSIZE; i++)
@@ -1292,48 +1265,44 @@ String event_chatMessage()
 				sprintf(strTime, "%dd %02d:%02d", tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min);
 			// String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
 
-			if(pkg.ack>0){
+			if (pkg.ack > 0)
+			{
 				html += "<tr style=\"background-color: #f1697dff;\">";
-			}else if(pkg.ack<0){
+			}
+			else if (pkg.ack == -1)
+			{
 				html += "<tr style=\"background-color: #7ff1c5ff;\">";
-			}else{
-				html += "<tr style=\"background-color: #a9b2e4ff;\">";
+			}
+			else if (pkg.ack == -2)
+			{
+				html += "<tr style=\"background-color: #73caf0ff;\">";
+			}
+			else
+			{
+				html += "<tr style=\"background-color: #f55353ff;\">";
 			}
 			html += "<td>" + String(strTime) + "</td>";
 			html += "<td>" + String(pkg.callsign) + "</td>";
 			html += "<td style=\"text-align: left;\">" + String(pkg.text) + "</td>";
-			if(pkg.ack>0){
-				html += "<td>" + String(pkg.ack)+"/"+String(config.msg_retry) + "</td>";
-			}else if(pkg.ack<0){
+			if (pkg.ack > 0)
+			{
+				html += "<td>" + String(pkg.ack) + "/" + String(config.msg_retry) + "</td>";
+			}
+			else if (pkg.ack == -1)
+			{
 				html += "<td>RX</td>";
-			}else{
+			}
+			else if (pkg.ack == -2)
+			{
 				html += "<td>TX</td>";
+			}
+			else
+			{
+				html += "<td>TF</td>";
 			}
 			html += "<td>" + String(pkg.msgID) + "</td></tr>";
 		}
 	}
-	//html += "</table>\n";
-	//  html += "<tr><td colspan=\"5\">";
-
-	// //html += "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"formMsg\" method=\"post\">\n";
-	// 	html += "<table>\n";
-
-	// 	html += "<tr>\n";
-	// 	//html += "<td align=\"right\"><b>TO:</b></td>\n";
-	// 	//html += "<td style=\"text-align: left;\"><input size=\"10\" name=\"toCall\" type=\"text\" value=\"\" /></td>\n";
-	// 	html += "<td align=\"left\"><b>TO:</b><input size=\"10\" name=\"toCall\" id=\"toCall\" type=\"text\" value=\"\" /> <b>MSG:</b><input size=\"80\" name=\"msg\" id=\"msg\" type=\"text\" value=\"\" /></td>\n";
-	// 	//html += "</tr>\n";
-
-	// 	html += "<td align=\"right\">\n";
-	// 	//html += "<input class=\"button\" id=\"submitChat\" name=\"commitChat\" type=\"submit\" value=\"Send\"/>\n";
-	// 	html += "<input type=\"hidden\" name=\"commitChat\"/>\n";
-	// 	//html += "</form><br />\n";
-	// 	html += "<button id=\"sendMessageButton\">Send</button>";
-	// 	html += "</td></tr></table>\n";
-	// 	//html += "</form><br />\n";
-
-	// html += "</td></tr></table>";
-	// log_d("HTML Length=%d Byte",html.length());
 	size_t len = html.length();
 	char *info = (char *)calloc(len, sizeof(char));
 	if (info)
@@ -3302,7 +3271,7 @@ void handle_msg(AsyncWebServerRequest *request)
 		config.msg_rf = msgRf;
 		config.msg_inet = msgInet;
 		config.msg_encrypt = msgEncrypt;
-		clientMQTT.disconnect();
+
 		String html;
 		if (saveConfiguration("/default.cfg", config))
 		{
@@ -3338,10 +3307,7 @@ void handle_msg(AsyncWebServerRequest *request)
 		html += "}\n";
 		html += "});\n";
 		html += "});\n";
-		// 	html += "function reloadChatMsg() {\n";
-		// html += "$(\"#chatMsg\").load(\"/chatMsg\", function () { setTimeout(reloadChatMsg, 10000) });\n";
-		// html += "}\n";
-		// html += "setTimeout(reloadChatMsg, 200);\n";
+
 		html += "if (!!window.EventSource) {";
 		html += "var source = new EventSource('/eventMsg');";
 
@@ -3350,7 +3316,7 @@ void handle_msg(AsyncWebServerRequest *request)
 		html += "}, false);";
 		html += "source.addEventListener('error', function(e) {";
 		html += "if (e.target.readyState != EventSource.OPEN) {";
-		html += "console.log(\"Events Disconnected\");";
+		html += "console.log(\"Events MSG Disconnected\");";
 		html += "}\n}, false);";
 		html += "source.addEventListener('chatMsg', function(e) {";
 		// webString += "console.log(\"lastHeard\", e.data);";
@@ -3374,7 +3340,7 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>My Callsign:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input  size=\"20\" maxlength=\"9\" name=\"mycall\" type=\"text\" value=\"" + String(config.msg_mycall) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input  size=\"20\" maxlength=\"9\" name=\"mycall\" type=\"text\" value=\"" + String(config.msg_mycall) + "\" /> *<i>Callsign with SSID (Ex. HS5TQA-12)</i></td>\n";
 		html += "</tr>\n";
 
 		String msg2RFFlag = "";
@@ -3395,17 +3361,17 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>AES Key:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input  size=\"33\" maxlength=\"33\" name=\"key\" type=\"text\" value=\"" + String(config.msg_key) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input  size=\"40\" maxlength=\"33\" name=\"key\" type=\"text\" value=\"" + String(config.msg_key) + "\" /> *<i>ASCI HEX 16Byte</i></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Send Retry:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"5\"  maxlength=\"5\"  name=\"retry\" type=\"number\" value=\"" + String(config.msg_retry) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input  min=\"0\" max=\"99\"   name=\"retry\" type=\"number\" value=\"" + String(config.msg_retry) + "\" /></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Send Timeout:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"5\"  maxlength=\"5\"  name=\"timeout\" type=\"number\" value=\"" + String(config.msg_interval) + "\" /></td>\n";
+		html += "<td style=\"text-align: left;\"><input  min=\"10000\" max=\"99999\"   name=\"timeout\" type=\"number\" value=\"" + String(config.msg_interval) + "\" /> msec.</td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -3433,20 +3399,7 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "<table width=\"90%\">\n";
 		html += "<th style=\"background-color: #070ac2;\">CHAT MESSAGE</th>\n";
-		// html += "<tr>\n";
-		// html += "<th style=\"width:60pt\"><span><b>Time (";
-		// if (config.timeZone >= 0)
-		// 	html += "+";
 
-		// if (config.timeZone == (int)config.timeZone)
-		// 	html += String((int)config.timeZone) + ")</b></span></th>\n";
-		// else
-		// 	html += String(config.timeZone, 1) + ")</b></span></th>\n";
-
-		// html += "<th style=\"width:70pt\">Callsign</th>\n";
-		// html += "<th>Message</th>\n";
-		// html += "<th style=\"mwidth:10pt\">ACK</th>\n";
-		// html += "<th style=\"width:20pt\">msgID</th>\n";
 		html += "<tr><td>\n";
 		html += "<table id=\"chatMsg\">\n";
 		html += "</table>\n";
@@ -3468,7 +3421,6 @@ void handle_msg(AsyncWebServerRequest *request)
 		html += "</td></tr></table>";
 
 		request->send(200, "text/html", html); // send to someones browser when asked
-		event_lastHeard();
 	}
 }
 
@@ -11161,9 +11113,10 @@ void webService()
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
-    client->send("hello!", NULL, millis(), 10000); });
-
+	String html = event_lastHeard();
+    client->send(html.c_str(), NULL, millis(), 10000); });
 	async_server.addHandler(&lastheard_events);
+
 	message_events.onConnect([](AsyncEventSourceClient *client)
 							 {
     if(client->lastId()){

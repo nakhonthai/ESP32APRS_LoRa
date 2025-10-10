@@ -299,10 +299,10 @@ int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack)
     psramBusy = true;
 #endif
     int i = -1;
-    if (ack > 0) // Check ACK to update
-    {
+    //if (ack > 0) // Check ACK to update
+    //{
         i = pkgMsg_Find(call, msg_id);
-    }
+    //}
 
     if (i < 0)
     {
@@ -427,7 +427,7 @@ void sendAPRSMessageRetry()
                 path += ",";
                 path += getPath(config.msg_path);
             }
-            String packet = String(config.msg_mycall) + ">APE32L" + path + "::" + String(toCallFixed) + ":" + encrypted + "{" + String(msgQueue[i].ack);
+            String packet = String(config.msg_mycall) + ">APE32L" + path + "::" + String(toCallFixed) + ":" + encrypted + "{" + String(msgQueue[i].msgID);
             uint8_t SendMode = 0;
             if (config.msg_rf)
                 SendMode |= RF_CHANNEL;
@@ -473,6 +473,7 @@ void sendAPRSAck(const String &toCall, const String &msgNo)
 // ===== จัดการข้อความขาเข้า =====
 void handleIncomingAPRS(const String &line)
 {
+    if(config.msg_enable == false) return;
     // ตัวอย่างการกรองข้อความที่มีรูปแบบ Message
     int msgPos = line.indexOf("::");
     if (msgPos <= 0)
@@ -515,7 +516,7 @@ void handleIncomingAPRS(const String &line)
                 log_d("Message ACk from %s msgNo %d msgQueue %i", toCall.c_str(), msgNo.toInt(), i);
                 if (i > -1)
                 {
-                    msgQueue[i].ack = 0;
+                    msgQueue[i].ack = -2; // ตอบรับแล้ว
                     event_chatMessage();
                 }
                 return;

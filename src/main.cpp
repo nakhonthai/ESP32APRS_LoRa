@@ -2833,6 +2833,29 @@ void defaultConfig()
     config.i2c1_sck_pin = -1;
     config.i2c1_freq = 100000;
 
+    #ifdef BLUETOOTH
+    config.at_cmd_bluetooth = true;
+    #else
+    config.at_cmd_bluetooth = false;
+    #endif
+    #ifdef MQTT
+    config.at_cmd_mqtt = true;
+    #else
+    config.at_cmd_mqtt = false;
+    #endif
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 0;
+
+    config.msg_enable = true;
+    config.msg_encrypt = false;
+    config.msg_rf = true;
+    config.msg_inet = true;
+    config.msg_retry = 3;
+    config.msg_interval = 30000;
+    config.msg_path = 1;
+    sprintf(config.msg_key, "8EC8233E91D59B0164C24E771BA66307");
+    sprintf(config.msg_mycall, "NOCALL");
+
 #ifdef TTGO_LORA32_V1
     config.rf_en = true;
     config.rf_type = RF_SX1276;
@@ -3102,6 +3125,8 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 2;
 #elif defined(T_BEAM_S3_SUPREME)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3133,6 +3158,8 @@ void defaultConfig()
     config.i2c1_enable = true;
     config.i2c1_sda_pin = PMU_I2C_SDA;
     config.i2c1_sck_pin = PMU_I2C_SCL;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 4;
 #elif defined(T_BEAM_S3_BPF)
     config.rf_en = true;
     config.rf_type = RF_SX1278;
@@ -3172,6 +3199,8 @@ void defaultConfig()
     config.i2c1_sda_pin = -1;
     config.i2c1_sck_pin = -1;    
     config.oled_enable = true;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 4;
 #elif defined(HELTEC_V3_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3200,6 +3229,8 @@ void defaultConfig()
     config.i2c_sck_pin = 18;
     config.pwr_gpio = 36;
     config.pwr_active = 0;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 2;
 #elif defined(APRS_LORA_HT)
     config.rf_en = true;
     config.rf_type = RF_SX1268;
@@ -3230,6 +3261,8 @@ void defaultConfig()
     config.pwr_active = 1;
     sprintf(config.wifi_ap_ssid, "LoRa_HT");
     sprintf(config.wifi_ap_pass, "aprsthnetwork");
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 4;
 #elif defined(HELTEC_HTIT_TRACKER)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3258,6 +3291,8 @@ void defaultConfig()
     config.i2c_sck_pin = -1;
     config.pwr_gpio = 3;
     config.pwr_active = 1;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 4;
 #elif defined(APRS_LORA_DONGLE)
     config.rf_en = true;
     config.rf_type = RF_SX1278;
@@ -3298,6 +3333,8 @@ void defaultConfig()
     config.i2c_sck_pin = 47;
     config.pwr_gpio = 17;
     config.pwr_active = 1;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 4;
 #elif defined(NAWS4)
     config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
     config.rf_rx_gpio = -1;
@@ -3366,7 +3403,7 @@ void defaultConfig()
     sprintf(config.path[3], "RFONLY");
 
     config.log = 0;
-
+#ifdef MQTT
     config.en_mqtt = false;
     sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
     sprintf(config.mqtt_topic, "/APRS/TNC2");
@@ -3374,6 +3411,7 @@ void defaultConfig()
     config.mqtt_user[0]=0;
     config.mqtt_pass[0]=0;
     config.mqtt_port = 1883;
+#endif
 
     config.ppp_enable = false;
     sprintf(config.ppp_apn, "internet");
@@ -8877,7 +8915,7 @@ void taskAPRS(void *pvParameters)
                     free(rawP);
                 }
             }
-            if(type & FILTER_MESSAGE)
+            if(config.msg_enable && (type & FILTER_MESSAGE))
             {
                 handleIncomingAPRS(tnc2);
             }
