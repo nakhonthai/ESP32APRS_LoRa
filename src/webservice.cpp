@@ -16,7 +16,6 @@
 #include <LibAPRSesp.h>
 #include <parse_aprs.h>
 #include "jquery_min_js.h"
-#include "message.h"
 
 AsyncWebServer async_server(80);
 AsyncWebServer async_websocket(81);
@@ -146,6 +145,22 @@ void setMainPage(AsyncWebServerRequest *request)
 	webString += "if(lh != null) {lh.innerHTML = e.data;}";
 	webString += "}, false);\n}";
 
+	webString += "if (!!window.EventSource) {";
+		webString += "var source = new EventSource('/eventMsg');";
+
+		webString += "source.addEventListener('open', function(e) {";
+		webString += "console.log(\"Events MSG Connected\");";
+		webString += "}, false);";
+		webString += "source.addEventListener('error', function(e) {";
+		webString += "if (e.target.readyState != EventSource.OPEN) {";
+		webString += "console.log(\"Events MSG Disconnected\");";
+		webString += "}\n}, false);";
+		webString += "source.addEventListener('chatMsg', function(e) {";
+		// webString += "console.log(\"lastHeard\", e.data);";
+		webString += "var lh=document.getElementById(\"chatMsg\");";
+		webString += "if(lh != null) {lh.innerHTML = e.data;}";
+		webString += "}, false);\n}";
+
 	webString += "</script>\n";
 	webString += "</head>\n";
 	webString += "\n";
@@ -248,21 +263,21 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "setTimeout(reloadSidebarInfo, 200);\n";
 	webString += "$(window).trigger('resize');\n";
 
-	webString += "if (!!window.EventSource) {";
-	webString += "var source = new EventSource('/eventHeard');";
+	// webString += "if (!!window.EventSource) {";
+	// webString += "var source = new EventSource('/eventHeard');";
 
-	webString += "source.addEventListener('open', function(e) {";
-	webString += "console.log(\"Events Connected\");";
-	webString += "}, false);";
-	webString += "source.addEventListener('error', function(e) {";
-	webString += "if (e.target.readyState != EventSource.OPEN) {";
-	webString += "console.log(\"Events Disconnected\");";
-	webString += "}\n}, false);";
-	webString += "source.addEventListener('lastHeard', function(e) {";
-	// webString += "console.log(\"lastHeard\", e.data);";
-	webString += "var lh=document.getElementById(\"lastHeard\");";
-	webString += "if(lh != null) {lh.innerHTML = e.data;}";
-	webString += "}, false);\n}";
+	// webString += "source.addEventListener('open', function(e) {";
+	// webString += "console.log(\"Events Connected\");";
+	// webString += "}, false);";
+	// webString += "source.addEventListener('error', function(e) {";
+	// webString += "if (e.target.readyState != EventSource.OPEN) {";
+	// webString += "console.log(\"Events Disconnected\");";
+	// webString += "}\n}, false);";
+	// webString += "source.addEventListener('lastHeard', function(e) {";
+	// // webString += "console.log(\"lastHeard\", e.data);";
+	// webString += "var lh=document.getElementById(\"lastHeard\");";
+	// webString += "if(lh != null) {lh.innerHTML = e.data;}";
+	// webString += "}, false);\n}";
 	webString += "</script>\n";
 
 	webString += "<div id=\"sysInfo\">\n";
@@ -458,14 +473,14 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	webString += "\n";
 	webString += "<div class=\"content\">\n";
 	webString += "<div id=\"lastHeard\">\n";
+	webString += event_lastHeard(true);
 	webString += "</div>\n";
 
 	request->send(200, "text/html", webString); // send to someones browser when asked
 	delay(100);
 	webString.clear();
-	// event_lastHeard();
-	lastHeard_Flag = true;
-	lastHeardTimeout = 0;
+	lastHeard_Flag = false;
+	lastHeardTimeout = 0;	
 }
 
 void handle_sidebar(AsyncWebServerRequest *request)
@@ -704,262 +719,262 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html.clear();
 }
 
-void handle_lastHeard(AsyncWebServerRequest *request)
-{
-	struct pbuf_t aprs;
-	ParseAPRS aprsParse;
-	struct tm tmstruct;
-	String html = "";
-	sort(pkgList, PKGLISTSIZE);
+// void handle_lastHeard(AsyncWebServerRequest *request)
+// {
+// 	struct pbuf_t aprs;
+// 	ParseAPRS aprsParse;
+// 	struct tm tmstruct;
+// 	String html = "";
+// 	sort(pkgList, PKGLISTSIZE);
 
-	html = "<table>\n";
-	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[Live Feed]]</a></th>\n";
-	html += "<tr>\n";
-	html += "<th style=\"min-width:10ch\"><span><b>Time (";
-	if (config.timeZone >= 0)
-		html += "+";
-	// else
-	//	html += "-";
+// 	html = "<table>\n";
+// 	html += "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[Live Feed]]</a></th>\n";
+// 	html += "<tr>\n";
+// 	html += "<th style=\"min-width:10ch\"><span><b>Time (";
+// 	if (config.timeZone >= 0)
+// 		html += "+";
+// 	// else
+// 	//	html += "-";
 
-	if (config.timeZone == (int)config.timeZone)
-		html += String((int)config.timeZone) + ")</b></span></th>\n";
-	else
-		html += String(config.timeZone, 1) + ")</b></span></th>\n";
-	html += "<th style=\"min-width:16px\">ICON</th>\n";
-	if (config.rf_mode == RF_MODE_AIS)
-	{
-		html += "<th style=\"min-width:10ch\">MMSI</th>\n";
-		html += "<th style=\"min-width:5ch\">Latitude</th>\n";
-		html += "<th style=\"min-width:5ch\">Longitude</th>\n";
-		// html += "<th style=\"min-width:5ch\">Speed</th>\n";
-		html += "<th style=\"min-width:5ch\">DX</th>\n";
-		html += "<th style=\"min-width:5ch\">PKT</th>\n";
-		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
-	}
-	else
-	{
-		html += "<th style=\"min-width:10ch\">Callsign</th>\n";
-		html += "<th>VIA LAST PATH</th>\n";
-		html += "<th style=\"min-width:5ch\">DX</th>\n";
-		html += "<th style=\"min-width:5ch\">RX</th>\n";
-		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
-		html += "<th style=\"min-width:5ch\">FreqErr</th>\n";
-	}
-	html += "</tr>\n";
+// 	if (config.timeZone == (int)config.timeZone)
+// 		html += String((int)config.timeZone) + ")</b></span></th>\n";
+// 	else
+// 		html += String(config.timeZone, 1) + ")</b></span></th>\n";
+// 	html += "<th style=\"min-width:16px\">ICON</th>\n";
+// 	if (config.rf_mode == RF_MODE_AIS)
+// 	{
+// 		html += "<th style=\"min-width:10ch\">MMSI</th>\n";
+// 		html += "<th style=\"min-width:5ch\">Latitude</th>\n";
+// 		html += "<th style=\"min-width:5ch\">Longitude</th>\n";
+// 		// html += "<th style=\"min-width:5ch\">Speed</th>\n";
+// 		html += "<th style=\"min-width:5ch\">DX</th>\n";
+// 		html += "<th style=\"min-width:5ch\">PKT</th>\n";
+// 		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
+// 	}
+// 	else
+// 	{
+// 		html += "<th style=\"min-width:10ch\">Callsign</th>\n";
+// 		html += "<th>VIA LAST PATH</th>\n";
+// 		html += "<th style=\"min-width:5ch\">DX</th>\n";
+// 		html += "<th style=\"min-width:5ch\">RX</th>\n";
+// 		html += "<th style=\"min-width:5ch\">RSSI</th>\n";
+// 		html += "<th style=\"min-width:5ch\">FreqErr</th>\n";
+// 	}
+// 	html += "</tr>\n";
 
-	for (int i = 0; i < PKGLISTSIZE; i++)
-	{
-		if (i >= PKGLISTSIZE)
-			break;
-		pkgListType pkg = getPkgList(i);
-		if (pkg.time > 0)
-		{
-			String line = String(pkg.raw);
-			int packet = pkg.pkg;
-			int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
-			if (start_val > 3)
-			{
-				String src_call = line.substring(0, start_val);
-				memset(&aprs, 0, sizeof(pbuf_t));
-				aprs.buf_len = 300;
-				aprs.packet_len = line.length();
-				line.toCharArray(&aprs.data[0], aprs.packet_len);
-				int start_info = line.indexOf(":", 0);
-				int end_ssid = line.indexOf(",", 0);
-				int start_dst = line.indexOf(">", 2);
-				int start_dstssid = line.indexOf("-", start_dst);
-				String path = "";
+// 	for (int i = 0; i < PKGLISTSIZE; i++)
+// 	{
+// 		if (i >= PKGLISTSIZE)
+// 			break;
+// 		pkgListType pkg = getPkgList(i);
+// 		if (pkg.time > 0)
+// 		{
+// 			String line = String(pkg.raw);
+// 			int packet = pkg.pkg;
+// 			int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
+// 			if (start_val > 3)
+// 			{
+// 				String src_call = line.substring(0, start_val);
+// 				memset(&aprs, 0, sizeof(pbuf_t));
+// 				aprs.buf_len = 300;
+// 				aprs.packet_len = line.length();
+// 				line.toCharArray(&aprs.data[0], aprs.packet_len);
+// 				int start_info = line.indexOf(":", 0);
+// 				int end_ssid = line.indexOf(",", 0);
+// 				int start_dst = line.indexOf(">", 2);
+// 				int start_dstssid = line.indexOf("-", start_dst);
+// 				String path = "";
 
-				if ((end_ssid > start_dst) && (end_ssid < start_info))
-				{
-					path = line.substring(end_ssid + 1, start_info);
-				}
-				if (end_ssid < 5)
-					end_ssid = start_info;
-				if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
-				{
-					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
-				}
-				else
-				{
-					aprs.dstcall_end_or_ssid = &aprs.data[end_ssid];
-				}
-				aprs.info_start = &aprs.data[start_info + 1];
-				aprs.dstname = &aprs.data[start_dst + 1];
-				aprs.dstname_len = end_ssid - start_dst;
-				aprs.dstcall_end = &aprs.data[end_ssid];
-				aprs.srccall_end = &aprs.data[start_dst];
+// 				if ((end_ssid > start_dst) && (end_ssid < start_info))
+// 				{
+// 					path = line.substring(end_ssid + 1, start_info);
+// 				}
+// 				if (end_ssid < 5)
+// 					end_ssid = start_info;
+// 				if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
+// 				{
+// 					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
+// 				}
+// 				else
+// 				{
+// 					aprs.dstcall_end_or_ssid = &aprs.data[end_ssid];
+// 				}
+// 				aprs.info_start = &aprs.data[start_info + 1];
+// 				aprs.dstname = &aprs.data[start_dst + 1];
+// 				aprs.dstname_len = end_ssid - start_dst;
+// 				aprs.dstcall_end = &aprs.data[end_ssid];
+// 				aprs.srccall_end = &aprs.data[start_dst];
 
-				if (aprsParse.parse_aprs(&aprs))
-				{
-					pkg.calsign[10] = 0;
-					time_t tm = pkg.time;
-					localtime_r(&pkg.time, &tmstruct);
-					char strTime[10];
-					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-					// String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
+// 				if (aprsParse.parse_aprs(&aprs))
+// 				{
+// 					pkg.calsign[10] = 0;
+// 					time_t tm = pkg.time;
+// 					localtime_r(&pkg.time, &tmstruct);
+// 					char strTime[10];
+// 					sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+// 					// String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
 
-					html += "<tr><td>" + String(strTime) + "</td>";
-					String fileImg = "";
-					uint8_t sym = (uint8_t)aprs.symbol[1];
-					if (sym > 31 && sym < 127)
-					{
-						if (aprs.symbol[0] > 64 && aprs.symbol[0] < 91) // table A-Z
-						{
-							html += "<td><b>" + String(aprs.symbol[0]) + "</b></td>";
-						}
-						else
-						{
-							fileImg = String(sym, DEC);
-							if (aprs.symbol[0] == 92)
-							{
-								fileImg += "-2.png";
-							}
-							else if (aprs.symbol[0] == 47)
-							{
-								fileImg += "-1.png";
-							}
-							else
-							{
-								fileImg = "dot.png";
-							}
-							html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/" + fileImg + "\"></td>";
-						}
-					}
-					else
-					{
-						html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>";
-					}
-					if (config.rf_mode == RF_MODE_AIS)
-					{
-						html += "<td>" + String(pkg.object) + "</td>";
-						html += "<td style=\"text-align: right;\">" + String(aprs.lat, 5) + "</td>";
-						html += "<td style=\"text-align: right;\">" + String(aprs.lng, 5) + "</td>";
-						// html += "<td style=\"text-align: center;\">" + String(aprs.speed,1) + "</td>";
-					}
-					else
-					{
-						html += "<td>" + src_call;
-						if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
-						{
-							char itemname[10];
-							memset(&itemname, 0, sizeof(itemname));
-							memcpy(&itemname, aprs.srcname, aprs.srcname_len);
-							html += "(" + String(itemname) + ")";
-						}
+// 					html += "<tr><td>" + String(strTime) + "</td>";
+// 					String fileImg = "";
+// 					uint8_t sym = (uint8_t)aprs.symbol[1];
+// 					if (sym > 31 && sym < 127)
+// 					{
+// 						if (aprs.symbol[0] > 64 && aprs.symbol[0] < 91) // table A-Z
+// 						{
+// 							html += "<td><b>" + String(aprs.symbol[0]) + "</b></td>";
+// 						}
+// 						else
+// 						{
+// 							fileImg = String(sym, DEC);
+// 							if (aprs.symbol[0] == 92)
+// 							{
+// 								fileImg += "-2.png";
+// 							}
+// 							else if (aprs.symbol[0] == 47)
+// 							{
+// 								fileImg += "-1.png";
+// 							}
+// 							else
+// 							{
+// 								fileImg = "dot.png";
+// 							}
+// 							html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/" + fileImg + "\"></td>";
+// 						}
+// 					}
+// 					else
+// 					{
+// 						html += "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>";
+// 					}
+// 					if (config.rf_mode == RF_MODE_AIS)
+// 					{
+// 						html += "<td>" + String(pkg.object) + "</td>";
+// 						html += "<td style=\"text-align: right;\">" + String(aprs.lat, 5) + "</td>";
+// 						html += "<td style=\"text-align: right;\">" + String(aprs.lng, 5) + "</td>";
+// 						// html += "<td style=\"text-align: center;\">" + String(aprs.speed,1) + "</td>";
+// 					}
+// 					else
+// 					{
+// 						html += "<td>" + src_call;
+// 						if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
+// 						{
+// 							char itemname[10];
+// 							memset(&itemname, 0, sizeof(itemname));
+// 							memcpy(&itemname, aprs.srcname, aprs.srcname_len);
+// 							html += "(" + String(itemname) + ")";
+// 						}
 
-						html += +"</td>";
-						if (path == "")
-						{
-							html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
-						}
-						else
-						{
-							String LPath = path.substring(path.lastIndexOf(',') + 1);
-							// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
-							if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
-							{
-								html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
-							}
-							else
-							{
-								if (LPath.indexOf("*") > 0)
-									html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
-								else
-									html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
-							}
-						}
-					}
-					// html += "<td>" + path + "</td>";
-					if (aprs.flags & F_HASPOS)
-					{
-						double lat, lon;
-						if (gps.location.isValid())
-						{
-							lat = gps.location.lat();
-							lon = gps.location.lng();
-						}
-						else
-						{
-							lat = config.igate_lat;
-							lon = config.igate_lon;
-						}
-						double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
-						double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
-						html += "<td>" + String(dist, 1) + "km/" + String(dtmp, 0) + "°</td>";
-					}
-					else
-					{
-						html += "<td>-</td>\n";
-					}
-					html += "<td>" + String(packet) + "</td>\n";
-					if (pkg.rssi == 0)
-					{
-						html += "<td>-</td>\n";
-					}
-					else
-					{
-						float rssi = pkg.rssi;
-						if (rssi < -120.0F)
-						{
-							html += "<td style=\"color: #0000f0;\">";
-						}
-						else if (rssi > -60.0F)
-						{
-							html += "<td style=\"color: #f00000;\">";
-						}
-						else
-						{
-							html += "<td style=\"color: #008000;\">";
-						}
-						html += String((int)rssi) + "dBm</td>\n";
-					}
-					if (config.rf_mode != RF_MODE_AIS)
-					{
-						if (pkg.freqErr == 0)
-						{
-							html += "<td>-</td></tr>\n";
-						}
-						else
-						{
-							html += "<td>" + String((int)pkg.freqErr) + "Hz</td></tr>\n";
-						}
-					}
-				}
-			}
-		}
-	}
-	html += "</table>\n";
-	if ((ESP.getFreeHeap() / 1000) > 120)
-	{
-		request->send(200, "text/html", html); // send to someones browser when asked
-	}
-	else
-	{
-		size_t len = html.length();
-		char *info = (char *)calloc(len, sizeof(char));
-		if (info)
-		{
+// 						html += +"</td>";
+// 						if (path == "")
+// 						{
+// 							html += "<td style=\"text-align: left;\">RF: DIRECT</td>";
+// 						}
+// 						else
+// 						{
+// 							String LPath = path.substring(path.lastIndexOf(',') + 1);
+// 							// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
+// 							if (path.indexOf("qA") >= 0 || path.indexOf("TCPIP") >= 0)
+// 							{
+// 								html += "<td style=\"text-align: left;\">INET: " + LPath + "</td>";
+// 							}
+// 							else
+// 							{
+// 								if (LPath.indexOf("*") > 0)
+// 									html += "<td style=\"text-align: left;\">DIGI: " + path + "</td>";
+// 								else
+// 									html += "<td style=\"text-align: left;\">RF: " + path + "</td>";
+// 							}
+// 						}
+// 					}
+// 					// html += "<td>" + path + "</td>";
+// 					if (aprs.flags & F_HASPOS)
+// 					{
+// 						double lat, lon;
+// 						if (gps.location.isValid())
+// 						{
+// 							lat = gps.location.lat();
+// 							lon = gps.location.lng();
+// 						}
+// 						else
+// 						{
+// 							lat = config.igate_lat;
+// 							lon = config.igate_lon;
+// 						}
+// 						double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
+// 						double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
+// 						html += "<td>" + String(dist, 1) + "km/" + String(dtmp, 0) + "°</td>";
+// 					}
+// 					else
+// 					{
+// 						html += "<td>-</td>\n";
+// 					}
+// 					html += "<td>" + String(packet) + "</td>\n";
+// 					if (pkg.rssi == 0)
+// 					{
+// 						html += "<td>-</td>\n";
+// 					}
+// 					else
+// 					{
+// 						float rssi = pkg.rssi;
+// 						if (rssi < -120.0F)
+// 						{
+// 							html += "<td style=\"color: #0000f0;\">";
+// 						}
+// 						else if (rssi > -60.0F)
+// 						{
+// 							html += "<td style=\"color: #f00000;\">";
+// 						}
+// 						else
+// 						{
+// 							html += "<td style=\"color: #008000;\">";
+// 						}
+// 						html += String((int)rssi) + "dBm</td>\n";
+// 					}
+// 					if (config.rf_mode != RF_MODE_AIS)
+// 					{
+// 						if (pkg.freqErr == 0)
+// 						{
+// 							html += "<td>-</td></tr>\n";
+// 						}
+// 						else
+// 						{
+// 							html += "<td>" + String((int)pkg.freqErr) + "Hz</td></tr>\n";
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// 	html += "</table>\n";
+// 	if ((ESP.getFreeHeap() / 1000) > 120)
+// 	{
+// 		request->send(200, "text/html", html); // send to someones browser when asked
+// 	}
+// 	else
+// 	{
+// 		size_t len = html.length();
+// 		char *info = (char *)calloc(len, sizeof(char));
+// 		if (info)
+// 		{
 
-			html.toCharArray(info, len, 0);
-			html.clear();
-			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
+// 			html.toCharArray(info, len, 0);
+// 			html.clear();
+// 			AsyncWebServerResponse *response = request->beginResponse_P(200, String(F("text/html")), (const uint8_t *)info, len);
 
-			response->addHeader("Sensor", "content");
-			request->send(response);
-			free(info);
-		}
-		else
-		{
-			log_d("Can't define calloc info size %d", len);
-		}
-	}
-	// request->send(200, "text/html", html); // send to someones browser when asked
-	// delay(100);
-	// html.clear();
-}
+// 			response->addHeader("Sensor", "content");
+// 			request->send(response);
+// 			free(info);
+// 		}
+// 		else
+// 		{
+// 			log_d("Can't define calloc info size %d", len);
+// 		}
+// 	}
+// 	// request->send(200, "text/html", html); // send to someones browser when asked
+// 	// delay(100);
+// 	// html.clear();
+// }
 
-String event_lastHeard()
+String event_lastHeard(bool gethtml)
 {
 	// log_d("Event count: %d",lastheard_events.count());
 	//if (lastheard_events.count() == 0)
@@ -1202,20 +1217,20 @@ String event_lastHeard()
 	}
 	html += "</table>\n";
 	// log_d("HTML Length=%d Byte",html.length());
+	if(gethtml) return html;
 	size_t len = html.length();
 	char *info = (char *)calloc(len, sizeof(char));
 	if (info)
 	{
 		html.toCharArray(info, len, 0);
-		// html.clear();
-		lastheard_events.send(info, "lastHeard", millis(), 10000);
+		html.clear();
+		lastheard_events.send(info, "lastHeard", time(NULL), 5000);
 		free(info);
 	}
-	return html;
-	// lastheard_events.send(html.c_str(), "lastHeard", millis());
+	return "";
 }
 
-String event_chatMessage()
+String event_chatMessage(bool gethtml)
 {
 	// log_d("Event count: %d",lastheard_events.count());
 	// if (message_events.count() == 0)
@@ -1245,6 +1260,7 @@ String event_chatMessage()
 	html += "<th style=\"width:20pt\">msgID</th>\n";
 	html += "</tr>\n";
 
+	pkgMsgSort(msgQueue);
 	for (int i = 0; i < PKGLISTSIZE; i++)
 	{
 		if (i >= PKGLISTSIZE)
@@ -1303,16 +1319,20 @@ String event_chatMessage()
 			html += "<td>" + String(pkg.msgID) + "</td></tr>";
 		}
 	}
-	size_t len = html.length();
-	char *info = (char *)calloc(len, sizeof(char));
-	if (info)
-	{
-		html.toCharArray(info, len, 0);
-		// html.clear();
-		message_events.send(info, "chatMsg", millis(), 10000);
-		free(info);
+	log_d("HTML Length=%d Byte gethtml:%d event_cnt:%d", html.length(),gethtml,message_events.count());
+	if(gethtml) return html;
+	if (message_events.count() >0){
+		size_t len = html.length();
+		char *info = (char *)calloc(len, sizeof(char));
+		if (info)
+		{
+			html.toCharArray(info, len, 0);
+			html.clear();
+			message_events.send(info, "chatMsg", time(NULL), 5000);
+			free(info);
+		}	
 	}
-	return html;
+	return "";
 }
 
 void handle_storage(AsyncWebServerRequest *request)
@@ -3308,21 +3328,21 @@ void handle_msg(AsyncWebServerRequest *request)
 		html += "});\n";
 		html += "});\n";
 
-		html += "if (!!window.EventSource) {";
-		html += "var source = new EventSource('/eventMsg');";
+		// html += "if (!!window.EventSource) {";
+		// html += "var source = new EventSource('/eventMsg');";
 
-		html += "source.addEventListener('open', function(e) {";
-		html += "console.log(\"Events MSG Connected\");";
-		html += "}, false);";
-		html += "source.addEventListener('error', function(e) {";
-		html += "if (e.target.readyState != EventSource.OPEN) {";
-		html += "console.log(\"Events MSG Disconnected\");";
-		html += "}\n}, false);";
-		html += "source.addEventListener('chatMsg', function(e) {";
-		// webString += "console.log(\"lastHeard\", e.data);";
-		html += "var lh=document.getElementById(\"chatMsg\");";
-		html += "if(lh != null) {lh.innerHTML = e.data;}";
-		html += "}, false);\n}";
+		// html += "source.addEventListener('open', function(e) {";
+		// html += "console.log(\"Events MSG Connected\");";
+		// html += "}, false);";
+		// html += "source.addEventListener('error', function(e) {";
+		// html += "if (e.target.readyState != EventSource.OPEN) {";
+		// html += "console.log(\"Events MSG Disconnected\");";
+		// html += "}\n}, false);";
+		// html += "source.addEventListener('chatMsg', function(e) {";
+		// // webString += "console.log(\"lastHeard\", e.data);";
+		// html += "var lh=document.getElementById(\"chatMsg\");";
+		// html += "if(lh != null) {lh.innerHTML = e.data;}";
+		// html += "}, false);\n}";
 		html += "</script>\n";
 
 		// html += "<h2>System Setting</h2>\n";
@@ -3361,7 +3381,7 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>AES Key:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input  size=\"40\" maxlength=\"33\" name=\"key\" type=\"text\" value=\"" + String(config.msg_key) + "\" /> *<i>ASCI HEX 16Byte</i></td>\n";
+		html += "<td style=\"text-align: left;\"><input  size=\"40\" maxlength=\"33\" name=\"key\" type=\"text\" value=\"" + String(config.msg_key) + "\" /> *<i>ASCII HEX 16Byte</i></td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -3371,7 +3391,7 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "<tr>\n";
 		html += "<td align=\"right\"><b>Send Timeout:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input  min=\"10000\" max=\"99999\"   name=\"timeout\" type=\"number\" value=\"" + String(config.msg_interval) + "\" /> msec.</td>\n";
+		html += "<td style=\"text-align: left;\"><input  min=\"1\" max=\"9999\"   name=\"timeout\" type=\"number\" value=\"" + String(config.msg_interval) + "\" /> Sec.</td>\n";
 		html += "</tr>\n";
 
 		html += "<tr>\n";
@@ -3402,6 +3422,7 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "<tr><td>\n";
 		html += "<table id=\"chatMsg\">\n";
+		html += event_chatMessage(true);
 		html += "</table>\n";
 
 		html += "</td></tr><tr><td colspan=\"5\">";
@@ -3420,7 +3441,7 @@ void handle_msg(AsyncWebServerRequest *request)
 
 		html += "</td></tr></table>";
 
-		request->send(200, "text/html", html); // send to someones browser when asked
+		request->send(200, "text/html", html); // send to someones browser when asked		
 	}
 }
 
@@ -5019,7 +5040,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "<td align=\"right\"><b>PORT:</b></td>\n";
 		html += "<td style=\"text-align: left;\">\n";
 		html += "<select name=\"port\" id=\"port\">\n";
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 2; i++)
 		{
 			if (config.ppp_serial == i)
 				html += "<option value=\"" + String(i) + "\" selected>" + String(GNSS_PORT[i + 1]) + " </option>\n";
@@ -10631,7 +10652,7 @@ void handle_about(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-	char strCID[50];
+	char strCID[13];
 	uint64_t chipid = ESP.getEfuseMac();
 	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
@@ -11040,8 +11061,8 @@ void webService()
 					{ handle_sidebar(request); });
 	async_server.on("/sysinfo", HTTP_GET, [](AsyncWebServerRequest *request)
 					{ handle_sysinfo(request); });
-	async_server.on("/lastHeard", HTTP_GET, [](AsyncWebServerRequest *request)
-					{ handle_lastHeard(request); });
+	// async_server.on("/lastHeard", HTTP_GET, [](AsyncWebServerRequest *request)
+	// 				{ handle_lastHeard(request); });
 	async_server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request)
 					{ handle_css(request); });
 	async_server.on("/jquery-3.7.1.js", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -11113,8 +11134,8 @@ void webService()
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
-	String html = event_lastHeard();
-    client->send(html.c_str(), NULL, millis(), 10000); });
+	String html = event_lastHeard(true);
+    client->send(html.c_str(), "lastHeard", time(NULL), 5000); });
 	async_server.addHandler(&lastheard_events);
 
 	message_events.onConnect([](AsyncEventSourceClient *client)
@@ -11124,8 +11145,8 @@ void webService()
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
-	String html = event_chatMessage();
-    client->send(html.c_str(), NULL, millis(), 10000); });
+	String html = event_chatMessage(true);
+    client->send(html.c_str(), "chatMsg", time(NULL), 5000); });
 	async_server.addHandler(&message_events);
 	async_server.onNotFound(notFound);
 	async_server.begin();

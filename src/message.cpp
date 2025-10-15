@@ -91,7 +91,7 @@ static bool pkcs7_unpad(uint8_t *buf, size_t buf_len, size_t *out_len)
 }
 
 // ---------- AES Encrypt (auto IV prepend + Base64) ----------
-String aesEncryptBase64WithIV(const String &plain, const uint8_t key[16])
+String aesEncryptBase64WithIV(const String &plain, const uint8_t key[16], uint16_t msgID)
 {
     size_t in_len = plain.length();
     const uint8_t *in_ptr = (const uint8_t *)plain.c_str();
@@ -99,13 +99,13 @@ String aesEncryptBase64WithIV(const String &plain, const uint8_t key[16])
     // 1. Generate random IV
     uint8_t iv[AES_BLOCK_SIZE];
     // esp_fill_random(iv, 8);
-    time_t timeStamp = time(NULL) / 60;
+    // time_t timeStamp = time(NULL) / 60;
 
     // char input[20];
     // sprintf(input,"%s%d",config.msg_mycall,timeStamp);
     String input = String(config.msg_mycall);
     input.trim();
-    input += String(timeStamp);
+    input += "_" + String(msgID);
     log_d("input = %s", input.c_str());
 
     // Generate MD5 hash
@@ -162,7 +162,7 @@ String aesEncryptBase64WithIV(const String &plain, const uint8_t key[16])
 }
 
 // ---------- AES Decrypt (auto extract IV from Base64) ----------
-String aesDecryptBase64WithIV(const String &b64, const uint8_t key[16], const char *callsign)
+String aesDecryptBase64WithIV(const String &b64, const uint8_t key[16], const char *callsign, uint16_t msgID)
 {
     size_t b64_len = b64.length();
     const uint8_t *b64_ptr = (const uint8_t *)b64.c_str();
@@ -187,10 +187,10 @@ String aesDecryptBase64WithIV(const String &b64, const uint8_t key[16], const ch
     uint8_t iv[AES_BLOCK_SIZE];
     // memcpy(iv, decoded,8);
 
-    time_t timeStamp = time(NULL) / 60;
+    // time_t timeStamp = time(NULL) / 60;
     String input = String(callsign);
     input.trim();
-    input += String(timeStamp);
+    input += "_" + String(msgID);
 
     log_d("input = %s", input.c_str());
 
@@ -234,12 +234,41 @@ String aesDecryptBase64WithIV(const String &b64, const uint8_t key[16], const ch
     return result;
 }
 
-int pkgMsg_Find(const char *call, uint16_t msgID)
+void pkgMsgSort(msgType a[])
+{
+    msgType t;
+    char *ptr1;
+    char *ptr2;
+    char *ptr3;
+    ptr1 = (char *)&t;
+#ifdef BOARD_HAS_PSRAM
+    while (psramBusy)
+        delay(1);
+    psramBusy = true;
+#endif
+    for (int i = 0; i < (PKGLISTSIZE - 1); i++)
+    {
+        for (int o = 0; o < (PKGLISTSIZE - (i + 1)); o++)
+        {
+            if (a[o].time > a[o + 1].time)
+            {
+                ptr2 = (char *)&a[o];
+                ptr3 = (char *)&a[o + 1];
+                memcpy(ptr1, ptr2, sizeof(msgType));
+                memcpy(ptr2, ptr3, sizeof(msgType));
+                memcpy(ptr3, ptr1, sizeof(msgType));
+            }
+        }
+    }
+    psramBusy = false;
+}
+
+int pkgMsg_Find(const char *call, uint16_t msgID, bool rxtx)
 {
     int i;
     for (i = 0; i < PKGLISTSIZE; i++)
     {
-        if ((strstr(msgQueue[(int)i].callsign, call) != NULL) && (msgQueue[(int)i].msgID == msgID))
+        if ((strstr(msgQueue[(int)i].callsign, call) != NULL) && (msgQueue[(int)i].msgID == msgID) && (msgQueue[(int)i].rxtx == rxtx))
             return i;
     }
     return -1;
@@ -275,7 +304,7 @@ msgType getMsgList(int idx)
     return ret;
 }
 
-int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack)
+int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack, bool rxtx)
 {
     size_t len;
     if (*call == 0)
@@ -299,9 +328,9 @@ int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack)
     psramBusy = true;
 #endif
     int i = -1;
-    //if (ack > 0) // Check ACK to update
+    // if (ack > 0) // Check ACK to update
     //{
-        i = pkgMsg_Find(call, msg_id);
+    i = pkgMsg_Find(call, msg_id, rxtx);
     //}
 
     if (i < 0)
@@ -317,6 +346,7 @@ int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack)
     msgQueue[i].time = time(NULL);
     msgQueue[i].msgID = msg_id;
     msgQueue[i].ack = ack;
+    msgQueue[i].rxtx = rxtx;
 
     // strcpy(pkgList[i].calsign, callsign);
     memset(msgQueue[i].callsign, 0, sizeof(msgQueue[i].callsign));
@@ -326,17 +356,19 @@ int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack)
     if (msgQueue[i].text != NULL)
     {
         msgQueue[i].text = (char *)realloc(msgQueue[i].text, msgQueue[i].length);
+        log_d("Realloc: msgQueue[%d] callsign:%s msgID:%d ack:%i", i, callsign, msg_id, ack);
     }
     else
     {
         msgQueue[i].text = (char *)calloc(msgQueue[i].length, sizeof(char));
+        log_d("Calloc: msgQueue[%d] callsign:%s msgID:%d ack:%i", i, callsign, msg_id, ack);
     }
     if (msgQueue[i].text)
     {
         memset(msgQueue[i].text, 0, msgQueue[i].length);
         memcpy(msgQueue[i].text, raw, len);
-        msgQueue[i].text[len] = 0;
-        log_d("New: msgList_idx=%d callsign:%s msgID:%d ack:%i", i, callsign, msg_id, ack);
+        //msgQueue[i].text[len] = 0;
+        log_d("New: msgQueue[%d] callsign:%s msgID:%d ack:%i", i, msgQueue[i].callsign, msgQueue[i].msgID, msgQueue[i].ack);
     }
     //}
     psramBusy = false;
@@ -346,6 +378,7 @@ int pkgMsgUpdate(const char *call, const char *raw, uint16_t msg_id, int8_t ack)
 // ===== ส่งข้อความ APRS =====
 void sendAPRSMessage(const String &toCall, const String &message, bool encrypt)
 {
+    ++msgID;
     if (toCall == "")
         return;
     if (message == "")
@@ -362,7 +395,7 @@ void sendAPRSMessage(const String &toCall, const String &message, bool encrypt)
     {
         uint8_t aes_key[16];
         hexStringToBytes(config.msg_key, aes_key, sizeof(aes_key));
-        encrypted = aesEncryptBase64WithIV(message, aes_key);
+        encrypted = aesEncryptBase64WithIV(message, aes_key, msgID);
     }
     else
     {
@@ -379,25 +412,31 @@ void sendAPRSMessage(const String &toCall, const String &message, bool encrypt)
         path += ",";
         path += getPath(config.msg_path);
     }
-    String packet = String(config.msg_mycall) + ">APE32L" + path + "::" + String(toCallFixed) + ":" + encrypted + "{" + String(++msgID);
+    String packet = String(config.msg_mycall) + ">APE32L" + path + "::" + String(toCallFixed) + ":" + encrypted + "{" + String(msgID);
     uint8_t SendMode = 0;
     if (config.msg_rf)
         SendMode |= RF_CHANNEL;
     if (config.msg_inet)
         SendMode |= INET_CHANNEL;
     pkgTxPush(packet.c_str(), packet.length(), 0, SendMode);
-    pkgMsgUpdate(config.msg_mycall, message.c_str(), msgID, config.msg_retry);
-    event_chatMessage();
+    log_d("Send APRS Message to %s msgID %d TNC2: %s", toCall.c_str(), msgID, packet.c_str());
+    if (config.msg_retry == 0)
+        pkgMsgUpdate(toCall.c_str(), message.c_str(), msgID, -2, false); // -2=No retry
+    else
+        pkgMsgUpdate(toCall.c_str(), message.c_str(), msgID, config.msg_retry, false);
+    event_chatMessage(false);
     // log_d(">> " + packet);
 }
 
 void sendAPRSMessageRetry()
 {
+    time_t timeStamp = time(NULL);
     for (int i = 0; i < PKGLISTSIZE; i++)
     {
-        if (msgQueue[i].ack > 0)
+        if ((msgQueue[i].ack > 0) && (timeStamp - msgQueue[i].time) > config.msg_interval)
         {
-            msgQueue[i].ack--;
+            if(--msgQueue[i].ack>0) msgQueue[i].time = timeStamp+config.msg_interval; // update time only if retry left
+
             // ฟอร์แมต: FROM>APRS,TCPIP*::TOCALL   :MESSAGE
             char toCallFixed[10];
             memset(toCallFixed, 0x20, 10);
@@ -410,7 +449,7 @@ void sendAPRSMessageRetry()
             {
                 uint8_t aes_key[16];
                 hexStringToBytes(config.msg_key, aes_key, sizeof(aes_key));
-                encrypted = aesEncryptBase64WithIV(String(msgQueue[i].text), aes_key);
+                encrypted = aesEncryptBase64WithIV(String(msgQueue[i].text), aes_key, msgQueue[i].msgID);
             }
             else
             {
@@ -434,9 +473,10 @@ void sendAPRSMessageRetry()
             if (config.msg_inet)
                 SendMode |= INET_CHANNEL;
             pkgTxPush(packet.c_str(), packet.length(), 0, SendMode);
-            pkgMsgUpdate(msgQueue[i].callsign, msgQueue[i].text, msgQueue[i].msgID, msgQueue[i].ack);
+            log_d("Retry APRS Message msgQueue[%i] to %s msgID %d ack left %i TNC2: %s", i, msgQueue[i].callsign, msgQueue[i].msgID, msgQueue[i].ack, packet.c_str());
+            //pkgMsgUpdate(msgQueue[i].callsign, msgQueue[i].text, msgQueue[i].msgID, msgQueue[i].ack);
             // log_d(">> " + packet);
-            event_chatMessage();
+            event_chatMessage(false);
         }
     }
 }
@@ -468,12 +508,14 @@ void sendAPRSAck(const String &toCall, const String &msgNo)
     if (config.msg_inet)
         SendMode |= INET_CHANNEL;
     pkgTxPush(packet.c_str(), packet.length(), 0, SendMode);
+    log_d("Send APRS ACK to %s msgNo %s TNC2: %s", toCall.c_str(), msgNo.c_str(), packet.c_str());
 }
 
 // ===== จัดการข้อความขาเข้า =====
 void handleIncomingAPRS(const String &line)
 {
-    if(config.msg_enable == false) return;
+    if (config.msg_enable == false)
+        return;
     // ตัวอย่างการกรองข้อความที่มีรูปแบบ Message
     int msgPos = line.indexOf("::");
     if (msgPos <= 0)
@@ -512,47 +554,49 @@ void handleIncomingAPRS(const String &line)
             if (message.startsWith("ack"))
             {
                 msgNo = message.substring(3);
-                int i = pkgMsg_Find(toCall.c_str(), msgNo.toInt());
-                log_d("Message ACk from %s msgNo %d msgQueue %i", toCall.c_str(), msgNo.toInt(), i);
-                if (i > -1)
-                {
-                    msgQueue[i].ack = -2; // ตอบรับแล้ว
-                    event_chatMessage();
-                }
-                return;
             }
 
-            String decrypted = "";
-            if (config.msg_encrypt)
-            {
-                uint8_t aes_key[16];
-                hexStringToBytes(config.msg_key, aes_key, sizeof(aes_key));
-                decrypted = aesDecryptBase64WithIV(message, aes_key, fromCall.c_str());
-            }
-            else
-            {
-                decrypted = message;
-            }
-            decrypted.trim();
-
-            // Serial.println("📩 Message from " + fromCall + " to " + toCall + ": " + message);
-            log_d("📩 Message from %s to %s : %s", fromCall.c_str(), toCall.c_str(), decrypted.c_str());
-
-            if (decrypted == "")
-                return;
+            log_d("📩 Message from %s to %s : %s", fromCall.c_str(), toCall.c_str(), message.c_str());
 
             // ถ้าเป็นข้อความถึงเราเอง ให้ตอบกลับ ack
             if (toCall.equalsIgnoreCase(config.msg_mycall) && msgNo.length() > 0)
             {
-                pkgMsgUpdate(fromCall.c_str(), decrypted.c_str(), msgNo.toInt(), -1);
-                sendAPRSAck(fromCall, msgNo);
-                if (config.at_cmd_msg)
+                if (message.startsWith("ack"))
                 {
-                    String response = handleATCommand(decrypted);
-                    if (response != "")
-                        sendAPRSMessage(fromCall, response, config.msg_encrypt);
+                    msgNo = message.substring(3);
+                    int i = pkgMsg_Find(fromCall.c_str(), msgNo.toInt(), false);
+                    log_d("Message ACk from %s msgNo %d msgQueue %i", fromCall.c_str(), msgNo.toInt(), i);
+                    if (i > -1)
+                    {
+                        msgQueue[i].ack = -2; // ตอบรับแล้ว
+                    }
                 }
-                event_chatMessage();
+                else
+                {
+                    String decrypted = "";
+                    if (config.msg_encrypt)
+                    {
+                        uint8_t aes_key[16];
+                        hexStringToBytes(config.msg_key, aes_key, sizeof(aes_key));
+                        decrypted = aesDecryptBase64WithIV(message, aes_key, fromCall.c_str(), msgNo.toInt());
+                    }
+                    else
+                    {
+                        decrypted = message;
+                    }
+                    decrypted.trim();
+                    if (decrypted == "")
+                        return;
+                    pkgMsgUpdate(fromCall.c_str(), decrypted.c_str(), msgNo.toInt(), -1, true); // RX Message
+                    sendAPRSAck(fromCall, msgNo);
+                    if (config.at_cmd_msg)
+                    {
+                        String response = handleATCommand(decrypted);
+                        if (response != "")
+                            sendAPRSMessage(fromCall, response, config.msg_encrypt);
+                    }
+                }
+                event_chatMessage(false);
             }
         }
     }

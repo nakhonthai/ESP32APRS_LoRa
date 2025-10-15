@@ -48,6 +48,8 @@ void wireguard_setup(netif *ppp_netif);
 
 bool wireguard_up();
 
+void wireguard_change_device();
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

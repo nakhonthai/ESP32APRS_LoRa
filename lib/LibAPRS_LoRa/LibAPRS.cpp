@@ -45,21 +45,21 @@ TaskHandle_t fifoTaskHandle1;
 unsigned long custom_preamble = 350UL;
 unsigned long custom_tail = 50UL;
 
-AX25Call src;
-AX25Call dst;
-AX25Call path1;
-AX25Call path2;
+// AX25Call src;
+// AX25Call dst;
+// AX25Call path1;
+// AX25Call path2;
 
-char CALL[7] = "NOCALL";
-int CALL_SSID = 0;
-char DST[7] = "APE32L";
-int DST_SSID = 0;
-char PATH1[7] = "WIDE1";
-int PATH1_SSID = 1;
-char PATH2[7] = "WIDE2";
-int PATH2_SSID = 2;
+// char CALL[7] = "NOCALL";
+// int CALL_SSID = 0;
+// char DST[7] = "APE32L";
+// int DST_SSID = 0;
+// char PATH1[7] = "WIDE1";
+// int PATH1_SSID = 1;
+// char PATH2[7] = "WIDE2";
+// int PATH2_SSID = 2;
 
-AX25Call path[8];
+// AX25Call path[8];
 
 // Location packet assembly fields
 char latitude[9];

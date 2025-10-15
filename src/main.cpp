@@ -2851,8 +2851,8 @@ void defaultConfig()
     config.msg_rf = true;
     config.msg_inet = true;
     config.msg_retry = 3;
-    config.msg_interval = 30000;
-    config.msg_path = 1;
+    config.msg_interval = 30; // second
+    config.msg_path = 9;
     sprintf(config.msg_key, "8EC8233E91D59B0164C24E771BA66307");
     sprintf(config.msg_mycall, "NOCALL");
 
@@ -3003,6 +3003,15 @@ void defaultConfig()
     config.trk_tlm_EQNS[1][0] = 0;    // a av2 + bv + c
     config.trk_tlm_EQNS[1][1] = 1; // b
     config.trk_tlm_EQNS[1][2] = 0;    // c
+    char strCID[13];
+	uint64_t chipid = ESP.getEfuseMac();
+	sprintf(strCID, "0%03X", (uint16_t)(chipid >> 28) & 0x000FFFFF);
+    sprintf(config.igate_mycall,"%s",strCID);
+    sprintf(config.trk_mycall,"%s",strCID);
+    sprintf(config.digi_mycall,"%s",strCID);
+    sprintf(config.msg_mycall,"%s",strCID);
+    sprintf(config.tlm0_mycall,"%s",strCID);
+    sprintf(config.wx_mycall,"%s",strCID);
 #elif defined(HT_CT62)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3406,8 +3415,11 @@ void defaultConfig()
 #ifdef MQTT
     config.en_mqtt = false;
     sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
-    sprintf(config.mqtt_topic, "/APRS/TNC2");
-    sprintf(config.mqtt_subscribe, "/APRS/CTL");
+    char strCID[13];
+	uint64_t chipid = ESP.getEfuseMac();
+	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
+    sprintf(config.mqtt_topic, "/%s/TX",strCID);
+    sprintf(config.mqtt_subscribe, "/%s/RX",strCID);
     config.mqtt_user[0]=0;
     config.mqtt_pass[0]=0;
     config.mqtt_port = 1883;
@@ -4208,11 +4220,11 @@ bool pkgTxSend()
                                 psramBusy = false;
                                 // digitalWrite(config.rf_pwr_gpio, config.rf_power); // RF Power
                                 status.txCount++;
-
+                                log_d("TX->RF: %s", txQueue[i].Info);
                                 // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
-                                APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);
+                                APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);                                
                                 //igateTLM.TX++;
-                                // log_d("TX->RF: %s", info);
+                                
                                 if (config.trk_en)
                                 {
                                     timeSleep = millis() + 5000;
@@ -4222,9 +4234,9 @@ bool pkgTxSend()
                                 // digitalWrite(config.rf_pwr_gpio, 0); // set RF Power Low
                                 free(info);
                                 txQueue[i].Channel &= ~RF_CHANNEL;
-                                if (txQueue[i].Channel & INET_CHANNEL)
-                                {
-                                }
+                                // if (txQueue[i].Channel & INET_CHANNEL)
+                                // {
+                                // }
                             }
                         }
                     }
@@ -5251,6 +5263,7 @@ void mqtt_reconnect()
             clientMQTT.publish(config.mqtt_topic, payload);
             // ... and resubscribe
             clientMQTT.subscribe(config.mqtt_subscribe);
+            delay(3000);
         }
         else
         {
@@ -9647,6 +9660,12 @@ IPAddress ap_mask(255, 255, 255, 0);
 IPAddress ap_leaseStart(192, 168, 4, 2);
 IPAddress ap_dns(8, 8, 8, 8);
 
+uint8_t wifiStatus = WL_DISCONNECTED;
+bool vpnConnected = false;
+bool wifiDisconnecting = false;
+uint16_t wifiDisCount=0;
+unsigned long vpnTimeout=0;
+
 void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 {
     switch (event)
@@ -9657,16 +9676,27 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         break;
     case ARDUINO_EVENT_PPP_CONNECTED:
         log_d("PPP Connected");
+        if(!WiFi.isConnected()){
+            if(config.vpn){
+                log_d("Setup Wireguard VPN by PPP!");
+                vpnConnected = false;
+                vpnTimeout=millis()+3000;
+            }
+        
 #ifdef MQTT
         if (config.en_mqtt)
         {
             if (!clientMQTT.connected())
             {
+                clientMQTT.disconnect();
                 clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
                 clientMQTT.setCallback(mqtt_callback);
+            }else{
+                mqtt_reconnect();
             }
         }
 #endif
+        }
         break;
     case ARDUINO_EVENT_PPP_GOT_IP:
         pppStatus.ip = info.got_ip.ip_info.ip.addr;
@@ -9714,6 +9744,8 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         log_d("AP Stopped");
         break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        wifiDisCount=0;
+        wifiDisconnecting = false;
 // String info = "WiFi Infor:";
 // info += "\nSSID: " + WiFi.SSID();
 // info += "\nRSSI: " + String(WiFi.RSSI()) + "dBm";
@@ -9721,20 +9753,61 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 // info += "\nGW IP: " + WiFi.gatewayIP().toString();
 // info += "\nMAC: " + WiFi.macAddress();
 // lv_label_set_text(ui_txtSystemInfo, info.c_str());
+        if(config.vpn){
+            log_d("Setup Wireguard VPN by WiFi!");
+            vpnConnected = false;
+            vpnTimeout=millis()+3000;
+        }
 #ifdef MQTT
         if (config.en_mqtt)
         {
             if (!clientMQTT.connected())
             {
+                clientMQTT.disconnect();
                 clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
                 clientMQTT.setCallback(mqtt_callback);
+            }else{
+                mqtt_reconnect();
             }
         }
-#endif
+#endif        
         log_d("WiFi Connected");
         break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
         log_d("WiFi Disconnected");
+        wifiDisCount++;        
+        // if(wifiDisCount%5==0){
+        //     log_d("WiFi Disconnected count=%d",wifiDisCount);
+        //     WiFi.disconnect(true,true);            
+        //     wifiMulti.run(); // Move to next AP             
+        //     WiFi.reconnect();
+        // }
+        if(wifiDisconnecting==false && wifiDisCount>10){
+            wifiDisCount=0;
+            wifiDisconnecting = true; 
+            pingTimeout = millis() + 10000;
+            #ifdef MQTT
+        if (config.en_mqtt)
+        {
+            if (!clientMQTT.connected())
+            {
+                clientMQTT.disconnect();
+                clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
+                clientMQTT.setCallback(mqtt_callback);
+            }else{
+                mqtt_reconnect();
+            }
+        }
+#endif                           
+        #ifdef PPPOS
+        if(config.vpn ){            
+            //if(PPP.connected()){
+                vpnConnected = false;  
+                vpnTimeout=millis()+1000;              
+            //}
+        }
+        #endif
+        }
         break;
     default:
         break;
@@ -9746,7 +9819,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 void PPPOS_Start()
 {
     if (config.ppp_enable)
-    {
+    {        
         pppTimeout = millis() + (600 * 1000);
         log_d("Starting the modem. It might take a while!");
         pinMode(config.ppp_rst_gpio, OUTPUT);
@@ -9761,7 +9834,8 @@ void PPPOS_Start()
         PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
         PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
         log_d("PPP Modem Init...");
-
+        log_d("Using UART %d as PPP interface", config.ppp_serial);
+        if(config.ppp_serial>1) return;
         if (PPP.begin(PPP_MODEM_MODEL, config.ppp_serial, 115200))
         {
             log_d("PPP started successfully");
@@ -9808,7 +9882,7 @@ void PPPOS_Start()
             int i = 0;
             unsigned int s = millis();
             log_d("Waiting to connect to network");
-            while (!attached && ((++i) < 300))
+            while (!attached && ((++i) < 30))
             {
                 log_d(".");
                 delay(100);
@@ -9913,6 +9987,8 @@ void taskNetwork(void *pvParameters)
             log_d("IP address: %s", WiFi.localIP().toString().c_str());
             NTP_Timeout = millis() + 2000;
         }
+        wifiMulti.setStrictMode(false);  // Default is true.  Library will disconnect and forget currently connected AP if it's not in the AP list.
+        wifiMulti.setAllowOpenAP(true);  // Default is false.  True adds open APs to the AP list.
     }
 
     if (config.wifi_mode & WIFI_AP_FIX)
@@ -9955,7 +10031,6 @@ void taskNetwork(void *pvParameters)
     if (config.wifi_mode & WIFI_AP_STA_FIX)
     #endif
         webService();
-
     #ifdef BLUETOOTH
     bluetooth_init(); // Initialize Bluetooth if enabled
     #endif
@@ -9994,7 +10069,7 @@ void taskNetwork(void *pvParameters)
             {
                     lastHeard_Flag = false;
                     lastHeardTimeout = millis() + 1000;
-                    event_lastHeard();                    
+                    event_lastHeard(false);                    
             }
         }
 
@@ -10015,10 +10090,10 @@ void taskNetwork(void *pvParameters)
                 }
             }
         }
-        uint8_t wifiStatus = WL_DISCONNECTED;
+        wifiStatus = WL_DISCONNECTED;
         if (config.wifi_mode & WIFI_STA_FIX)
         {
-            wifiStatus = wifiMulti.run(connectTimeoutMs);
+            wifiStatus = wifiMulti.run(10000); // Timeout 10 sec
         }
         #ifdef PPPOS
         if ((wifiStatus == WL_CONNECTED) || (PPP.connected()))
@@ -10051,14 +10126,20 @@ void taskNetwork(void *pvParameters)
                         //     log_d("Wireguard UP Link");
                         // else
                         //     log_d("Wireguard Connect Fail!");
+                        log_d("Setup Wireguard Setup!");
+                        vpnTimeout=millis()+10000;
+                        //if (wireguard_active()) wireguard_remove();
                         if (!wireguard_active())
-                        {
+                        {                            
+                         //if (wireguard_active()) wireguard_remove();
                             log_d("Setup Wireguard VPN!");
                             if(WiFi.isConnected()){
                                 wireguard_setup(NULL);
+                                vpnConnected=true;
                             }else{
                                 if(PPP.connected()){
                                     wireguard_setup((netif *)PPP.netif());
+                                    vpnConnected=true;
                                 }
                             }
                         }
@@ -10066,8 +10147,15 @@ void taskNetwork(void *pvParameters)
                 }
                 else
                 {
-                    NTP_Timeout = millis() + 5000;
+                    NTP_Timeout = millis() + 5000;                    
                 }
+            }
+
+            if(millis()>vpnTimeout && !vpnConnected && config.vpn){
+                vpnTimeout=millis()+10000;                                
+                log_d("RENEW Device Wireguard VPN!"); 
+                wireguard_change_device();
+                vpnConnected=true; 
             }
 
             if (config.igate_en)
@@ -10198,11 +10286,13 @@ void taskNetwork(void *pvParameters)
 
             if (millis() > pingTimeout)
             {
-                pingTimeout = millis() + 60000;
+                pingTimeout = millis() + 600000;
                 if(config.wifi_mode & WIFI_STA_FIX)
                 {
                     log_d("Ping WiFi to %s\n", WiFi.gatewayIP().toString().c_str());
-                    if (ping_start(ap_dns, 2, 0, 0, 5) == true)
+                    IPAddress wifiIP;
+                    wifiIP.fromString(String(WiFi.gatewayIP().toString()));
+                    if (ping_start(wifiIP, 2, 0, 0, 10) == true)
                     {
                         log_d("Ping WiFi Success!!\n");
                     }
@@ -10238,37 +10328,37 @@ void taskNetwork(void *pvParameters)
                         wifiMulti.run(5000);
                     }
                 }
-                if (config.vpn)
-                {
-                    if (!wireguard_active())
-                    {
-                        log_d("Reconnection Wireguard VPN!");
-                        wireguard_remove();
-                        delay(1000);
-                        if(WiFi.isConnected()){
-                                wireguard_setup(NULL);
-                            }else{
-                                if(PPP.connected()){
-                                    wireguard_setup((netif *)PPP.netif());
-                                }
-                            }
-                    }
-                    IPAddress vpnIP;
-                    vpnIP.fromString(String(config.wg_gw_address));
-                    log_d("Ping VPN to %s", vpnIP.toString().c_str());
-                    if (ping_start(vpnIP, 2, 0, 0, 30) == true)
-                    {
-                        log_d("VPN Ping Success!!");
-                    }
-                    else
-                    {
-                        log_d("VPN Ping Fail!");
-                        wireguard_remove();
-                        delay(1000);
-                        wireguard_setup(NULL);
+                // if (config.vpn)
+                // {
+                //     if (!wireguard_active())
+                //     {
+                //         log_d("Reconnection Wireguard VPN!");
+                //         wireguard_remove();
+                //         delay(1000);
+                //         if(WiFi.isConnected()){
+                //                 wireguard_setup(NULL);
+                //             }else{
+                //                 if(PPP.connected()){
+                //                     wireguard_setup((netif *)PPP.netif());
+                //                 }
+                //             }
+                //     }
+                //     IPAddress vpnIP;
+                //     vpnIP.fromString(String(config.wg_local_address));
+                //     log_d("Ping VPN to %s", vpnIP.toString().c_str());
+                //     if (ping_start(vpnIP, 2, 0, 0, 10) == true)
+                //     {
+                //         log_d("VPN Ping Success!");
+                //     }
+                //     else
+                //     {
+                //         log_d("VPN Ping Fail!");
+                //         wireguard_remove();
+                //         delay(1000);
+                //         wireguard_setup(NULL);
                             
-                    }
-                }
+                //     }
+                // }
                 #ifdef PPPOS
                 if(config.ppp_enable)
                 {

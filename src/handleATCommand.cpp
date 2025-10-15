@@ -12,7 +12,7 @@ String handleATCommand(String cmd)
     if (cmd == "AT")
         return "OK";
 
-    if (cmd == "AT+RESET")
+    if (cmd == "AT+RESET" || cmd == "AT+RESTART")
     {
         log_d("CMD Reset System");
         delay(3000);
@@ -422,7 +422,7 @@ String handleATCommand(String cmd)
     }
 
     if (cmd == "AT+RF_FREQ?")
-        return String(config.rf_freq, 6);
+        return String(config.rf_freq, 5);
     else if (cmd.startsWith("AT+RF_FREQ="))
     {
         config.rf_freq = cmd.substring(11).toFloat();
@@ -438,7 +438,7 @@ String handleATCommand(String cmd)
     }
 
     if (cmd == "AT+RF_BW?")
-        return String(config.rf_bw, 6);
+        return String(config.rf_bw, 2);
     else if (cmd.startsWith("AT+RF_BW="))
     {
         config.rf_bw = cmd.substring(9).toFloat();
@@ -446,7 +446,7 @@ String handleATCommand(String cmd)
     }
 
     if (cmd == "AT+RF_BR?")
-        return String(config.rf_br, 6);
+        return String(config.rf_br, 2);
     else if (cmd.startsWith("AT+RF_BR="))
     {
         config.rf_br = cmd.substring(9).toFloat();
@@ -574,7 +574,7 @@ String handleATCommand(String cmd)
     }
 
     if (cmd == "AT+RF1_FREQ?")
-        return String(config.rf1_freq, 6);
+        return String(config.rf1_freq, 5);
     else if (cmd.startsWith("AT+RF1_FREQ="))
     {
         config.rf1_freq = cmd.substring(12).toFloat();
@@ -590,7 +590,7 @@ String handleATCommand(String cmd)
     }
 
     if (cmd == "AT+RF1_BW?")
-        return String(config.rf1_bw, 6);
+        return String(config.rf1_bw, 2);
     else if (cmd.startsWith("AT+RF1_BW="))
     {
         config.rf1_bw = cmd.substring(10).toFloat();
@@ -598,7 +598,7 @@ String handleATCommand(String cmd)
     }
 
     if (cmd == "AT+RF1_BR?")
-        return String(config.rf1_br, 6);
+        return String(config.rf1_br, 2);
     else if (cmd.startsWith("AT+RF1_BR="))
     {
         config.rf1_br = cmd.substring(10).toFloat();

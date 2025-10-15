@@ -507,6 +507,8 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["mqttHost"] = config.mqtt_host;
     doc["mqttTopic"] = config.mqtt_topic;
     doc["mqttSub"] = config.mqtt_subscribe;
+    doc["mqttTopicFlag"] = config.mqtt_topic_flag;
+    doc["mqttSubFlag"] = config.mqtt_subscribe_flag;
     doc["mqttPort"] = config.mqtt_port;
     doc["mqttUser"] = config.mqtt_user;
     doc["mqttPass"] = config.mqtt_pass;
@@ -1018,6 +1020,8 @@ bool loadConfiguration(const char *filename, Configuration &config)
         strlcpy(config.mqtt_host, doc["mqttHost"] | "", sizeof(config.mqtt_host));
         strlcpy(config.mqtt_topic, doc["mqttTopic"] | "", sizeof(config.mqtt_topic));
         strlcpy(config.mqtt_subscribe, doc["mqttSub"] | "", sizeof(config.mqtt_subscribe));
+        config.mqtt_topic_flag = doc["mqttTopicFlag"];
+        config.mqtt_subscribe_flag = doc["mqttSubFlag"];
         config.mqtt_port = doc["mqttPort"];
         strlcpy(config.mqtt_user, doc["mqttUser"] | "", sizeof(config.mqtt_user));
         strlcpy(config.mqtt_pass, doc["mqttPass"] | "", sizeof(config.mqtt_pass));
@@ -1040,8 +1044,8 @@ bool loadConfiguration(const char *filename, Configuration &config)
             config.msg_rf = true;
             config.msg_inet = true;
             config.msg_retry = 3;
-            config.msg_interval = 30000;
-            config.msg_path = 1;
+            config.msg_interval = 30;
+            config.msg_path = 9;
             sprintf(config.msg_key, "8EC8233E91D59B0164C24E771BA66307");
             sprintf(config.msg_mycall, "NOCALL");
         }else{

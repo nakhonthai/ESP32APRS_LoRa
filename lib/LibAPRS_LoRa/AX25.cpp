@@ -776,6 +776,7 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
     p = strpos(txt, '-');
     if (p > 0 && p < size)
     {
+        if(p>6) p=6;
         for (i = 0; i < p; i++)
         { // Get CallSign/Path
             hdr->addr[i] = txt[i];
@@ -800,6 +801,8 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
     }
     else
     {
+        if(size > 6)
+            size = 6;
         for (i = 0; i < size; i++)
         { // Get CallSign/Path
             if (txt[i] == '*')
@@ -828,7 +831,7 @@ char ax25_encode(ax25frame &frame, char *txt, int size)
     ptr = (char *)&frame;
     memset(ptr, 0, sizeof(ax25frame)); // Clear frame
     p = strpos(txt, ':');
-    if (p > 0 && p < size)
+    if (p > 7 && p < size)
     {
         // printf("p{:}=%d\r\n",p);
         // Get String APRS
@@ -838,7 +841,7 @@ char ax25_encode(ax25frame &frame, char *txt, int size)
             frame.data[i] = txt[p + i + 1];
         }
         p2 = strpos(txt, '>');
-        if (p2 > 0 && p2 < size)
+        if (p2 > 2 && p2 < size)
         {
             // printf("p2{>}=%d\r\n",p2);
             convPath(&frame.header[1], &txt[0], p2); // Get callsign src

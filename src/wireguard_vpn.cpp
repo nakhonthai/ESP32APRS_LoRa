@@ -107,6 +107,14 @@ static uint8_t wireguard_peer_index_local = WIREGUARDIF_INVALID_INDEX;
 //==============================================================================
 //  Exported functions
 //==============================================================================
+void wireguard_change_device()
+{
+    if(wg_netif==NULL) return;
+    LOCK_TCPIP_CORE();
+        wireguardif_changedevice(wg_netif);
+    UNLOCK_TCPIP_CORE();
+}
+
 bool wireguard_active()
 {
     if(wg_netif!=NULL) return true;
@@ -117,10 +125,12 @@ void wireguard_remove()
 {
 
  if(wg_netif!=NULL){
+    LOCK_TCPIP_CORE();
         wireguardif_disconnect(wg_netif, wireguard_peer_index_local);
         wireguardif_remove_peer(wg_netif, wireguard_peer_index_local);
-     //netif_set_down(wg_netif);
-     //netif_remove(&wg_netif_struct);
+     netif_set_down(wg_netif);
+     netif_remove(&wg_netif_struct);
+     UNLOCK_TCPIP_CORE();
  }
 }
 
@@ -144,7 +154,7 @@ void wireguard_setup(netif *ppp_netif)
     // wg.listen_port = WG_CLIENT_PORT;
     wg.private_key = config.wg_private_key;
     wg.listen_port = config.wg_port+1;
-    log_d("WireGuard ppp netif: %p",ppp_netif);
+    //log_d("WireGuard ppp netif: %p",ppp_netif);
     //log_d("PPP Gateway: %s",IPAddress(&ppp_netif->gw).toString().c_str());
     wg.bind_netif = NULL; // NB! not working on ESP32 even if set!
 
