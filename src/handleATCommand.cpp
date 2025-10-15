@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "handleATCommand.h"
 #include "config.h"
+#include <WiFi.h>
 
 extern Configuration config;
 
@@ -17,6 +18,37 @@ String handleATCommand(String cmd)
         log_d("CMD Reset System");
         delay(3000);
         esp_restart();
+    }
+
+    if (cmd == "AT+WIFI?")
+    {
+        String mode = "";
+        if (config.wifi_mode == WIFI_AP)
+            mode = "AP";
+        else if (config.wifi_mode == WIFI_STA)
+            mode = "STA";
+        else if (config.wifi_mode == WIFI_AP_STA)
+            mode = "AP+STA";
+        else
+            mode = "OFF";
+        mode = "Mode:" + mode + ",SSID:" + String(WiFi.SSID()) + ",RSSI:" + String(WiFi.RSSI()) + "dBm";
+        return mode;
+    }
+
+    if(cmd == "AT+MODE?")
+    {
+        String mode = "MODE: ";
+        if (config.igate_en)
+            mode += "IGATE";
+        if (config.digi_en)
+            mode += ",DIGI";
+        if (config.trk_en)
+            mode += ",TRK";
+        if (config.wx_en)
+            mode += ",WX";
+        if (config.tlm0_en)
+            mode += ",TLM0";
+        return mode;
     }
 
     if (cmd == "AT+TIME?")
