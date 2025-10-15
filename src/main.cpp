@@ -5233,15 +5233,18 @@ void mqtt_reconnect()
     // Loop until we're reconnected
     if (!clientMQTT.connected())
     {
+        char strCID[13];
+        uint64_t chipid = ESP.getEfuseMac();
+        sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
         Serial.print("Attempting MQTT connection...");
         // Attempt to connect
         char idMqtt[50];
-        sprintf(idMqtt, "%s", config.wx_mycall);
-        if (strlen(config.wx_object) > 3)
-        {
-            strcat(idMqtt, "_");
-            strcat(idMqtt, config.wx_object);
-        }
+        sprintf(idMqtt, "%s", strCID);
+        // if (strlen(config.wx_object) > 3)
+        // {
+        //     strcat(idMqtt, "_");
+        //     strcat(idMqtt, config.wx_object);
+        // }
         bool res=false;
         if(config.mqtt_user[0]!=0){
             res=clientMQTT.connect(idMqtt, config.mqtt_user, config.mqtt_pass);
@@ -9691,9 +9694,8 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
                 clientMQTT.disconnect();
                 clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
                 clientMQTT.setCallback(mqtt_callback);
-            }else{
-                mqtt_reconnect();
             }
+            mqtt_reconnect();
         }
 #endif
         }
@@ -9766,9 +9768,8 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
                 clientMQTT.disconnect();
                 clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
                 clientMQTT.setCallback(mqtt_callback);
-            }else{
-                mqtt_reconnect();
             }
+            mqtt_reconnect();
         }
 #endif        
         log_d("WiFi Connected");
@@ -9794,9 +9795,8 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
                 clientMQTT.disconnect();
                 clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
                 clientMQTT.setCallback(mqtt_callback);
-            }else{
-                mqtt_reconnect();
             }
+            mqtt_reconnect();
         }
 #endif                           
         #ifdef PPPOS
