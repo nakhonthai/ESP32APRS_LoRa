@@ -122,10 +122,16 @@ void getSensor(uint32_t type, float *val, int i)
         {
             
             weather.visable |= type;
-            if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
-                *val = sen[senIdx].sample;
-            else
+            if(config.wx_sensor_avg[i] && (sen[senIdx].timeAvg > 0) )
+            {
                 *val = sen[senIdx].average;
+            }else{
+                *val = sen[senIdx].sample;
+            }
+            // if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
+            //     *val = sen[senIdx].sample;
+            // else
+            //     *val = sen[senIdx].average;
         }
         else
         {
@@ -147,10 +153,16 @@ void getSensor(uint32_t type, uint16_t *val, int i)
         if (sen[senIdx].visable)
         {
             weather.visable |= type;
-            if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
-                *val = sen[senIdx].sample;
-            else
+            if(config.wx_sensor_avg[i] && (sen[senIdx].timeAvg > 0) )
+            {
                 *val = sen[senIdx].average;
+            }else{
+                *val = sen[senIdx].sample;
+            }
+            // if (!config.wx_sensor_avg[i] || (config.sensor[senIdx].averagerate <= config.sensor[senIdx].samplerate) || (sen[senIdx].timeAvg == 0))
+            //     *val = sen[senIdx].sample;
+            // else
+            //     *val = sen[senIdx].average;
         }
         else
         {
