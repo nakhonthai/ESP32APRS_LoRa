@@ -731,14 +731,14 @@ int getWxJson(char *strData)
     if (config.wx_flage & WX_WIND_SPD)
     {
         if (weather.visable & WX_WIND_SPD){
-            sprintf(strtmp, ",\"windSpeed\":\"%.1f\"", weather.windspeed * 0.621);
+            sprintf(strtmp, ",\"windSpeed\":\"%.1f\"", weather.windspeed);
             strcat(strData, strtmp);
         }
     }
 
     if ((weather.visable & WX_WIND_SPD) && (weather.visable & WX_WIND_GUST))
     {
-        sprintf(strtmp, ",\"windGust\":\"%.1f\"", weather.windgust * 0.621);
+        sprintf(strtmp, ",\"windGust\":\"%.1f\"", weather.windgust);
         strcat(strData, strtmp);
     }
 
@@ -752,20 +752,20 @@ int getWxJson(char *strData)
         }
     }
 
-    unsigned int rain = (unsigned int)round((weather.rain * 100.0F) / 25.6F);
-    unsigned int rain24 = (unsigned int)round((weather.rain24hr * 100.0F) / 25.6F);
-    unsigned int rainGMT = (unsigned int)round((weather.rainmidnight * 100.0F) / 25.6F);
+    // unsigned int rain = (unsigned int)round((weather.rain * 100.0F) / 25.6F);
+    // unsigned int rain24 = (unsigned int)round((weather.rain24hr * 100.0F) / 25.6F);
+    // unsigned int rainGMT = (unsigned int)round((weather.rainmidnight * 100.0F) / 25.6F);
     time_t now;
     time(&now);
     struct tm *info = gmtime(&now);
     if (info->tm_min == 0)
     {
-        rain = 0;
+        //rain = 0;
         weather.rain = 0;
     }
     if (info->tm_hour == 0 && info->tm_min == 0)
     {
-        rain24 = 0;
+        //rain24 = 0;
         weather.rain24hr = 0;
     }
 
