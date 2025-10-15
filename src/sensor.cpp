@@ -1148,6 +1148,7 @@ bool getSensor(int cfgIdx)
         if (config.gnss_enable)
         {
             getSAT();
+            return true;
         }
         else
         {
@@ -1158,6 +1159,7 @@ bool getSensor(int cfgIdx)
         if (config.gnss_enable)
         {
             getSAT();
+            return true;
         }
         else
         {
@@ -1201,19 +1203,24 @@ bool getSensor(int cfgIdx)
         // #endif
     case PORT_BATTERY:
         getBAT(0);
+        return true;
         break;
     case PORT_CNT_0:
         getCNT0(port);
+        return true;
         break;
     case PORT_CNT_1:
         getCNT1(port);
+        return true;
         break;
     case PORT_LOGIC:
         getLOGIC(port);
+        return true;
         break; 
     case PORT_DS1820:
         if(config.onewire_enable){
             getDS1820(port);
+            return true;
         }
         break;       
     default:
