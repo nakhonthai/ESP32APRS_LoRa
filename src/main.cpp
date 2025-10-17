@@ -618,13 +618,13 @@ bool setupPower()
         delay(500);
         PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
         delay(500);
-        PMU.setDC3Voltage(3400); // Set DC3 voltage to 3300mV ,VRF_V
+        PMU.setDC3Voltage(3500); // Set DC3 voltage to 3500mV ,VRF_V
         delay(500);
-        PMU.setDC4Voltage(3400); // Set DC4 voltage to VRF_U
+        PMU.setDC4Voltage(3500); // Set DC4 voltage to 3500mV ,VRF_U
         delay(500);
-        PMU.setALDO1Voltage(3000); // Set ALDO1 voltage to 3300mV
+        PMU.setALDO1Voltage(3000); // Set ALDO1 voltage to 3000mV
         delay(500);
-        PMU.setALDO2Voltage(2000); // Set ALDO2 voltage to
+        PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to 3300mV
         delay(500);
         PMU.setDLDO1Voltage(3300);           // Set DLDO1 voltage to 3300mV
         PMU.setDLDO2Voltage(3300);           // Set DLDO2 voltage to 3300mV
@@ -3392,6 +3392,118 @@ void defaultConfig()
     config.i2c1_sda_pin = 21;
     config.i2c1_sck_pin = 47;
     config.oled_enable = false;
+    //"Sensor":true,15,0,60,600,0,1,0,6,"Temperature","°C",true,15,0,60,600,0,1,0,7,"Humidity","%RH",true,13,118,60,600,0,1,0,8,"Pressure","hPa",true,5,1,60,600,0,0.2,0,11,"Rain","mm",true,6,2,60,600,0,0.06,0,9,"WindSpeed","kPh",true,29,0,60,600,0,0.00271,0,10,"WindCourse","°",true,29,1,10,600,0,0.01412,0,12,"Luminosity","W/m³",true,27,0,60,600,0,1,0,19,"Voltage","V",true,27,0,60,600,0,0.001,0,20,"Current","A",true,29,3,10,600,0,0.00018,0,19,"Voltage","V"]
+    config.sensor[0].enable = true;
+    config.sensor[0].port = 15;
+    config.sensor[0].address = 0;
+    config.sensor[0].samplerate = 60;
+    config.sensor[0].averagerate = 600;
+    config.sensor[0].eqns[0] = 0; // a
+    config.sensor[0].eqns[1] = 1; // b
+    config.sensor[0].eqns[2] = 0; // c
+    config.sensor[0].type = 6;
+    sprintf(config.sensor[0].parm, "Temperature");
+    sprintf(config.sensor[0].unit, "°C");
+    config.sensor[1].enable = true;
+    config.sensor[1].port = 15; 
+    config.sensor[1].address = 1;
+    config.sensor[1].samplerate = 60;
+    config.sensor[1].averagerate = 600;
+    config.sensor[1].eqns[0] = 0; // a
+    config.sensor[1].eqns[1] = 1; // b
+    config.sensor[1].eqns[2] = 0; // c
+    config.sensor[1].type = 7;
+    sprintf(config.sensor[1].parm, "Humidity");
+    sprintf(config.sensor[1].unit, "%RH");
+    config.sensor[2].enable = true;
+    config.sensor[2].port = 13;
+    config.sensor[2].address = 2;
+    config.sensor[2].samplerate = 60;
+    config.sensor[2].averagerate = 600;
+    config.sensor[2].eqns[0] = 0; // a
+    config.sensor[2].eqns[1] = 1; // b
+    config.sensor[2].eqns[2] = 0; // c
+    config.sensor[2].type = 8;
+    sprintf(config.sensor[2].parm, "Pressure");
+    sprintf(config.sensor[2].unit, "hPa");
+    config.sensor[3].enable = true;
+    config.sensor[3].port = 5;
+    config.sensor[3].address = 1;
+    config.sensor[3].samplerate = 60;
+    config.sensor[3].averagerate = 600;
+    config.sensor[3].eqns[0] = 0; // a
+    config.sensor[3].eqns[1] = 0.2; // b
+    config.sensor[3].eqns[2] = 0; // c
+    config.sensor[3].type = 11;
+    sprintf(config.sensor[3].parm, "Rain");
+    sprintf(config.sensor[3].unit, "mm");
+    config.sensor[4].enable = true; //Davis Anemometer PN#6410
+    config.sensor[4].port = 6;
+    config.sensor[4].address = 2;
+    config.sensor[4].samplerate = 60;
+    config.sensor[4].averagerate = 600;
+    config.sensor[4].eqns[0] = 0; // a
+    config.sensor[4].eqns[1] = 0.06; // b
+    config.sensor[4].eqns[2] = 0; // c
+    config.sensor[4].type = 9;
+    sprintf(config.sensor[4].parm, "WindSpeed");
+    sprintf(config.sensor[4].unit, "kPh");
+    config.sensor[5].enable = true;
+    config.sensor[5].port = 29;
+    config.sensor[5].address = 0;
+    config.sensor[5].samplerate = 60;
+    config.sensor[5].averagerate = 600;
+    config.sensor[5].eqns[0] = 0; // a
+    config.sensor[5].eqns[1] = 0.00271; // b
+    config.sensor[5].eqns[2] = 0; // c
+    config.sensor[5].type = 10;
+    sprintf(config.sensor[5].parm, "WindCourse");
+    sprintf(config.sensor[5].unit, "°");
+    config.sensor[6].enable = true;
+    config.sensor[6].port = 29;
+    config.sensor[6].address = 1;
+    config.sensor[6].samplerate = 60;
+    config.sensor[6].averagerate = 600;
+    config.sensor[6].eqns[0] = 0; // a
+    config.sensor[6].eqns[1] = 0.01412; // b
+    config.sensor[6].eqns[2] = 0; // c
+    config.sensor[6].type = 12;
+    sprintf(config.sensor[6].parm, "Luminosity");
+    sprintf(config.sensor[6].unit, "W/m³");
+    config.sensor[7].enable = true;
+    config.sensor[7].port = 27;
+    config.sensor[7].address = 0;
+    config.sensor[7].samplerate = 60;
+    config.sensor[7].averagerate = 600;
+    config.sensor[7].eqns[0] = 0; // a
+    config.sensor[7].eqns[1] = 1; // b
+    config.sensor[7].eqns[2] = 0; // c
+    config.sensor[7].type = 19;
+    sprintf(config.sensor[7].parm, "Voltage");
+    sprintf(config.sensor[7].unit, "V");
+    config.sensor[8].enable = true;
+    config.sensor[8].port = 27;
+    config.sensor[8].address = 0;
+    config.sensor[8].samplerate = 60;
+    config.sensor[8].averagerate = 600;
+    config.sensor[8].eqns[0] = 0; // a
+    config.sensor[8].eqns[1] = 1; // b
+    config.sensor[8].eqns[2] = 0; // c
+    config.sensor[8].type = 20;
+    sprintf(config.sensor[8].parm, "Current");
+    sprintf(config.sensor[8].unit, "A");
+    config.sensor[9].enable = true;
+    config.sensor[9].port = 29;
+    config.sensor[9].address = 3;
+    config.sensor[9].samplerate = 60;
+    config.sensor[9].averagerate = 600;
+    config.sensor[9].eqns[0] = 0; // a
+    config.sensor[9].eqns[1] = 0.00018; // b
+    config.sensor[9].eqns[2] = 0; // c
+    config.sensor[9].type = 19;
+    sprintf(config.sensor[9].parm, "Voltage");
+    sprintf(config.sensor[9].unit, "V");
+
 #endif
 
     config.counter0_enable = false;
