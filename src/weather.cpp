@@ -233,7 +233,6 @@ int getRawWx(char *strData)
             getSensor(senType, &windspeed, i, config.wx_sensor_avg[i]);
             if(wgIdx>=(sizeof(wgArray)/4)) wgIdx=0;
             wgArray[wgIdx++]=windspeed;
-            weather.windgust=0.0F;
             for(int i;i<(sizeof(wgArray)/4);i++)
             {
                 if(wgArray[i]>weather.windgust) weather.windgust=wgArray[i];
@@ -416,6 +415,7 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_HUMIDITY)
     {
+        if(weather.humidity>99.0F) weather.humidity=99.0F;
         if ((weather.visable & WX_HUMIDITY) && (weather.humidity<100.0F))
             sprintf(strtmp, "h%02u", (unsigned int)round(weather.humidity));
         else
