@@ -85,10 +85,10 @@ extern float mslAltitude;
 
 int getRawWx(char *strData);
 bool getCSV2Wx(String stream);
-void getSensor(uint32_t type, float *val, int i);
-void getSensor(uint32_t type, uint16_t *val, int i);
-void getSensor(uint32_t type, uint32_t *val, int i);
-int getWxJson(char *strData);
+void getSensor(uint32_t type, float *val, int i, bool avg);
+void getSensor(uint32_t type, uint16_t *val, int i, bool avg);
+void getSensor(uint32_t type, uint32_t *val, int i, bool avg);
+int getWxJson(char *strData, bool avg);
 // bool getM70xModbus(ModbusMaster &node);
 // bool getM70xModbus(ModbusMaster &node, uint32_t sensor);
 

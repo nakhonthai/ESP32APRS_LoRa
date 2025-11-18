@@ -1783,12 +1783,12 @@ void handle_radio(AsyncWebServerRequest *request)
 		String html = "OK";
 		if (APRS_init(&config))
 		{
-			html = "Setup completed successfully";
+			html = "OK_RF1";
 			saveConfiguration("/default.cfg", config);
 		}
 		else
 		{
-			html = "Setup failed";
+			html = "FAIL_RF1";
 		}
 		request->send(200, "text/html", html); // send to someones browser when asked
 	}
@@ -1963,15 +1963,15 @@ void handle_radio(AsyncWebServerRequest *request)
 		config.rf1_en = radioEnable1;
 		config.rf1_ax25 = ax25Enable1;
 		config.rf1_rx_boost = rxBoost1;
-		String html = "OK";
+		String html = "";
 		if (APRS_init2(&config))
 		{
-			html = "Setup completed successfully";
+			html = "OK_RF2";
 			saveConfiguration("/default.cfg", config);
 		}
 		else
 		{
-			html = "Setup failed";
+			html = "FAIL_RF2";
 		}
 		request->send(200, "text/html", html); // send to someones browser when asked
 	}
@@ -1994,9 +1994,12 @@ void handle_radio(AsyncWebServerRequest *request)
 		html += "contentType: false,\n";
 		html += "processData: false,\n";
 		html += "success: function (data) {\n";
-		html += "alert(\"Submited Successfully\");\n";
+		html += "console.log(data);";
+		html += "if(data === \"OK_RF1\") {alert(\"RF1 Initialized Successfully\");}else if(data === \"FAIL_RF1\"){alert(\"RF1 Initialized Failed\");}";
+		html += "else if(data === \"OK_RF2\") {alert(\"RF2 Initialized Successfully\");}else if(data === \"FAIL_RF2\"){alert(\"RF2 Initialized Failed\");}else{alert(\"RF Initialized not response.\");}\n";
 		html += "},\n";
 		html += "error: function (data) {\n";
+		html += "console.log(data);";
 		html += "alert(\"An error occurred.\");\n";
 		html += "}\n";
 		html += "});\n";

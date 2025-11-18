@@ -20,6 +20,90 @@ String handleATCommand(String cmd)
         esp_restart();
     }
 
+    // if(cmd == "AT+VERSION?")
+    // {
+    //     String ver = "Firmware Version: " + String(FIRMWARE_VERSION);
+    //     ver += ", SDK Version: " + String(ESP.getSdkVersion());
+    //     ver += ", Core Version: " + String(ARDUINO_ESP32_RELEASE);
+    //     return ver;
+    // }
+
+    if(cmd == "AT+CHIPID?")
+    {
+        uint64_t chipid = ESP.getEfuseMac();
+        String id = String((uint16_t)(chipid >> 32), HEX) + String((uint32_t)chipid, HEX);
+        id.toUpperCase();
+        return id;
+    }
+
+    if(cmd == "AT+SAVECONFIG")
+    {
+        if(saveConfiguration("/default.cfg", config))
+        {
+            return "Configuration Saved";
+        }
+        else
+        {
+            return "Failed to Save Configuration";
+        }
+    }
+
+    if(cmd == "LOADCONFIG")
+    {
+        if(loadConfiguration("/default.cfg", config))
+        {
+            return "Configuration Loaded";
+        }
+        else
+        {
+            return "Failed to Load Configuration";
+        }
+    }
+
+    if(cmd == "AT+WIFI_DISCONNECT")
+    {
+        WiFi.disconnect(true);
+        return "WiFi Disconnected";
+    }
+
+    if(cmd == "AT+WIFI_CONNECT")
+    {
+        WiFi.reconnect();
+        return "WiFi Reconnecting";
+    }
+
+    if(cmd == "AT+WIFI_STATUS?")
+    {
+        String status = "WiFi Status: ";
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            status += "Connected";
+        }
+        else
+        {
+            status += "Disconnected";
+        }
+        return status;
+    }
+
+
+    if(cmd == "AT+WIFI_SCAN")
+    {
+        int16_t n = WiFi.scanNetworks();
+        String scanResult = "Scan Complete: " + String(n) + " networks found.\n";
+        for (int i = 0; i < n; ++i)
+        {
+            scanResult += String(i + 1) + ": ";
+            scanResult += WiFi.SSID(i);
+            scanResult += ", RSSI: " + String(WiFi.RSSI(i)) + "dBm";
+            scanResult += ", BSSID: " + WiFi.BSSIDstr(i);
+            scanResult += ", Channel: " + String(WiFi.channel(i));
+            scanResult += ", Encryption: " + String((int)WiFi.encryptionType(i)) + "\n";
+        }
+        WiFi.scanDelete();
+        return scanResult;
+    }
+
     if (cmd == "AT+WIFI?")
     {
         String mode = "";

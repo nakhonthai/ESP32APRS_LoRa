@@ -4571,6 +4571,9 @@ void setup()
     // pinMode(1, INPUT);
     //  Set the CPU frequency to 80 MHz for power optimization
     // setCpuFrequencyMhz(80);
+    #ifdef NAWS4
+    setCpuFrequencyMhz(160);
+    #endif
 
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
@@ -4599,9 +4602,9 @@ void setup()
 
     // Set up serial port
     // #ifdef CORE_DEBUG_LEVEL
-    Serial.begin(115200); // debug
+    //Serial.begin(115200); // debug
                           // #else
-    Serial.begin(9600);   // monitor
+    //Serial.begin(9600);   // monitor
                           // #endif
 
     if (!LITTLEFS.begin(FORMAT_LITTLEFS_IF_FAILED))
@@ -4923,7 +4926,7 @@ void setup()
             display.display();
 
             delay(1000);
-            digitalWrite(LED_RX, HIGH);
+            //digitalWrite(LED_RX, HIGH);
             LED_Status(0, 255, 0);
             display.fillRect(69, 59, 50, 8, 0);
             display.setCursor(90, 60);
@@ -4982,6 +4985,7 @@ void setup()
     LED_Status(0, 0, 0);
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
+        pinMode(BOOT_PIN, INPUT_PULLUP);
                 if (digitalRead(BOOT_PIN) == LOW)
                 {
                     defaultConfig();
@@ -4997,13 +5001,13 @@ void setup()
 #endif
                 display.display();
 #endif
-                while (digitalRead(BOOT_PIN) == LOW)
-                {
-                    delay(500);
-                    LED_Status(255, 255, 255);
-                    delay(500);
-                    LED_Status(0, 0, 0);
-                }
+                    while (digitalRead(BOOT_PIN) == LOW)
+                    {
+                        delay(500);
+                        LED_Status(255, 255, 255);
+                        delay(500);
+                        LED_Status(0, 0, 0);
+                    }
                 }
     }
     LED_Status(0, 0, 0);
@@ -5011,6 +5015,7 @@ void setup()
 #if ARDUINO_USB_MODE
         Serial.begin(115200);
 #endif
+
     if(config.uart0_enable)
     {
         Serial0.begin(config.uart0_baudrate, SERIAL_8N1, config.uart0_rx_gpio, config.uart0_tx_gpio);
@@ -5203,6 +5208,7 @@ void setup()
             0);                /* Core where the task should run */
     }
 
+        pinMode(BOOT_PIN, INPUT_PULLUP);
     //esp_task_wdt_add(taskAPRSPollHandle);
     // esp_task_wdt_add(NULL);
     // esp_task_wdt_status(NULL);
@@ -8417,6 +8423,7 @@ void taskSerial(void *pvParameters)
 long timeSlot;
 unsigned long iGatetickInterval;
 unsigned long WxInterval;
+unsigned long WxIntervalAvg = 0;
 unsigned long msgInterval;
 bool initInterval = true;
 int trkTlmInvCount = 0;
@@ -8458,6 +8465,8 @@ void taskAPRS(void *pvParameters)
     tx_interval = config.trk_interval;
     initInterval = true;
     AFSKInitAct = true;
+    WxIntervalAvg = millis() + (600 * 1000);
+    WxInterval= millis() + (config.wx_interval * 1000);
     log_d("Task APRS init susses....");
     for (;;)
     {
@@ -8467,7 +8476,7 @@ void taskAPRS(void *pvParameters)
         time(&timeStamp);
         if (initInterval)
         {
-            tickInterval = WxInterval = DiGiInterval = iGatetickInterval = millis() + 10000;
+            tickInterval = DiGiInterval = iGatetickInterval = millis() + 10000;
             igateSTSInterval = digiSTSInterval = trkSTSInterval = millis() + 15000;
             systemTLM.ParmTimeout = millis() + 20000;
             systemTLM.TeleTimeout = millis() + 30000;
@@ -9621,14 +9630,35 @@ void taskAPRS(void *pvParameters)
                     WxInterval = millis() + (10 * 1000);
                 }
 #ifdef MQTT
-                if (config.en_mqtt && clientMQTT.connected() && (config.mqtt_topic_flag & MQTT_TOPIC_WX))
+                if (config.en_mqtt && (config.mqtt_topic_flag & MQTT_TOPIC_WX) && clientMQTT.connected())
                 {
                     char payload[500];
-                    getWxJson(&payload[0]);
+                    char topic[100];
+                    if(strlen(config.wx_object)<3)
+                        sprintf(topic,"/%s/WEATHER/sample",config.wx_mycall);
+                    else
+                        sprintf(topic,"/%s/WEATHER/sample",config.wx_object);
+                    getWxJson(&payload[0],false);
                     log_d("Publish MQTT Topic: %s Payload: %s", config.mqtt_topic, payload);
                     clientMQTT.publish(config.mqtt_topic, payload);
                 }
 #endif
+            }
+            if (millis() > WxIntervalAvg)
+            {
+                WxIntervalAvg = millis() + (600 * 1000);
+                if (config.en_mqtt && (config.mqtt_topic_flag & MQTT_TOPIC_WX) && clientMQTT.connected())
+                {
+                    char payload[500];
+                    char topic[100];
+                    if(strlen(config.wx_object)<3)
+                        sprintf(topic,"/%s/WEATHER/average",config.wx_mycall);
+                    else
+                        sprintf(topic,"/%s/WEATHER/average",config.wx_object);
+                    getWxJson(&payload[0],true);
+                    log_d("Publish MQTT Topic: %s Payload: %s", topic, payload);
+                    clientMQTT.publish(topic, payload);
+                }
             }
         }
 
@@ -9934,6 +9964,7 @@ void PPPOS_Start()
     {        
         pppTimeout = millis() + (600 * 1000);
         log_d("Starting the modem. It might take a while!");
+        PPP.end();
         pinMode(config.ppp_rst_gpio, OUTPUT);
         digitalWrite(config.ppp_rst_gpio, config.ppp_rst_active);
         delay(config.ppp_rst_delay);
@@ -9941,7 +9972,7 @@ void PPPOS_Start()
         // pinMode(39, INPUT_PULLUP); // Set GPIO39 as input with pull-up resistor
         //  digitalWrite(39, HIGH); // Set GPIO39 to high to enable pull-up resistor
         delay(1000); // Wait for the modem to reset
-
+        
         PPP.setApn(config.ppp_apn);     // Set the APN for the modem
         PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
         PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
@@ -10085,6 +10116,7 @@ void taskNetwork(void *pvParameters)
     if (config.wifi_mode & WIFI_STA_FIX)
     {
         manualWiFi = true;
+        wifiMulti.APlistClean(); // Clear AP list
         for (int i = 0; i < 5; i++)
         {
             if (config.wifi_sta[i].enable)
@@ -10485,8 +10517,6 @@ void taskNetwork(void *pvParameters)
                         else
                         {
                             log_d("PPP Ping Fail!");
-                            PPP.reset();                        
-                            delay(1000);
                             PPPOS_Start();
                             pppTimeout = millis() + (600 * 1000);
                         }
