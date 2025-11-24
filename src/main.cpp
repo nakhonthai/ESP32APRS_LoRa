@@ -9608,7 +9608,7 @@ void taskAPRS(void *pvParameters)
                     }
                     #endif
                 }
-                if (rawData != "")
+                if (!rawData.isEmpty())
                 {
                     WxInterval = millis() + (config.wx_interval * 1000);
                     Sleep_Activate &= ~ACTIVATE_WX;
@@ -9644,6 +9644,7 @@ void taskAPRS(void *pvParameters)
                 }
 #endif
             }
+#ifdef MQTT            
             if (millis() > WxIntervalAvg)
             {
                 WxIntervalAvg = millis() + (600 * 1000);
@@ -9660,6 +9661,7 @@ void taskAPRS(void *pvParameters)
                     clientMQTT.publish(topic, payload);
                 }
             }
+#endif            
         }
 
         if (config.tlm0_en)

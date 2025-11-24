@@ -598,7 +598,8 @@ int getRawWx(char *strData)
     if (config.wx_flage & WX_HUMIDITY)
     {
         if (weather.visable & WX_HUMIDITY){
-            sprintf(strtmp, "H%03u", (unsigned int)round(weather.humidity*10.0F));
+            if(weather.humidity>99.9F) weather.humidity=99.9F;
+            sprintf(strtmp, "H%03u", (unsigned int)(weather.humidity*10.0F));
             strcat(strData, strtmp);
         }
     }
