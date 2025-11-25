@@ -16,6 +16,7 @@
 #include <LibAPRSesp.h>
 #include <parse_aprs.h>
 #include "jquery_min_js.h"
+#include <ESPCPUTemp.h>
 
 AsyncWebServer async_server(80);
 AsyncWebServer async_websocket(81);
@@ -686,6 +687,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<th><span>SD CARD(MByte)</span></th>\n";
 #endif
 	html += "<th><span>CPU Speed(Mhz)</span></th>\n";
+	html += "<th><span>CPU.Temp(°C)</span></th>\n";
 
 	html += "</tr>\n";
 	html += "<tr>\n";
@@ -712,6 +714,12 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	html += "<td><b>" + String(cardUsed) + "/" + String(cardTotal) + "</b></td>\n";
 #endif
 	html += "<td><b>" + String(ESP.getCpuFreqMHz()) + "</b></td>\n";
+	ESPCPUTemp tempSensor;
+	if (tempSensor.begin()) {
+		html += "<td><b>" + String(tempSensor.getTemp(), 1) + "</b></td>\n";
+	}else{
+		html += "<td><b>N/A</b></td>\n";
+	}
 	// html += "<td style=\"background: #f00\"><b>" + String(ESP.getCycleCount()) + "</b></td>\n";
 	html += "</tr>\n";
 	html += "</table>\n";

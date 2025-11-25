@@ -22,6 +22,7 @@
 #include <ModbusMaster.h>
 #include <TinyGPS++.h>
 #include <soc/gpio_struct.h>
+#include <ESPCPUTemp.h>
 //#include <OneWire.h>
 //#include <DallasTemperature.h>
 
@@ -217,6 +218,28 @@ bool sensorUpdate(int i, double val)
     return true;
 }
 
+bool getCPU_TEMP(uint8_t port)
+{
+    ESPCPUTemp tempSensor;
+
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+    {
+        if (config.sensor[i].type == SENSOR_TEMPERATURE)
+        {
+            if (tempSensor.begin())
+            {
+                float temperature = tempSensor.getTemp();
+                sensorUpdate(i, (double)temperature);
+            }
+            else
+            {
+                log_d("CPU Temp Sensor not available");
+                return false;
+            }
+        }       
+    }
+    return true;
+}
 bool getBAT(uint8_t port)
 {
     // analogReadResolution(12);
@@ -1204,6 +1227,9 @@ bool getSensor(int cfgIdx)
     case PORT_BATTERY:
         getBAT(0);
         return true;
+        break;
+    case PORT_CPU_TEMP:
+        getCPU_TEMP(0);
         break;
     case PORT_CNT_0:
         getCNT0(port);
