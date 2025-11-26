@@ -9278,7 +9278,7 @@ void taskAPRS(void *pvParameters)
                 }
             }
             // IGATE send to inet
-            if (newIGatePkg)
+            if ((newIGatePkg && aprsClient.connected()==true))
             {
                 newIGatePkg = false;
                 // if (config.rf2inet && aprsClient.connected())
@@ -9300,6 +9300,9 @@ void taskAPRS(void *pvParameters)
                         //igateTLM.RF2INET++;
                     }
                 }
+            }
+            if(config.digi_auto){
+               DiGiInterval = millis() + (config.digi_interval * 1000);
             }
         }
 
