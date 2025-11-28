@@ -2400,7 +2400,7 @@ void defaultConfig()
     sprintf(config.igate_host, "aprs.dprns.com");
     //memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
     sprintf(config.igate_moniCall, "%s-%d", config.igate_mycall, config.igate_ssid);
-    sprintf(config.igate_filter, "m/0");
+    sprintf(config.igate_filter, "m/10");
     //--Position
     config.igate_gps = false;
     config.igate_lat = 13.7555;
