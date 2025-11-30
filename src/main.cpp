@@ -2397,7 +2397,7 @@ void defaultConfig()
     config.igate_ssid = 1;
     config.aprs_port = 14580;
     sprintf(config.igate_mycall, "NOCALL");
-    sprintf(config.igate_host, "aprs.dprns.com");
+    sprintf(config.igate_host, "aprs.nakhonthai.net");
     //memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
     sprintf(config.igate_moniCall, "%s-%d", config.igate_mycall, config.igate_ssid);
     sprintf(config.igate_filter, "m/10");
@@ -2574,7 +2574,7 @@ void defaultConfig()
     config.rx_display = true;
 
     // afsk,TNC
-    sprintf(config.ntp_host, "ntp.dprns.com");
+    sprintf(config.ntp_host, "ntp.nakhonthai.net");
 
     sprintf(config.path[0], "WIDE1-1");
     sprintf(config.path[1], "WIDE1-1,WIDE2-1");
@@ -2584,7 +2584,7 @@ void defaultConfig()
     // VPN Wireguard
     config.vpn = false;
     config.wg_port = 51820;
-    sprintf(config.wg_peer_address, "vpn.dprns.com");
+    sprintf(config.wg_peer_address, "vpn.nakhonthai.net");
     sprintf(config.wg_local_address, "192.168.1.2");
     sprintf(config.wg_netmask_address, "255.255.255.0");
     sprintf(config.wg_gw_address, "192.168.1.1");
@@ -4299,7 +4299,7 @@ bool pkgTxSend()
                                 if((config.aprs_port != 24580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
                                 {
                                     String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
-                                    aprsUDP.beginPacket("aprs.dprns.com", 8081); // Send packet to APRS-IS (udp)
+                                    aprsUDP.beginPacket("aprs.nakhonthai.net", 8081); // Send packet to APRS-IS (udp)
                                     aprsUDP.write((const uint8_t *)packet.c_str(), packet.length()); // Send binary frame packet to APRS-IS (udp)
                                     aprsUDP.endPacket();
                                 }else{

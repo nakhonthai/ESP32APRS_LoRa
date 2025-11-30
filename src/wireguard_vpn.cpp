@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include "main.h"
 #include <esp_wireguard.h>
+#include <WiFi.h>
 
 
 //ใช้ตัวแปรโกลบอลในไฟล์ main.cpp

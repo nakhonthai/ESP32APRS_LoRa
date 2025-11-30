@@ -14,6 +14,9 @@ ESP32APRS_LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather
 * Support APRS internet gateway (IGATE)
 * Support APRS digital repeater (DIGI)
 * Support APRS tracker (TRACKER)
+* Support APRS Weather (WX)
+* Support APRS telemetry (TLM)
+* Support APRS Message (MSG)
 * Support GNSS External mod select UART0-2 and TCP Client
 * Support TNC External mod select UART0-2 and Yaesu packet
 * Support APRS IGATE/DIGI/WX with fix position for move position from GNSS
@@ -27,6 +30,10 @@ ESP32APRS_LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather
 * support VPN wireguard
 * support global time zone
 * support web service auth login
+* support BLUETOOTH SPP/BLE
+* support PPPoS (PPP Over Serial GSM network)
+* support MQTT
+* support AT-Command config/ctl by channel UART,MSG,Bluetooth
 * support Telemetry on IGate,Digi,Tracker
 * display received and transmit packet on the LED and display OLED
 
