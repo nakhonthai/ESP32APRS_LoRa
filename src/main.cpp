@@ -5018,13 +5018,21 @@ void setup()
 
     if(config.uart0_enable)
     {
+        
+    pinMode(config.uart0_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
+    pinMode(config.uart0_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial0.begin(config.uart0_baudrate, SERIAL_8N1, config.uart0_rx_gpio, config.uart0_tx_gpio);
     }
     if (config.uart1_enable)
     {
+        
+        pinMode(config.uart1_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
+        pinMode(config.uart1_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial1.begin(config.uart1_baudrate, SERIAL_8N1, config.uart1_rx_gpio, config.uart1_tx_gpio);
     }
     #if SOC_UART_NUM > 2
+    pinMode(config.uart2_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
+    pinMode(config.uart2_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
     Serial2.begin(config.uart2_baudrate, SERIAL_8N1, config.uart2_rx_gpio, config.uart2_tx_gpio);
     #endif
 
@@ -7986,16 +7994,16 @@ void taskGPS(void *pvParameters)
                     c = -1;
                     if (config.gnss_channel == 1)
                     {
-                        c = Serial0.read();
+                        if(Serial0.available()) c = Serial0.read();
                     }
                     else if (config.gnss_channel == 2)
                     {
-                        c = Serial1.read();
+                        if(Serial1.available()) c = Serial1.read();
                     }
                     #if SOC_UART_NUM > 2
                     else if (config.gnss_channel == 3)
                     {
-                        c = Serial2.read();
+                        if(Serial2.available()) c = Serial2.read();
                     }
                     #endif
                     if (c > -1)
@@ -8228,21 +8236,21 @@ void taskSerial(void *pvParameters)
                     c = -1;
                     if (config.ext_tnc_channel == 1)
                     {
-                        c = Serial0.read();
+                        if(Serial0.available()) c = Serial0.read();
                     }
                     else if (config.ext_tnc_channel == 2)
                     {
-                        c = Serial1.read();
+                        if(Serial1.available()) c = Serial1.read();
                     }
                     #if SOC_UART_NUM > 2
                     else if (config.ext_tnc_channel == 3)
                     {
-                        c = Serial2.read();
+                        if(Serial2.available()) c = Serial2.read();
                     }
                     #endif
                     else if (config.ext_tnc_channel == 4)
                     {
-                        c = Serial.read();
+                        if(Serial.available()) c = Serial.read();
                     }
 
                     if (c > -1)
