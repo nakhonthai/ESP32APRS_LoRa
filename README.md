@@ -35,6 +35,7 @@ ESP32APRS_LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather
 * support MQTT
 * support AT-Command config/ctl by channel UART,MSG,Bluetooth
 * support Telemetry on IGate,Digi,Tracker
+* support Automatic REBOOT by interval time
 * display received and transmit packet on the LED and display OLED
 
 ## Hardware screen short

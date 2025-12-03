@@ -7291,17 +7291,11 @@ void sendTelemetry_0(char *raw, bool header)
     char call[11];
     int i;
     memset(&call[0], 0, 11);
-    if (strlen(config.trk_item) > 3)
-    {
-        sprintf(call, "%s", config.trk_item);
-    }
+    if (config.tlm0_ssid == 0)
+        sprintf(call, "%s", config.tlm0_mycall);
     else
-    {
-        if (config.tlm0_ssid == 0)
-            sprintf(call, "%s", config.tlm0_mycall);
-        else
-            sprintf(call, "%s-%d", config.tlm0_mycall, config.tlm0_ssid);
-    }
+        sprintf(call, "%s-%d", config.tlm0_mycall, config.tlm0_ssid);
+
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
