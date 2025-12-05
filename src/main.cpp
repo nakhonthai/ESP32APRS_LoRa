@@ -490,8 +490,8 @@ RTC_DATA_ATTR pkgListType *pkgList;
 
 RTC_DATA_ATTR TelemetryType *Telemetry;
 
-RTC_DATA_ATTR double VBat;
-RTC_DATA_ATTR double TempNTC;
+RTC_DATA_ATTR float VBat;
+RTC_DATA_ATTR float TempNTC;
 
 RTC_NOINIT_ATTR uint16_t TLM_SEQ;
 RTC_NOINIT_ATTR uint16_t IGATE_TLM_SEQ;
@@ -3537,6 +3537,7 @@ void defaultConfig()
     config.mqtt_port = 1883;
 #endif
 
+#ifdef PPPOS
     config.ppp_enable = false;
     sprintf(config.ppp_apn, "internet");
     sprintf(config.ppp_pin, "0000");
@@ -3554,6 +3555,7 @@ void defaultConfig()
     config.ppp_pwr_gpio = -1;
     config.ppp_pwr_active = 1;
     config.ppp_napt = true;
+#endif
 
     config.trk_mice_type = 7;
     config.trk_tlm_interval = 0;
@@ -4026,7 +4028,9 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 if (body[z] < 0x30 || body[z] > 0x7A)
                 {
+                    #if (CORE_DEBUG_LEVEL > 0)
                     log_d("\titem name has unprintable characters");
+                    #endif
                     break; /* non-printable */
                 }
                 object[x++] = body[z];
@@ -4046,7 +4050,9 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 if (body[z] < 0x30 || body[z] > 0x7A)
                 {
+                    #if (CORE_DEBUG_LEVEL > 0)
                     log_d("\tobject name has unprintable characters");
+                    #endif
                     break; // non-printable
                 }
                 object[x++] = body[z];
@@ -4101,7 +4107,9 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
                 memset(pkgList[i].raw, 0, pkgList[i].length);
                 memcpy(pkgList[i].raw, raw, len);
                 pkgList[i].raw[len] = 0;
+                #if (CORE_DEBUG_LEVEL > 0)
                 log_d("Update: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
+                #endif
             }
         }
     }
@@ -4157,7 +4165,9 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             memset(pkgList[i].raw, 0, pkgList[i].length);
             memcpy(pkgList[i].raw, raw, len);
             pkgList[i].raw[len] = 0;
+            #if (CORE_DEBUG_LEVEL > 0)
             log_d("New: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
+            #endif
         }
     }
     psramBusy = false;
@@ -4298,9 +4308,11 @@ bool pkgTxSend()
                             {
                                 if((config.aprs_port != 24580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
                                 {
-                                    String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
+                                    //String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
+                                    uint8_t packet[400];
+                                    sprintf((char *)packet,"user APRSCB pass 9123\n%s\r\n",txQueue[i].Info);
                                     aprsUDP.beginPacket("aprs.nakhonthai.net", 8081); // Send packet to APRS-IS (udp)
-                                    aprsUDP.write((const uint8_t *)packet.c_str(), packet.length()); // Send binary frame packet to APRS-IS (udp)
+                                    aprsUDP.write((const uint8_t *)packet, strlen((char *)packet)); // Send binary frame packet to APRS-IS (udp)
                                     aprsUDP.endPacket();
                                 }else{
                                     aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
@@ -4655,6 +4667,7 @@ void setup()
     }
     pinMode(BOOT_PIN, INPUT_PULLUP);
 
+#ifdef PPPOS
     if (config.ppp_enable)
     {
         if (config.ppp_serial == 0)
@@ -4670,6 +4683,7 @@ void setup()
             config.uart2_enable = false;
         }
     }
+#endif    
 
 #ifdef STRIP_PIN
     LED_Status(0,0,0);
@@ -5166,7 +5180,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        12000,              /* Stack size in words */
+        8192,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -10173,8 +10187,10 @@ void taskNetwork(void *pvParameters)
         // กำหนดค่าการทำงานไวไฟเป็นแอสเซสพ้อย
         // WiFi.softAP(config.wifi_ap_ssid, config.wifi_ap_pass); // Start HOTspot removing password will disable security
         // WiFi.softAPConfig(local_IP, gateway, subnet);
+        #if (CORE_DEBUG_LEVEL > 0)
         log_d("Access point running. IP address: ");
         log_d("%s", WiFi.softAPIP().toString().c_str());
+        #endif
         // Start the Access Point
         WiFi.AP.begin();
         WiFi.AP.config(ap_ip, ap_ip, ap_mask, ap_leaseStart, ap_dns);
@@ -10292,7 +10308,9 @@ void taskNetwork(void *pvParameters)
             {
                 NTP_Timeout = millis() + 86400000;
                 // setSyncProvider(getNtpTime);
+                #if (CORE_DEBUG_LEVEL > 0)
                 log_d("Contacting Time Server\n");
+                #endif
                 configTime(3600 * config.timeZone, 0, config.ntp_host);
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 struct tm tmstruct;
@@ -10323,10 +10341,13 @@ void taskNetwork(void *pvParameters)
                                 wireguard_setup(NULL);
                                 vpnConnected=true;
                             }else{
+                                #ifdef PPPOS
                                 if(PPP.connected()){
+        
                                     wireguard_setup((netif *)PPP.netif());
                                     vpnConnected=true;
                                 }
+                                #endif
                             }
                         }
                     }

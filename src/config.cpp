@@ -481,6 +481,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     }
 
     // PPP Modem
+    #ifdef PPPOS
     doc["pppEn"] = config.ppp_enable;
     doc["pppAPN"] = config.ppp_apn;
     doc["pppRST"] = config.ppp_rst_gpio;
@@ -501,6 +502,7 @@ bool saveConfiguration(const char *filename, const Configuration &config)
     doc["pppFlow"] = config.ppp_flow_ctrl;
     doc["pppGNSS"] = config.ppp_gnss;
     doc["pppNAPT"] = config.ppp_napt;
+    #endif
 
     #ifdef MQTT
     doc["mqttEnable"] = config.en_mqtt;
@@ -994,6 +996,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         }
 
         // PPP Modem
+        #ifdef PPPOS
         config.ppp_enable = doc["pppEn"];
         strlcpy(config.ppp_apn, doc["pppAPN"] | "", sizeof(config.ppp_apn));
         strlcpy(config.ppp_pin, doc["pppPin"] | "", sizeof(config.ppp_pin));
@@ -1014,6 +1017,7 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.ppp_flow_ctrl = doc["pppFlowCtrl"];
         config.ppp_gnss = doc["pppGNSS"];
         config.ppp_napt = doc["pppNAPT"];
+        #endif
 
         #ifdef MQTT
         config.en_mqtt = doc["mqttEnable"];

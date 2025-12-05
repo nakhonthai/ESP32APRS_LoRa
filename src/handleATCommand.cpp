@@ -2940,6 +2940,7 @@ String handleATCommand(String cmd)
     //   if (cmd == "AT+WX_SENSOR_CH?") return String(config.wx_sensor_ch);
     //   else if (cmd.startsWith("AT+WX_SENSOR_CH=")) { config.wx_sensor_ch = cmd.substring(16).toInt(); return "OK"; }
 
+    #ifdef PPPOS
     if (cmd == "AT+PPP_ENABLE?")
         return String(config.ppp_enable ? "1" : "0");
     else if (cmd == "AT+PPP_ENABLE=1")
@@ -3120,6 +3121,7 @@ String handleATCommand(String cmd)
         config.ppp_napt = false;
         return "OK";
     }
+#endif
 
 #ifdef MQTT
     if (cmd == "AT+EN_MQTT?")

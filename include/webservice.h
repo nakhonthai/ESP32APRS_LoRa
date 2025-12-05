@@ -72,7 +72,7 @@ const timeZoneName tzList[40] PROGMEM= {
 	{+14.00, "(GMT +14:00) Line Islands, Tokelau"},
 };
 
-const char ADC_ATTEN[4][19] = {"0dB (100-950mV)", "2.5dB (100-1250mV)", "6dB (150-1750mV)", "11dB (150-2450mV)"};
+//const char ADC_ATTEN[4][19] = {"0dB (100-950mV)", "2.5dB (100-1250mV)", "6dB (150-1750mV)", "11dB (150-2450mV)"};
 
 #define SYSTEM_LEN 6
 #define SYSTEM_BIT_LEN 9
@@ -102,8 +102,8 @@ extern WiFiClient aprsClient;
 extern bool initInterval;
 extern bool webServiceBegin;
 extern fs::LITTLEFSFS LITTLEFS;
-extern double VBat;
-extern double TempNTC;
+extern float VBat;
+extern float TempNTC;
 extern bool lastHeard_Flag;
 extern SensorData sen[SENSOR_NUMBER];
 extern uint16_t TLM_SEQ;

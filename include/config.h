@@ -470,6 +470,7 @@ typedef struct Config_Struct
 	bool wx_sensor_avg[WX_SENSOR_NUM];
 	uint8_t wx_sensor_ch[WX_SENSOR_NUM];
 
+	#ifdef PPPOS
 	bool ppp_enable = false;
 	char ppp_apn[32];
 	char ppp_pin[8];
@@ -490,6 +491,7 @@ typedef struct Config_Struct
 	uint8_t ppp_flow_ctrl = 0;
 	bool ppp_gnss = false;
 	bool ppp_napt = true;
+	#endif
 
 	// MQTT Config
 #ifdef MQTT	

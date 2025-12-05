@@ -9,7 +9,6 @@
 */
 #include <Arduino.h>
 #include <esp_task_wdt.h>
-#include <PPP.h>
 #include "webservice.h"
 #include "base64.hpp"
 #include "wireguard_vpn.h"
@@ -31,6 +30,7 @@ extern PubSubClient clientMQTT;
 extern unsigned long lastHeardTimeout;
 
 #ifdef PPPOS
+#include <PPP.h>
 extern pppType pppStatus;
 #endif
 
@@ -532,9 +532,11 @@ void handle_sidebar(AsyncWebServerRequest *request)
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">VPN</th>\n";
 	html += "</tr>\n";
 	html += "<tr>\n";
+	#ifdef PPPOS
 	if (PPP.connected())
 		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">PPPoS</th>\n";
 	else
+	#endif
 		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">PPPoS</th>\n";
 #ifdef MQTT
 	if (clientMQTT.connected())
@@ -1327,7 +1329,9 @@ String event_chatMessage(bool gethtml)
 			html += "<td>" + String(pkg.msgID) + "</td></tr>";
 		}
 	}
+	#if (CORE_DEBUG_LEVEL > 0)
 	log_d("HTML Length=%d Byte gethtml:%d event_cnt:%d", html.length(),gethtml,message_events.count());
+	#endif
 	if(gethtml) return html;
 	if (message_events.count() >0){
 		size_t len = html.length();
@@ -3279,7 +3283,9 @@ void handle_msg(AsyncWebServerRequest *request)
 				}
 			}
 		}
+		#if (CORE_DEBUG_LEVEL > 0)
 		log_d("Chat to %s | msg %s", toCall.c_str(), msg.c_str());
+		#endif
 		sendAPRSMessage(toCall, msg, config.msg_encrypt);
 		String html = "Send completed";
 		request->send(200, "text/html", html); // send to someones browser when asked
@@ -4269,6 +4275,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+	#ifdef PPPOS
 	else if (request->hasArg("commitPPPoS"))
 	{
 		bool pppEn = false;
@@ -4417,6 +4424,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+	#endif
 	else
 	{
 
@@ -5055,6 +5063,11 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "</td></tr></table><br />\n";
 		html += "</form><br />";
 
+		#ifdef PPPOS
+		html += "<br />\n";
+
+		html += "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;vertical-align:top\"><td width=\"50%\" style=\"border:unset;vertical-align:top\">";
+
 		/************************ PPPoS **************************/
 
 		html += "<form id='formPPPoS' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
@@ -5153,6 +5166,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		html += "</form>";
 
 		html += "</td></tr></table>\n";
+		#endif
 		if ((ESP.getFreeHeap() / 1000) > 120)
 		{
 			request->send(200, "text/html", html); // send to someones browser when asked
@@ -9281,7 +9295,9 @@ void handle_sensor(AsyncWebServerRequest *request)
 		html += "};\n";
 
 		html += "</script>\n";
+		#if (CORE_DEBUG_LEVEL > 0)
 		log_d("FreeHeap=%i", ESP.getFreeHeap() / 1000);
+		#endif
 		if ((ESP.getFreeHeap() / 1000) > 120)
 		{
 			request->send(200, "text/html", html); // send to someones browser when asked
@@ -10920,24 +10936,6 @@ void handle_about(AsyncWebServerRequest *request)
 	webString += "<td align=\"left\">" + String(IPAddress(pppStatus.gateway).toString().c_str()) + "</td></tr>\n";
 // webString += "<tr><td align=\"right\"><b>DNS:</b></td>\n";
 // webString += "<td align=\"left\">" + String(IPAddress(pppStatus.dns).toString().c_str()) + "</td></tr>\n";
-#else
-	webString += "<th colspan=\"2\"><span><b>PPPoS Disable</b></span></th>\n";
-	webString += "<tr><td align=\"right\" width=\"30%\"><b>Manufacturer:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>Model:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>IMEI:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>IMSI:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>Operator:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>RSSI:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>IP:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>Gateway:</b></td>\n";
-	webString += "<td align=\"left\">" + String("-") + "</td></tr>\n";
 #endif
 	webString += "</table>\n";
 	webString += "</td></tr></table><br />";
@@ -11210,7 +11208,9 @@ void webService()
 	lastheard_events.onConnect([](AsyncEventSourceClient *client)
 							   {
     if(client->lastId()){
+	  #if (CORE_DEBUG_LEVEL > 0)
       log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+	  #endif
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
@@ -11221,7 +11221,9 @@ void webService()
 	message_events.onConnect([](AsyncEventSourceClient *client)
 							 {
     if(client->lastId()){
+		#if (CORE_DEBUG_LEVEL > 0)
       log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+	  #endif
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
