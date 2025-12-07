@@ -9317,9 +9317,7 @@ void taskAPRS(void *pvParameters)
                     }
                 }
             }
-            if(config.digi_auto){
-               DiGiInterval = millis() + (config.digi_interval * 1000);
-            }
+            
         }
 
         // Digi Repeater Process
@@ -9338,7 +9336,7 @@ void taskAPRS(void *pvParameters)
             {
                 if (millis() > DiGiInterval)
                 {
-
+                    DiGiInterval = millis() + (config.digi_interval * 1000);
                     String rawData;
                     if (config.digi_gps)
                     { // DIGI Send GPS position
@@ -9364,8 +9362,7 @@ void taskAPRS(void *pvParameters)
                         #endif
                     }
                     if (rawData != "")
-                    {
-                        DiGiInterval = millis() + (config.digi_interval * 1000);
+                    {                        
                         Sleep_Activate &= ~ACTIVATE_DIGI;
                         StandByTick = millis() + (5000);
                         if (config.digi_tlm_interval > 0)
