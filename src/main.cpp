@@ -5286,50 +5286,77 @@ void DD_DDDDDtoDDMMSS(float DD_DDDDD, int *DD, int *MM, int *SS)
 String compress_position(double nowLat, double nowLng, int alt_feed, double course, uint16_t spdKnot, char table, char symbol, bool gps)
 {
     String str_comp = "";
-    // String lat, lon;
-    // lat = deg2lat(nowLat);
-    // lon = deg2lon(nowLng);
-    char lat[15], lon[15];
+
+    char lat[16], lon[16];
     memset(lat, 0, sizeof(lat));
     memset(lon, 0, sizeof(lon));
     deg2lat(lat, nowLat);
     deg2lon(lon, nowLng);
-    // ESP_LOGE("GPS", "Aprs Compress");
-    //  Translate from semicircles to Base91 format
-    char aprs_position[15];
-    long latitude = semicircles(lat, (nowLat < 0));
-    long longitude = semicircles(lon, (nowLng < 0));
-    long ltemp = 1073741824L - latitude; // 90 degrees - latitude
-    // ESP_LOGE("GPS", "lat=%u lon=%u", latitude, longitude);
+
+    char aprs_position[16];
     memset(aprs_position, 0, sizeof(aprs_position));
 
-    base91encode(ltemp, aprs_position);
-    ltemp = 1073741824L + (longitude >> 1); // 180 degrees + longitude
-    base91encode(ltemp, aprs_position + 4);
-    // Encode heading
-    uint8_t c = (uint8_t)(course / 4);
-    // Scan lookup table to encode speed
-    uint8_t s = (uint8_t)(log(spdKnot + 1) / log(1.08));
+    // convert to semicircles (long) as in original
+    long latitude = semicircles(lat, (nowLat < 0));
+    long longitude = semicircles(lon, (nowLng < 0));
+
+    // Use 64-bit intermediate to avoid overflow and avoid >> on negative
+    int64_t ltemp64;
+
+    // latitude: 90 degrees - latitude
+    ltemp64 = (int64_t)1073741824LL - (int64_t)latitude; // 2^30 - latitude
+    if (ltemp64 < 0) ltemp64 = 0;
+    if (ltemp64 > INT32_MAX) ltemp64 = INT32_MAX;
+    base91encode((long)ltemp64, aprs_position); // write 4 chars
+
+    // longitude: 180 degrees + longitude (divide by 2 as original intended)
+    // Avoid using >> on signed values; use integer division
+    ltemp64 = (int64_t)1073741824LL + ((int64_t)longitude / 2LL);
+    if (ltemp64 < 0) ltemp64 = 0;
+    if (ltemp64 > INT32_MAX) ltemp64 = INT32_MAX;
+    base91encode((long)ltemp64, aprs_position + 4); // write next 4 chars
+
+    // Encode heading (course/4) and speed
+    int c = (int)(course / 4.0);
+    if (c < 0) c = 0;
+    if (c > 90) c = 90; // cap into valid range
+
+    // compute speed index (same formula as before) but cap it
+    int s = 0;
+    if (spdKnot > 0) {
+        double tmp = log((double)spdKnot + 1.0) / log(1.08);
+        if (tmp < 0) tmp = 0;
+        s = (int)tmp;
+    } else {
+        s = 0;
+    }
+    if (s < 0) s = 0;
+    if (s > 90) s = 90; // cap into safe range
+
     if ((spdKnot <= 5) && (alt_feed > 0) && config.trk_altitude)
     {
         if (gps)
         {
             // Send Altitude
-            aprs_position[11] = '!' + 0x30; // t current,GGA
+            aprs_position[11] = (char)('!' + 0x30); // t current,GGA
             int alt = (int)alt_feed;
-            int cs = (int)(log(alt) / log(1.002));
-            c = (uint8_t)(cs / 91);
-            s = (uint8_t)(cs - ((int)c * 91));
-            if (s > 91)
-                s = 91;
-            aprs_position[9] = '!' + c;  // c
-            aprs_position[10] = '!' + s; // s
+            int cs = 0;
+            if (alt > 0) {
+                cs = (int)(log((double)alt) / log(1.002));
+            }
+            if (cs < 0) cs = 0;
+            int cc = cs / 91;
+            int ss = cs - (cc * 91);
+            if (ss > 90) ss = 90;
+            if (cc > 90) cc = 90;
+            aprs_position[9] = (char)('!' + cc);
+            aprs_position[10] = (char)('!' + ss);
         }
         else
         {
             // Send Range
-            aprs_position[11] = '!' + 0x00; //
-            aprs_position[9] = '{';         // c = {
+            aprs_position[11] = (char)('!' + 0x00);
+            aprs_position[9] = '{'; // special case as original
             if (!config.rf_power)
             {
                 s = 10;
@@ -5338,27 +5365,30 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
             {
                 s = 30;
             }
-            aprs_position[10] = '!' + s; // s
+            if (s > 90) s = 90;
+            aprs_position[10] = (char)('!' + s);
         }
     }
     else
     {
-        // Send course and speed
-        aprs_position[9] = '!' + c;  // c
-        aprs_position[10] = '!' + s; // s
+        // Normal: course and speed
+        aprs_position[9] = (char)('!' + c);
+        aprs_position[10] = (char)('!' + s);
 
         if (gps)
         {
-            aprs_position[11] = '!' + 0x20 + 0x18 + 0x06; // t 0x20 1=current,0x18 11=RMC,0x06 110=Other tracker
+            aprs_position[11] = (char)('!' + 0x20 + 0x18 + 0x06);
         }
         else
         {
-            aprs_position[11] = '!' + 0x00 + 0x18 + 0x06; // t
+            aprs_position[11] = (char)('!' + 0x00 + 0x18 + 0x06);
         }
     }
-    aprs_position[12] = 0;
-    // waveFlag = false;
-    aprs_position[8] = symbol; // Symbol
+
+    aprs_position[12] = 0;      // terminator
+    aprs_position[8] = symbol;  // symbol code at index 8
+
+    // Compose final: table char + compressed 12 bytes
     str_comp = String(table) + String(aprs_position);
     return str_comp;
 }
