@@ -17,6 +17,8 @@
 #include <Adafruit_Si7021.h>
 #include <Adafruit_CCS811.h>
 #include <Adafruit_INA219.h>
+#include <Adafruit_ADS1X15.h>
+#include <Adafruit_AHTX0.h>
 #include <SHTSensor.h>
 #include <MCP342x.h>
 #include <ModbusMaster.h>
@@ -48,6 +50,8 @@ Adafruit_CCS811 *ccs=NULL;
 Adafruit_INA219 *ina219=NULL;
 SHTSensor *sht=NULL; // Supported sensors:SHTC1, SHTC3, SHTW1, SHTW2, SHT3x-DIS (I2C), SHT2x, SHT85, SHT3x-ARP, SHT4x
 MCP342x *mcp342x=NULL; // Supported MCP3421, MCP3422, MCP3424, MCP3425, MCP3426, MCP3427
+Adafruit_ADS1115 *ads=NULL;  /* Use this for the 16-bit version */
+Adafruit_AHTX0 *aht=NULL;    // I2C
 //OneWire *oneWire=NULL;
 //DallasTemperature *ds1820;
 
@@ -78,8 +82,12 @@ double getTempNTC(double Vout)
 {
     double average, kelvin, resistance, celsius;
     int i;
-
+#if defined(T_BEAM_S3_1W) //R2 to gnd
+    resistance = SERIESRESISTOR * (3300 - Vout) / Vout;
+#else
+    //NTC to gnd
     resistance = SERIESRESISTOR * Vout / (3300 - Vout);
+#endif
     log_d("ADC=%0.fmV R=%0.1f", Vout, resistance);
     // Convert to resistanceresistance = 4095 / average - 1;resistance = SERIESRESISTOR/resistance;
     /*
@@ -484,12 +492,17 @@ bool getBMP_I2C(Adafruit_BMP280 &node, uint8_t port)
     result = node.takeForcedMeasurement();             // has no effect in normal mode
     if (result)
     {
+        // Read data from BMP280
+        float pressure = node.readPressure(); // Convert to hPa
+        //float altitude = node.readAltitude(1013.25); // Sea level pressure in hPa
+        float temperature = node.readTemperature(); // Temperature in Celsius
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {
             if(!config.sensor[i].enable) continue;
             if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
             {
-                sensorUpdate(i, node.readTemperature()); // Temperature
+                sensorUpdate(i, temperature); // Temperature
+                return true;
             }
             // else if (config.sensor[i].type == SENSOR_ALTITUDE && config.sensor[i].port == port)
             // {
@@ -497,10 +510,12 @@ bool getBMP_I2C(Adafruit_BMP280 &node, uint8_t port)
             // }
             else if (config.sensor[i].type == SENSOR_PRESSURE && config.sensor[i].port == port)
             {
-                sensorUpdate(i, node.readPressure() / 100.0F); // Pressure
+                if(pressure>0){
+                    sensorUpdate(i, pressure/100.0F); // Convert to hPa                    
+                }
             }
-        }
-        return true;
+        } 
+        return true;       
     }
     return false;
 }
@@ -544,6 +559,25 @@ bool getSHT_I2C(SHTSensor &node, uint8_t port)
     return false;
 }
 
+bool getAHT20_I2C(Adafruit_AHTX0 &node, uint8_t port)
+{
+     sensors_event_t humidity, temp;
+     node.getEvent(&humidity, &temp);// populate temp and humidity objects with fresh data
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+    {
+        if(!config.sensor[i].enable) continue;
+        if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
+        {
+            sensorUpdate(i, temp.temperature); // Temperature
+        }
+        else if (config.sensor[i].type == SENSOR_HUMIDITY && config.sensor[i].port == port)
+        {
+            sensorUpdate(i, humidity.relative_humidity); // Humidity
+        }
+    }
+    return true;
+}
+
 bool getMCP342x_I2C(MCP342x &node, int idx)
 {
     uint8_t port = config.sensor[idx].address;
@@ -576,6 +610,25 @@ bool getMCP342x_I2C(MCP342x &node, int idx)
         sensorUpdate(idx, (double)value); //update sensor value
         return true;
     }
+    return false;
+}
+
+bool getADS1115_I2C(Adafruit_ADS1115 &node, int idx)
+{
+    int16_t adc=0;
+    uint8_t port = config.sensor[idx].address;
+    long value = 0;
+    adc = node.readADC_SingleEnded(port);
+    if(adc>0){
+        if (config.sensor[idx].type == SENSOR_VOLTAGE)
+        {
+            sensorUpdate(idx, node.computeVolts(adc)); // Voltage
+        }else{
+            sensorUpdate(idx, (double)adc); //update sensor value
+        }
+        return true;
+    }
+
     return false;
 }
 
@@ -1206,10 +1259,34 @@ bool getSensor(int cfgIdx)
         }
         break;
         #endif
+    case PORT_AHT20_I2C0:
+        if (config.i2c_enable)
+        {
+            if (getAHT20_I2C(*aht, port))
+                return true;
+        }
+        break; 
+        #if SOC_I2C_NUM > 1
+    case PORT_AHT20_I2C1:
+        if (config.i2c1_enable)
+        {
+            if (getAHT20_I2C(*aht, port))
+                return true;
+        }
+        break;      
+        #endif 
     case PORT_MCP342x_I2C0:
         if (config.i2c_enable)
         {
             if (getMCP342x_I2C(*mcp342x, cfgIdx))
+                return true;
+        }
+        break;
+
+    case PORT_ADS1115_I2C0:
+        if (config.i2c_enable)
+        {
+            if (getADS1115_I2C(*ads, cfgIdx))
                 return true;
         }
         break;
@@ -1248,7 +1325,8 @@ bool getSensor(int cfgIdx)
             getDS1820(port);
             return true;
         }
-        break;       
+        break; 
+          
     default:
         log_d("Sensor Not config");
         break;
@@ -1365,6 +1443,14 @@ void sensorInit(bool resetAll)
         case PORT_BMP280_I2C0:
             if (config.i2c_enable)
             {
+                int i2c_timeout = 0;
+                while (i2c_busy)
+                {
+                    delay(10);
+                    if (++i2c_timeout > 50)
+                        break;
+                }
+                i2c_busy = true;
                 if (bmp280 != NULL)
                     break;
                 bmp280 = new Adafruit_BMP280(&Wire);
@@ -1377,6 +1463,7 @@ void sensorInit(bool resetAll)
                     log_d("ID of 0x60 represents a BME 280.");
                     log_d("ID of 0x61 represents a BME 680.");
                 }
+                i2c_busy = false;
             }
             else
             {
@@ -1387,10 +1474,11 @@ void sensorInit(bool resetAll)
         case PORT_BMP280_I2C1:
             if (config.i2c1_enable)
             {
-                if (bmp280 != NULL)
-                    break;
+                //if (bmp280 != NULL)
+                //    break;
                 bmp280 = new Adafruit_BMP280(&Wire1);
-                if (!bmp280->begin(config.sensor[i].address)) // 0x76=118,0x77=119
+                //if (!bmp280->begin(config.sensor[i].address,88)) // 0x76=118,0x77=119
+                if(!bmp280->begin())
                 {
                     log_d("Could not find a valid BMP280 sensor, check wiring, address, sensor ID!");
                     log_d("SensorID was: 0x%0X", bmp280->sensorID()); // log_d(bme.sensorID(),16);
@@ -1572,6 +1660,36 @@ void sensorInit(bool resetAll)
             }
             break;
             #endif
+        case PORT_AHT20_I2C0:
+            if (config.i2c_enable)
+            {
+                aht = new Adafruit_AHTX0();
+                if (!aht->begin(&Wire))
+                {
+                    log_d("Could not find a valid AHT20 sensor, check wiring, address, sensor ID!");
+                }
+            }
+            else
+            {
+                log_d("Not enable I2C0 port");
+            }
+            break;
+            #if SOC_I2C_NUM > 1
+        case PORT_AHT20_I2C1:
+            if (config.i2c1_enable)
+            {
+                aht = new Adafruit_AHTX0();
+                if (!aht->begin(&Wire1))
+                {
+                    log_d("Could not find a valid AHT20 sensor, check wiring, address, sensor ID!");
+                }
+            }
+            else
+            {
+                log_d("Not enable I2C1 port");
+            }
+            break;
+            #endif            
         case PORT_MCP342x_I2C0:
             if (config.i2c_enable)
             {
@@ -1591,6 +1709,32 @@ void sensorInit(bool resetAll)
                 log_d("Not enable I2C0 port");
             }
             break;
+        case PORT_ADS1115_I2C0:
+            if (config.i2c_enable)
+            {
+                ads = new Adafruit_ADS1115();
+                ads->begin(72, &Wire); // 0x48=72,0x49=73,0x4A=74,0x4B=75
+                ads->setGain(GAIN_TWO);       // 2x gain   +/- 2.048V  1 bit = 1mV      0.0625mV
+            }
+            else
+            {
+                log_d("Not enable I2C0 port");
+            }
+            break;
+         #if SOC_I2C_NUM > 1
+         case PORT_ADS1115_I2C1:
+            if (config.i2c1_enable)
+            {
+                ads = new Adafruit_ADS1115();
+                ads->begin(0x72, &Wire1); // 0x48=72,0x49=73,0x4A=74,0x4B=75
+                ads->setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
+            }
+            else
+            {
+                log_d("Not enable I2C1 port");
+            }
+            break;
+         #endif
         //     #if SOC_I2C_NUM > 1
         // case PORT_MCP342x_I2C1:
         //     if (config.i2c1_enable)

@@ -169,7 +169,7 @@ void IRAM_ATTR doEncoder()
 #define PMU_I2C_SCL (41)
 #define PMU_IRQ (40)
 XPowersAXP2101 PMU;
-#elif T_BEAM_S3_BPF
+#elif defined(T_BEAM_S3_BPF)
 #include <XPowersLib.h>
 #define PMU_I2C_SDA (8)
 #define PMU_I2C_SCL (9)
@@ -491,6 +491,7 @@ RTC_DATA_ATTR pkgListType *pkgList;
 RTC_DATA_ATTR TelemetryType *Telemetry;
 
 RTC_DATA_ATTR float VBat;
+RTC_DATA_ATTR bool VBat_Flag = false;
 RTC_DATA_ATTR float TempNTC;
 
 RTC_NOINIT_ATTR uint16_t TLM_SEQ;
@@ -538,6 +539,19 @@ typedef struct
     uint32_t status;         // information on the event type that caused the interrupt
     unsigned long timeStamp; // The time the event occured
 } pcnt_evt_t;
+
+unsigned long upTimeStamp = 0;
+void convertSecondsToDHMS(char *dmhs, unsigned long totalSeconds)
+{
+    // Calculate days, hours, minutes, and seconds
+    unsigned int days = totalSeconds / 86400;           // 86400 seconds in a day
+    unsigned int hours = (totalSeconds % 86400) / 3600; // 3600 seconds in an hour
+    unsigned int minutes = (totalSeconds % 3600) / 60;  // 60 seconds in a minute
+    unsigned int seconds = totalSeconds % 60;
+
+    sprintf(dmhs, "%dD[%d:%d:%d]", days, hours, minutes, seconds);
+}
+
 
 #ifdef NAWS4
 bool setupPower()
@@ -902,7 +916,7 @@ void setupPower()
 }
 #endif
 
-#ifdef T_BEAM_S3_BPF
+#if defined(T_BEAM_S3_BPF)
 void setupPower()
 {
     bool result = PMU.begin(Wire, AXP2101_SLAVE_ADDRESS, PMU_I2C_SDA, PMU_I2C_SCL);
@@ -2730,11 +2744,19 @@ void defaultConfig()
     sprintf(config.sensor[9].unit, "kPh");
 
 #if (CORE_DEBUG_LEVEL>0)
+    #ifdef ARDUINO_USB_CDC_ON_BOOT
+    config.uart0_enable = false;
+    config.uart0_baudrate = 115200;
+    config.uart0_rx_gpio = -1;
+    config.uart0_tx_gpio = -1;
+    config.uart0_rts_gpio = -1;
+    #else
     config.uart0_enable = true;
     config.uart0_baudrate = 115200;
     config.uart0_rx_gpio = 20;
     config.uart0_tx_gpio = 21;
     config.uart0_rts_gpio = -1;
+    #endif
 #else
     config.uart0_enable = false;
     config.uart0_baudrate = 9600;
@@ -2749,11 +2771,11 @@ void defaultConfig()
     config.uart1_tx_gpio = 19;
     config.uart1_rts_gpio = -1;
 
-    // config.uart2_enable = false;
-    // config.uart2_baudrate = 9600;
-    // config.uart2_rx_gpio = 16;
-    // config.uart2_tx_gpio = 17;
-    // config.uart2_rts_gpio = -1;
+    config.uart2_enable = false;
+    config.uart2_baudrate = 9600;
+    config.uart2_rx_gpio = -1;
+    config.uart2_tx_gpio = -1;
+    //config.uart2_rts_gpio = -1;
 
     config.modbus_enable = false;
     config.modbus_de_gpio = -1;
@@ -3210,6 +3232,47 @@ void defaultConfig()
     config.oled_enable = true;
     config.at_cmd_msg = true;
     config.at_cmd_uart = 4;
+#elif defined(T_BEAM_S3_1W)
+    config.rf_en = true;
+    config.rf_type = RF_SX1262;
+    config.rf_tx_gpio = 21; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 1;
+    config.rf_reset_gpio = 3;
+    config.rf_dio0_gpio = 38;
+    config.rf_nss_gpio = 15;
+    config.rf_sclk_gpio = 13;
+    config.rf_miso_gpio = 12;
+    config.rf_mosi_gpio = 11;
+    config.rf_tx_active = 0;
+    config.rf_rx_active = 1;
+    config.rf_nss_active = 0;
+    config.rf_reset_active = 0;
+    config.gnss_enable = true;
+    config.gnss_channel = 2;
+    config.uart0_enable = false;
+    config.uart0_rx_gpio = 44;
+    config.uart0_tx_gpio = 43;
+    config.uart1_enable = true;
+    config.uart1_baudrate = 9600;
+    config.uart1_rx_gpio = 5;
+    config.uart1_tx_gpio = 6;
+    config.uart1_rts_gpio = -1;
+    config.uart2_enable=false;
+    config.uart2_rx_gpio = -1;
+    config.uart2_tx_gpio = -1;
+    //config.uart2_rts_gpio = -1;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 8;
+    config.i2c_sck_pin = 9;
+    config.i2c1_enable = false;
+    config.i2c1_sda_pin = -1;
+    config.i2c1_sck_pin = -1;    
+    config.oled_enable = true;
+    config.at_cmd_msg = true;
+    config.at_cmd_uart = 4;
+    config.pwr_gpio = 40;
+    config.pwr_active = 1;
 #elif defined(HELTEC_V3_GPS)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -4008,6 +4071,9 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     // strncpy(callsign, call, sz);
     memcpy(callsign, call, sz);
 
+    if(APRS_checkValidCallsign(callsign)==false)
+        return -1;
+
 #ifdef BOARD_HAS_PSRAM
     while (psramBusy)
         delay(1);
@@ -4402,9 +4468,14 @@ void aprs_msg_callback(struct AX25Msg *msg)
         info.clear();
     }
     memcpy(&pkg, msg, sizeof(AX25Msg));
-    PacketBuffer.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
-    status.rxCount++;
-    status.allCount++;
+    if(!PacketBuffer.isFull())
+    {
+        PacketBuffer.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
+        status.rxCount++;    
+    }else{
+        status.dropCount++;
+    }
+    status.allCount++;    
     //igateTLM.RX++;
 }
 
@@ -4539,8 +4610,8 @@ bool AFSKInitAct = false;
 unsigned long timeTask;
 void setup()
 {
-    pinMode(19,INPUT);
-    pinMode(20,INPUT);
+    //pinMode(19,INPUT);
+    //pinMode(20,INPUT);
     // byte *ptr;
     int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
@@ -5026,44 +5097,46 @@ void setup()
     }
     LED_Status(0, 0, 0);
 
-#if ARDUINO_USB_MODE
+#if ARDUINO_USB_CDC_ON_BOOT
         Serial.begin(115200);
 #endif
-
     if(config.uart0_enable)
-    {
-        
-    pinMode(config.uart0_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
-    pinMode(config.uart0_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
+    {        
+        pinMode(config.uart0_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
+        pinMode(config.uart0_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial0.begin(config.uart0_baudrate, SERIAL_8N1, config.uart0_rx_gpio, config.uart0_tx_gpio);
     }
     if (config.uart1_enable)
-    {
-        
+    {        
         pinMode(config.uart1_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
         pinMode(config.uart1_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial1.begin(config.uart1_baudrate, SERIAL_8N1, config.uart1_rx_gpio, config.uart1_tx_gpio);
     }
     #if SOC_UART_NUM > 2
-    pinMode(config.uart2_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
-    pinMode(config.uart2_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
-    Serial2.begin(config.uart2_baudrate, SERIAL_8N1, config.uart2_rx_gpio, config.uart2_tx_gpio);
+    if (config.uart2_enable){
+        pinMode(config.uart2_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
+        pinMode(config.uart2_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
+        Serial2.begin(config.uart2_baudrate, SERIAL_8N1, config.uart2_rx_gpio, config.uart2_tx_gpio);
+    }
     #endif
 
+    log_d("MODBUS config");
     if (config.modbus_enable)
     {
         if (config.modbus_channel == 1)
         {
-            modbus.begin(config.modbus_address, Serial);
+            modbus.begin(config.modbus_address, Serial0);
         }
         else if (config.modbus_channel == 2)
         {
             modbus.begin(config.modbus_address, Serial1);
         }
+#ifdef __XTENSA__
         else if (config.modbus_channel == 3)
         {
-            // modbus.begin(config.modbus_address, Serial2);
+            modbus.begin(config.modbus_address, Serial2);
         }
+#endif
         if (config.modbus_channel > 0 && config.modbus_channel < 4)
         {
             // Modbus slave ID 1
@@ -5240,6 +5313,7 @@ void setup()
 #endif
 
     timeTask = millis() + 10000;
+    upTimeStamp = millis() / 1000;
     autoResetTimeout = millis() + ((long)config.reset_timeout * 60000);
 
     if (config.gnss_enable)
@@ -6536,6 +6610,8 @@ void loop()
         VBat = (double)analogReadMilliVolts(1) / 201.15357F;
 #elif defined(APRS_LORA_HT)
         VBat = (double)analogReadMilliVolts(3) / 595.24F;
+#elif defined(T_BEAM_S3_1W)
+        VBat = (double)analogReadMilliVolts(4) / 333.289F;        
 #elif defined(BUOY)
         // #ifdef BUOY
         VBat = (double)analogReadMilliVolts(0) * 0.0028F;

@@ -2452,3 +2452,22 @@ int freeMemory()
     int free_memory = ESP.getFreeHeap();
     return free_memory;
 }
+
+// // ตรวจสอบโดยใช้ Arduino String
+// bool isValidToken(const String &s, bool allowEmpty = true) {
+//   if (!allowEmpty && s.length() == 0) return false;
+//   for (size_t i = 0; i < s.length(); ++i) {
+//     char c = s.charAt(i);
+//     // ใช้ isAlphaNumeric() ของ Arduino + ตรวจ '-' ด้วย
+//     if (!(isAlphaNumeric(c) || c == '-')) return false;
+//   }
+//   return true;
+// }
+
+bool APRS_checkValidCallsign(const char *callsign) {
+  // ตรวจสอบความยาว
+  size_t len = strlen(callsign);
+  if (len < 1 || len > 6) return false;
+  // ตรวจสอบตัวอักษร
+  return isValidToken(callsign, false);
+}

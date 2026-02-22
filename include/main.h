@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "0.7"
-#define VERSION_BUILD 'a'
+#define VERSION_BUILD 'b'
 
 #include <Arduino.h>
 // #include "ModbusMaster.h"
@@ -452,5 +452,6 @@ void radioDisp();
 void wifiDisp();
 void sensorDisp();
 void LED_Status(uint8_t r, uint8_t g, uint8_t b);
+void convertSecondsToDHMS(char *dmhs,unsigned long totalSeconds);
 
 #endif

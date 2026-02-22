@@ -56,5 +56,6 @@ int freeMemory();
 void radioSleep();
 
 void taskADDFifo(void *pvParameters);
+bool APRS_checkValidCallsign(const char *callsign);
 
 #endif

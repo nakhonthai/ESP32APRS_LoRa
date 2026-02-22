@@ -551,11 +551,19 @@ void ax25_decode(AX25Ctx *ctx)
 
     DECODE_CALL(buf, msg.dst.call);
     msg.dst.ssid = (*buf++ >> 1) & 0x0F;
-    msg.dst.call[6] = 0;    
+    msg.dst.call[6] = 0;
+    if (!isValidToken(msg.dst.call)) {
+        // Handle invalid callsign
+        return;
+    }
 
     DECODE_CALL(buf, msg.src.call);
     msg.src.ssid = (*buf >> 1) & 0x0F;
     msg.src.call[6] = 0;
+    if (!isValidToken(msg.src.call)) {
+        // Handle invalid callsign
+        return;
+    }
 
     for (msg.rpt_count = 0; !(*buf++ & 0x01) && (msg.rpt_count < countof(msg.rpt_list)); msg.rpt_count++)
     {
@@ -563,6 +571,10 @@ void ax25_decode(AX25Ctx *ctx)
         msg.rpt_list[msg.rpt_count].ssid = (*buf >> 1) & 0x0F;
         AX25_SET_REPEATED(&msg, msg.rpt_count, (*buf & 0x80));
         msg.rpt_list[msg.rpt_count].call[6] = 0;
+        if (!isValidToken(msg.rpt_list[msg.rpt_count].call)) {
+            // Handle invalid callsign
+            return;
+        }
     }
 
     msg.ctrl = *buf++;
@@ -1456,4 +1468,20 @@ int hdlcDecodeAX25(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t l
     }
     frame_len = 0;
     return i;
+}
+
+// ตรวจสอบโดยใช้ C-string (const char*)
+bool isValidToken(const char *s, bool allowEmpty) {
+  if (s == nullptr) return false;
+  if (!allowEmpty && s[0] == '\0') return false;
+  for (size_t i = 0; s[i] != '\0'; ++i) {
+    char c = s[i];
+    // ตรวจด้วยช่วง ASCII (ปลอดภัยและเร็ว)
+    bool ok = (c >= '0' && c <= '9') ||
+              (c >= 'A' && c <= 'Z') ||
+              (c >= 'a' && c <= 'z') ||
+              (c == '-');
+    if (!ok) return false;
+  }
+  return true;
 }

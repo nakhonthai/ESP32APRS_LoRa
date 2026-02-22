@@ -102,5 +102,6 @@ bool hdlcParse(Hdlc *hdlc, bool bit, FIFOBuffer *fifo);
 int hdlcDecode(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t len);
 int hdlcDecodeAX25(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t len);
 int unbit_stuffing(uint8_t *outbuf, size_t outbuf_size, uint8_t *inbuf, size_t inbuf_size);
+bool isValidToken(const char *s, bool allowEmpty = true);
 
 #endif
