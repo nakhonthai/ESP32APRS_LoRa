@@ -4055,10 +4055,14 @@ pkgListType getPkgList(int idx)
 int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
 {
     size_t len;
-    if (*call == 0)
+    if (*call == 0){
+        log_d("call Fail!");
         return -1;
-    if (*raw == 0)
+    }
+    if (*raw == 0){
+        log_d("raw Fail!");
         return -1;
+    }
 
     // int start_info = strchr(':',0);
 
@@ -4071,14 +4075,20 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     // strncpy(callsign, call, sz);
     memcpy(callsign, call, sz);
 
-    if(APRS_checkValidCallsign(callsign)==false)
+    // if(APRS_checkValidCallsign(callsign)==false){
+    //     log_d("CheckValidCall Fail!");
+    //     return -1;
+    // }
+    if(!isValidToken(callsign,false)){
+        log_d("CheckValidCall Fail!");
         return -1;
+    }
 
-#ifdef BOARD_HAS_PSRAM
-    while (psramBusy)
-        delay(1);
-    psramBusy = true;
-#endif
+// #ifdef BOARD_HAS_PSRAM
+//     while (psramBusy)
+//         delay(1);
+//     psramBusy = true;
+// #endif
     int i = -1;
 
     memset(object, 0, sizeof(object));
@@ -4136,6 +4146,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     if (i > PKGLISTSIZE)
     {
         psramBusy = false;
+        log_d("pkgListSize>%d",PKGLISTSIZE);
         return -1;
     }
     if (i > -1)
@@ -4160,6 +4171,12 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             }
             len = strlen(raw);
             pkgList[i].length = len + 1;
+            #ifdef BOARD_HAS_PSRAM
+            if (pkgList[i].raw == NULL)
+            {
+                pkgList[i].raw = (char *)ps_calloc(pkgList[i].length, sizeof(char));
+            }
+            #else
             if (pkgList[i].raw != NULL)
             {
                 pkgList[i].raw = (char *)realloc(pkgList[i].raw, pkgList[i].length);
@@ -4168,6 +4185,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 pkgList[i].raw = (char *)calloc(pkgList[i].length, sizeof(char));
             }
+            #endif
             if (pkgList[i].raw)
             {
                 memset(pkgList[i].raw, 0, pkgList[i].length);
@@ -4185,6 +4203,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         if (i > PKGLISTSIZE || i < 0)
         {
             psramBusy = false;
+            log_d("pkgListSize>%d",PKGLISTSIZE);
             return -1;
         }
         // memset(&pkgList[i], 0, sizeof(pkgListType));
@@ -4218,6 +4237,12 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
         len = strlen(raw);
         pkgList[i].length = len + 1;
+        #ifdef BOARD_HAS_PSRAM
+             if (pkgList[i].raw == NULL)
+            {
+                pkgList[i].raw = (char *)ps_calloc(pkgList[i].length, sizeof(char));
+            }
+        #else
         if (pkgList[i].raw != NULL)
         {
             pkgList[i].raw = (char *)realloc(pkgList[i].raw, pkgList[i].length);
@@ -4226,6 +4251,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         {
             pkgList[i].raw = (char *)calloc(pkgList[i].length, sizeof(char));
         }
+        #endif
         if (pkgList[i].raw)
         {
             memset(pkgList[i].raw, 0, pkgList[i].length);
@@ -4615,22 +4641,26 @@ void setup()
     // byte *ptr;
     int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
-    if (psramInit())
-    {
+    // if (psramInit())
+    // {
         psramAddToHeap();
         pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
         Telemetry = (TelemetryType *)ps_malloc(sizeof(TelemetryType) * TLMLISTSIZE);
         txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
         msgQueue = (msgType *)ps_malloc(sizeof(msgType) * PKGLISTSIZE);
         // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
-    }
-    else
+    for(int i=0;i<PKGLISTSIZE;i++)
     {
-        pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
-        Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
-        txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
-        msgQueue = (msgType *)malloc(sizeof(msgType) * PKGLISTSIZE);
+        pkgList[i].raw = (char *)ps_malloc(512);
     }
+    // }
+    // else
+    // {
+    //     pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
+    //     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
+    //     txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
+    //     msgQueue = (msgType *)malloc(sizeof(msgType) * PKGLISTSIZE);
+    // }
 #else
     pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
@@ -9167,7 +9197,7 @@ void taskAPRS(void *pvParameters)
                         if (config.rx_display && config.dispRF && (type & config.dispFilter))
                         {
                             dispBuffer.push(rawP);
-                            log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
+                            //log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
                         }
                     }
 #endif

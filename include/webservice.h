@@ -122,18 +122,18 @@ extern "C"
 uint8_t temprature_sens_read();
 
 void serviceHandle();
-void setHTML(byte page);
-void handle_root();
-void handle_setting();
-void handle_service();
-void handle_system();
-void handle_firmware();
-void handle_default();
+// void setHTML(byte page);
+// void handle_root();
+// void handle_setting();
+// void handle_service();
+// void handle_system();
+// void handle_firmware();
+// void handle_default();
 void webService();
-void handle_radio();
-extern void RF_MODULE(bool boot);
+// void handle_radio();
+// extern void RF_MODULE(bool boot);
 void handle_ws();
-void handle_ws_gnss(char *nmea);
+//void handle_ws_gnss(char *nmea);
 void handle_ws_gnss(char *nmea, size_t size);
 String event_lastHeard(bool gethtml=false);
 String event_chatMessage(bool gethtml=false);

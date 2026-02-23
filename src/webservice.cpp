@@ -24,8 +24,28 @@ char *allocateStringMemory(size_t size)
 {
 #ifdef BOARD_HAS_PSRAM
 	// Try to allocate in PSRAM first
-	size*=2; // overallocation to reduce fragmentation
-	char *ptr = (char *)ps_calloc(size, sizeof(char));
+	size *= 2; // overallocation to reduce fragmentation
+	// char *ptr = (char *)ps_calloc(size, sizeof(char));
+
+	// Retry loop for PSRAM allocation with backoff
+	char *ptr = NULL;
+	int retry_count = 3;
+	int delay_ms = 10;
+
+	while (retry_count > 0 && ptr == NULL)
+	{
+		ptr = (char *)ps_malloc(size);
+		if (ptr == NULL)
+		{
+			retry_count--;
+			if (retry_count > 0)
+			{
+				vTaskDelay(pdMS_TO_TICKS(delay_ms));
+				delay_ms *= 2; // Exponential backoff
+			}
+		}
+	}
+
 	if (ptr != NULL)
 	{
 		return ptr;
@@ -115,6 +135,9 @@ bool defaultSetting = false;
 extern float VBat;
 extern bool VBat_Flag;
 
+// ประกาศ global semaphore
+static SemaphoreHandle_t cfg_mutex = NULL;
+
 // #ifdef OLED
 // #ifdef SH1106
 // extern Adafruit_SH1106 display;
@@ -122,6 +145,22 @@ extern bool VBat_Flag;
 // extern Adafruit_SSD1306 display;
 // #endif
 // #endif // OLED
+
+void saveConfig(AsyncWebServerRequest *request)
+{
+	String html;
+	if (saveConfiguration("/default.cfg", config))
+	{
+		html = "Setup completed successfully";
+		request->send(200, "text/html", html); // send to someones browser when asked
+	}
+	else
+	{
+		html = "Save config failed.";
+		request->send(501, "text/html", html); // Not Implemented
+	}
+	html.clear();
+}
 
 void serviceHandle()
 {
@@ -257,7 +296,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "var lh=document.getElementById(\"chatMsg\");");
 	strcat(webString, "if(lh != null) {lh.innerHTML = e.data;}");
 	strcat(webString, "}, false);\n}\n");
-	//strcat(webString, "</script>\n");
+	// strcat(webString, "</script>\n");
 
 	strcat(webString, "let sortDirection = {};\n");
 	strcat(webString, "let currentSortKey = \"time\";\n\n");
@@ -265,14 +304,14 @@ void setMainPage(AsyncWebServerRequest *request)
 	// strcat(webString, "const tableBody = document.getElementById(\"aprsTableBody\");\n");
 	// //strcat(webString, "const tableBody = document.querySelector(\"#aprsTable tbody\");\n");
 	// strcat(webString, "if(tableBody == null) {return;}\n");
-	strcat(webString, "var data=JSON.parse(raw);\n");	
+	strcat(webString, "var data=JSON.parse(raw);\n");
 	strcat(webString, "lastHeardSort(data);\n");
 	strcat(webString, "document.querySelectorAll(\"#aprsTable th[data-sort]\")\n");
 	strcat(webString, ".forEach(header => {\n\n");
 	strcat(webString, "header.addEventListener(\"click\", () => {\n\n");
 	strcat(webString, "const key = header.dataset.sort;\n\n");
 	strcat(webString, "sortDirection[key] = !sortDirection[key];\n");
-	strcat(webString, "currentSortKey = key;\n\n");	
+	strcat(webString, "currentSortKey = key;\n\n");
 	strcat(webString, "clearArrows();\n\n");
 	strcat(webString, "const arrowSpan = header.querySelector(\".arrow\");\n");
 	strcat(webString, "arrowSpan.textContent = sortDirection[key] ? \"▲\" : \"▼\";\n\n");
@@ -285,7 +324,7 @@ void setMainPage(AsyncWebServerRequest *request)
 
 	strcat(webString, "function printLastHeard(data) {\n");
 	strcat(webString, "const tableBody = document.getElementById(\"aprsTableBody\");\n");
-	//strcat(webString, "const tableBody = document.querySelector(\"#aprsTable tbody\");\n");
+	// strcat(webString, "const tableBody = document.querySelector(\"#aprsTable tbody\");\n");
 	strcat(webString, "if(tableBody == null) {return;}\n");
 	strcat(webString, "tableBody.innerHTML = \"\";\n");
 	strcat(webString, "data.forEach(row => {\n");
@@ -311,11 +350,11 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "let valA = a[key];\n");
 	strcat(webString, "let valB = b[key];\n\n");
 	strcat(webString, "if (key === \"time\") {\n");
-	//strcat(webString, "// Parse time in dd hh:mm:ss format\n");
+	// strcat(webString, "// Parse time in dd hh:mm:ss format\n");
 	strcat(webString, "const [dayTime, timePart] = valA.split(' ');\n");
 	strcat(webString, "const [hours, minutes, seconds] = timePart.split(':');\n");
 	strcat(webString, "valA = parseInt(dayTime) * 86400 + parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds);\n");
-	//strcat(webString, "                \n");
+	// strcat(webString, "                \n");
 	strcat(webString, "const [dayTimeB, timePartB] = valB.split(' ');\n");
 	strcat(webString, "const [hoursB, minutesB, secondsB] = timePartB.split(':');\n");
 	strcat(webString, "valB = parseInt(dayTimeB) * 86400 + parseInt(hoursB) * 3600 + parseInt(minutesB) * 60 + parseInt(secondsB);\n");
@@ -329,7 +368,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "}\n\n");
 	strcat(webString, "</script>\n");
 	strcat(webString, "</head>\n");
-	//strcat(webString, "\n");
+	// strcat(webString, "\n");
 	strcat(webString, "<body onload=\"selectTab(event, 'DashBoard')\">\n");
 	strcat(webString, "\n");
 	strcat(webString, "<div class=\"container\">\n");
@@ -395,7 +434,6 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "</script>\n");
 	strcat(webString, "</body>\n");
 	strcat(webString, "</html>");
-
 
 	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
 	response->addHeader("Sensor", "content");
@@ -675,9 +713,9 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	strcat(webString, "\n");
 	strcat(webString, "<div class=\"content\">\n");
 	strcat(webString, "<div id=\"lastHeard\">\n");
-	//String lastHeardString = event_lastHeard(true);
-	//strcat(webString, lastHeardString.c_str());
-	//lastHeardString.clear();
+	// String lastHeardString = event_lastHeard(true);
+	// strcat(webString, lastHeardString.c_str());
+	// lastHeardString.clear();
 	strcat(webString, "<table id=\"aprsTable\">\n<thread>\n");
 	strcat(webString, "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n");
 	strcat(webString, "<tr>\n");
@@ -1038,7 +1076,6 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	free(html); // Free the allocated memory
 }
 
-
 String event_lastHeard(bool gethtml)
 {
 	// log_d("Event count: %d",lastheard_events.count());
@@ -1051,8 +1088,8 @@ String event_lastHeard(bool gethtml)
 
 	// Using dynamic memory allocation instead of String
 	char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
-	char *line = allocateStringMemory(1024); // Buffer for individual lines
-	char temp_buffer[1024];					 // Temporary buffer for string operations
+	char *line = allocateStringMemory(1024);  // Buffer for individual lines
+	char temp_buffer[1024];					  // Temporary buffer for string operations
 	if (!html || !line)
 	{
 		if (html)
@@ -1096,7 +1133,7 @@ String event_lastHeard(bool gethtml)
 
 	// log_d("Create html last heard");
 	localtime_r(&timeNow, &tmNow);
-//strcat(webString, "  { time: \"21:54:23\", icon: \"91-1.png\", callsign: \"HS5TQA-7\", path: \"RF: WIDE1-1\", dx: 0.0, packet: 2, audio: -19.6 },\n");
+	// strcat(webString, "  { time: \"21:54:23\", icon: \"91-1.png\", callsign: \"HS5TQA-7\", path: \"RF: WIDE1-1\", dx: 0.0, packet: 2, audio: -19.6 },\n");
 	strcpy(html, "[");
 	for (int i = 0; i < PKGLISTSIZE; i++)
 	{
@@ -1107,7 +1144,7 @@ String event_lastHeard(bool gethtml)
 		{
 			snprintf(line, 1024, "%s", pkg.raw);
 			// log_d("IDX=%d RAW:%s",i,line);
-			//char *html_ptr = html;
+			// char *html_ptr = html;
 			int packet = pkg.pkg;
 			char *pos_gt = strchr(line, '>'); // Find first position of '>'
 			int start_val = pos_gt ? (pos_gt - line) : -1;
@@ -1164,14 +1201,14 @@ String event_lastHeard(bool gethtml)
 					// time_t tm = pkg.time;
 					localtime_r(&pkg.time, &tmstruct);
 					char strTime[20];
-					//if (tmNow.tm_mday == tmstruct.tm_mday)
+					// if (tmNow.tm_mday == tmstruct.tm_mday)
 					//	sprintf(strTime, "%02d:%02d:%02d", tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-					//else
-						sprintf(strTime, "%02d %02d:%02d:%02d", tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+					// else
+					sprintf(strTime, "%02d %02d:%02d:%02d", tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
 					// String str = String(tmstruct.tm_hour, DEC) + ":" + String(tmstruct.tm_min, DEC) + ":" + String(tmstruct.tm_sec, DEC);
 
 					// Append to html
-					//strcat(html, "  { time: \"21:54:23\", icon: \"91-1.png\", callsign: \"HS5TQA-7\", path: \"RF: WIDE1-1\", dx: 0.0, packet: 2, rssi: -19.6 },\n");
+					// strcat(html, "  { time: \"21:54:23\", icon: \"91-1.png\", callsign: \"HS5TQA-7\", path: \"RF: WIDE1-1\", dx: 0.0, packet: 2, rssi: -19.6 },\n");
 					char temp_html[200];
 					snprintf(temp_html, sizeof(temp_html), "{\"time\":\"%s\",", strTime);
 					strcat(html, temp_html);
@@ -1189,10 +1226,10 @@ String event_lastHeard(bool gethtml)
 							// }
 							// else if (aprs.symbol[0] == 47)
 							// {
-								strcat(fileImg, "-1.png");
+							strcat(fileImg, "-1.png");
 							//}
 
-							//snprintf(temp_html, sizeof(temp_html), "<td><b>%c</b></td>", aprs.symbol[0]);
+							// snprintf(temp_html, sizeof(temp_html), "<td><b>%c</b></td>", aprs.symbol[0]);
 							snprintf(temp_html, sizeof(temp_html), "\"icon\":\"%s\",", fileImg);
 							strcat(html, temp_html);
 						}
@@ -1211,17 +1248,17 @@ String event_lastHeard(bool gethtml)
 							{
 								strcpy(fileImg, "dot.png");
 							}
-							//snprintf(temp_html, sizeof(temp_html), "<td><img src=\"http://aprs.dprns.com/symbols/icons/%s\"></td>", fileImg);
+							// snprintf(temp_html, sizeof(temp_html), "<td><img src=\"http://aprs.dprns.com/symbols/icons/%s\"></td>", fileImg);
 							snprintf(temp_html, sizeof(temp_html), "\"icon\":\"%s\",", fileImg);
 							strcat(html, temp_html);
 						}
 					}
 					else
 					{
-						//strcat(html, "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>");
+						// strcat(html, "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>");
 						strcat(html, "\"icon\":\"dot.png\",");
 					}
-					
+
 					if (aprs.srcname_len > 0 && aprs.srcname_len < 10) // Get Item/Object
 					{
 						char itemname[10];
@@ -1229,11 +1266,13 @@ String event_lastHeard(bool gethtml)
 						memcpy(&itemname, aprs.srcname, aprs.srcname_len);
 						snprintf(temp_html, sizeof(temp_html), "\"callsign\":\"%s(%s)\",", itemname, src_call);
 						strcat(html, temp_html);
-					}else{
+					}
+					else
+					{
 						snprintf(temp_html, sizeof(temp_html), "\"callsign\":\"%s\",", src_call);
 						strcat(html, temp_html);
 					}
-					//strcat(html, "</td>");
+					// strcat(html, "</td>");
 					if (strlen(path) == 0)
 					{
 						strcat(html, "\"path\":\"RF: DIRECT\",");
@@ -1254,12 +1293,12 @@ String event_lastHeard(bool gethtml)
 							LPath[sizeof(LPath) - 1] = '\0';
 						}
 						// if(path.indexOf("qAR")>=0 || path.indexOf("qAS")>=0 || path.indexOf("qAC")>=0){ //Via from Internet Server
-						pkgINET=false;
+						pkgINET = false;
 						if (strstr(path, "qA") != NULL || strstr(path, "TCPIP") != NULL)
 						{
 							snprintf(temp_html, sizeof(temp_html), "\"path\":\"INET:%s\",", LPath);
 							strcat(html, temp_html);
-							pkgINET=true;
+							pkgINET = true;
 						}
 						else
 						{
@@ -1321,31 +1360,33 @@ String event_lastHeard(bool gethtml)
 						// }
 						snprintf(temp_html, sizeof(temp_html), "\"rssi\":\"%.1f\"},", rssi);
 						strcat(html, temp_html);
-						//strcat(html, "dBV</td></tr>\n");
+						// strcat(html, "dBV</td></tr>\n");
 					}
-					//log_d("%s",html_ptr);
+					// log_d("%s",html_ptr);
 				}
 			}
 		}
 	}
 	html[strlen(html) - 1] = '\0'; // Remove the last comma
-	if(html[0]=='[') strcat(html, "]");
-	//strcat(html, "</table>\n");
-	// log_d("HTML Length=%d Byte", strlen(html));
-	// if (gethtml)
-	// {
-	// 	String result = String(html); // Convert back to String for return
-	// 	free(html);
-	// 	free(line);
-	// 	return result;
-	// }
+	if (html[0] == '[')
+		strcat(html, "]");
+	// strcat(html, "</table>\n");
+	//  log_d("HTML Length=%d Byte", strlen(html));
+	//  if (gethtml)
+	//  {
+	//  	String result = String(html); // Convert back to String for return
+	//  	free(html);
+	//  	free(line);
+	//  	return result;
+	//  }
 
 	size_t len = strlen(html);
 	// char *info = (char *)calloc(len + 1, sizeof(char));
 	// if (info)
 	// {
 	// 	strcpy(info, html);
-	if(len>10) lastheard_events.send(html, "lastHeard", millis() / 1000, 1000);
+	if (len > 10)
+		lastheard_events.send(html, "lastHeard", millis() / 1000, 1000);
 	// 	free(info);
 	// }
 
@@ -1525,14 +1566,14 @@ void handle_storage(AsyncWebServerRequest *request)
 #endif
 				if (LITTLEFS.remove("/" + path))
 				{
-					//html = "File deleted";
+					// html = "File deleted";
 #ifdef DEBUG
 					Serial.println("File deleted");
 #endif
 				}
 				else
 				{
-					//html = "Delete failed";
+					// html = "Delete failed";
 #ifdef DEBUG
 					Serial.println("Delete failed");
 #endif
@@ -1540,7 +1581,8 @@ void handle_storage(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-	}else if (request->hasArg("download"))
+	}
+	else if (request->hasArg("download"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
@@ -1596,20 +1638,22 @@ void handle_storage(AsyncWebServerRequest *request)
 						dataType = "image/svg+xml";
 					else
 						dataType = "application/x-gzip";
-				}else{
+				}
+				else
+				{
 					dataType = "application/octet-stream";
 					path = path.substring(0, path.lastIndexOf("."));
-					//html = "File type not support";
-					//request->send_P(404, PSTR("text/plain"), PSTR("File type not support"));
-					//break;
+					// html = "File type not support";
+					// request->send_P(404, PSTR("text/plain"), PSTR("File type not support"));
+					// break;
 				}
 
 				if (path != "" && dataType != "")
 				{
 					String file = "/" + path;
-					//request->send(LITTLEFS, file, dataType, true);
+					// request->send(LITTLEFS, file, dataType, true);
 					AsyncWebServerResponse *response = request->beginResponse(LITTLEFS, file, dataType, true);
-					//response->addHeader("Content-Disposition","attachment");
+					// response->addHeader("Content-Disposition","attachment");
 					request->send(response);
 				}
 				else
@@ -1631,7 +1675,7 @@ void handle_storage(AsyncWebServerRequest *request)
 		return; // Memory allocation failed
 	}
 
-		strcat(webString, "<script type=\"text/javascript\">\n"
+	strcat(webString, "<script type=\"text/javascript\">\n"
 					  "function sub(obj){"
 					  "var fileName = obj.value.split('\\\\');"
 					  "document.getElementById('file-input').innerHTML = '   '+ fileName[fileName.length-1];"
@@ -1640,10 +1684,10 @@ void handle_storage(AsyncWebServerRequest *request)
 					  "$('form').submit(function(e){"
 					  "e.preventDefault();"
 					  "var data = new FormData(e.currentTarget);\n"
-					  
+
 					  "if(e.currentTarget.id === 'upload_form'){ document.getElementById('upload_sumbit').disabled = true;"
 					  "var formUp = $('#upload_form')[0];"
-					  "var dataUp = new FormData(formUp);"					  
+					  "var dataUp = new FormData(formUp);"
 					  //"document.getElementById('upload_sumbit').disabled = true;"
 					  "$.ajax({"
 					  "url: '/upload',"
@@ -1670,13 +1714,13 @@ void handle_storage(AsyncWebServerRequest *request)
 					  "}"
 					  "});"
 					  //"});"
-					  "}else{"					  
+					  "}else{"
 					  "$.ajax({"
 					  "url: '/storage',"
 					  "type: 'POST',"
 					  "data: data,"
 					  "contentType: false,"
-					  "processData:false,"					  
+					  "processData:false,"
 					  "success:function(d, s) {"
 					  //"alert('Upload Success');"
 					  "if(e.currentTarget.id===\"formDelete\") $(\"#contentmain\").load(\"/storage\");\n"
@@ -4111,17 +4155,18 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.gnss_enable = En;
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
+		// String html;
+		// if (saveConfiguration("/default.cfg", config))
+		// {
+		// 	html = "Setup completed successfully";
+		// 	request->send(200, "text/html", html); // send to someones browser when asked
+		// }
+		// else
+		// {
+		// 	html = "Save config failed.";
+		// 	request->send(501, "text/html", html); // Not Implemented
+		// }
 	}
 	else if (request->hasArg("commitUART0"))
 	{
@@ -4789,7 +4834,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
-	#ifdef PPPOS
+#ifdef PPPOS
 	else if (request->hasArg("commitPPPoS"))
 	{
 		bool pppEn = false;
@@ -4938,7 +4983,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
-	#endif
+#endif
 	else
 	{
 		// Allocate memory for the HTML string
@@ -5175,7 +5220,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "</td></tr></table>\n");
 
 		strcat(html, "</form><br />\n");
-		//html += "</td><td width=\"32%\" style=\"border:unset;\">";
+		// html += "</td><td width=\"32%\" style=\"border:unset;\">";
 
 		/**************UART2 Modify******************/
 		// html += "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"fromUART2\" method=\"post\">\n";
@@ -5540,7 +5585,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>GNSS Modify</b></span></th>\n");
 		strcat(html, "<tr>");
 
-		//char *enFlage = allocateStringMemory(20);
+		// char *enFlage = allocateStringMemory(20);
 		strcpy(enFlage, "");
 		if (config.gnss_enable)
 			strcpy(enFlage, "checked");
@@ -5585,7 +5630,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "</td></tr></table>\n");
 
 		strcat(html, "</form><br />\n");
-		//free(enFlage);
+		// free(enFlage);
 
 		strcat(html, "</td><td width=\"23%\" style=\"border:unset;\">");
 
@@ -5595,7 +5640,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>MODBUS Modify</b></span></th>\n");
 		strcat(html, "<tr>");
 
-		//enFlage = allocateStringMemory(20);
+		// enFlage = allocateStringMemory(20);
 		strcpy(enFlage, "");
 		if (config.modbus_enable)
 			strcpy(enFlage, "checked");
@@ -5637,7 +5682,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "<input type=\"hidden\" name=\"commitMODBUS\"/>\n");
 		strcat(html, "</td></tr></table>\n");
 		strcat(html, "</form>\n");
-		//free(enFlage);
+		// free(enFlage);
 
 		strcat(html, "</td><td width=\"23%\" style=\"border:unset;\">");
 
@@ -5647,7 +5692,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>External TNC Modify</b></span></th>\n");
 		strcat(html, "<tr>");
 
-		//enFlage = allocateStringMemory(20);
+		// enFlage = allocateStringMemory(20);
 		strcpy(enFlage, "");
 		if (config.ext_tnc_enable)
 			strcpy(enFlage, "checked");
@@ -5693,7 +5738,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "<input type=\"hidden\" name=\"commitTNC\"/>\n");
 		strcat(html, "</td></tr></table>\n");
 		strcat(html, "</form>\n");
-		//free(enFlage);
+		// free(enFlage);
 		strcat(html, "</td></tr></table>\n");
 		strcat(html, "<br />\n");
 
@@ -5755,7 +5800,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "</td></tr></table><br />\n");
 		strcat(html, "</form><br />");
 
-		#ifdef PPPOS
+#ifdef PPPOS
 		strcat(html, "<br />\n");
 
 		strcat(html, "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;vertical-align:top\"><td width=\"50%\" style=\"border:unset;vertical-align:top\">");
@@ -5875,11 +5920,11 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "</form>");
 		free(pppEnFlag);
 		free(LowFlag);
-		free(HighFlag); 
+		free(HighFlag);
 
 		strcat(html, "</td></tr></table>\n");
 #endif
-		const char* dataType = "text/html";
+		const char *dataType = "text/html";
 		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
 		response->addHeader("MOD", "content");
 		response->addHeader("Cache-Control", "no-cache");
@@ -5887,6 +5932,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		free(html); // Free the allocated memory
 	}
 }
+
 void handle_system(AsyncWebServerRequest *request)
 {
 	if (!request->authenticate(config.http_username, config.http_password))
@@ -5910,50 +5956,29 @@ void handle_system(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("updateHostName"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
+			log_d("%s", request->arg(i).c_str());
 			if (request->argName(i) == "SetHostName")
 			{
 				if (request->arg(i) != "")
 				{
-					// Serial.println("WEB Config NTP");
-					strcpy(config.host_name, request->arg(i).c_str());
+					strncpy(config.host_name, request->arg(i).c_str(), sizeof(config.host_name) - 1);
+					config.host_name[sizeof(config.host_name) - 1] = '\0'; // Null terminate
 				}
 				break;
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("updateTimeNtp"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 			if (request->argName(i) == "SetTimeNtp")
 			{
 				if (request->arg(i) != "")
@@ -5965,16 +5990,7 @@ void handle_system(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("updateAutoReset"))
 	{
@@ -5990,25 +6006,12 @@ void handle_system(AsyncWebServerRequest *request)
 				break;
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("updateTime"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 			if (request->argName(i) == "SetTime")
 			{
 				if (request->arg(i) != "")
@@ -6041,34 +6044,25 @@ void handle_system(AsyncWebServerRequest *request)
 					settimeofday(&tv, &tz);
 
 					// Serial.println("Update TIME " + request->arg(i));
-					Serial.print("Set New Time at ");
-					Serial.print(dd);
-					Serial.print("/");
-					Serial.print(mm);
-					Serial.print("/");
-					Serial.print(yyyy);
-					Serial.print(" ");
-					Serial.print(hh);
-					Serial.print(":");
-					Serial.print(ii);
-					Serial.print(":");
-					Serial.print(ss);
-					Serial.print(" ");
-					Serial.println(timeStamp);
+					// Serial.print("Set New Time at ");
+					// Serial.print(dd);
+					// Serial.print("/");
+					// Serial.print(mm);
+					// Serial.print("/");
+					// Serial.print(yyyy);
+					// Serial.print(" ");
+					// Serial.print(hh);
+					// Serial.print(":");
+					// Serial.print(ii);
+					// Serial.print(":");
+					// Serial.print(ss);
+					// Serial.print(" ");
+					// Serial.println(timeStamp);
 				}
 				break;
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("REBOOT"))
 	{
@@ -6085,7 +6079,7 @@ void handle_system(AsyncWebServerRequest *request)
 	{
 		if (loadConfiguration("/default.cfg", config))
 		{
-			const char *html = "OK";
+			String html = "OK";
 			request->send(200, "text/html", html);
 		}
 	}
@@ -6093,10 +6087,6 @@ void handle_system(AsyncWebServerRequest *request)
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 			if (request->argName(i) == "webauth_user")
 			{
 				if (request->arg(i) != "")
@@ -6112,25 +6102,12 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitPath"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 			if (request->argName(i) == "path1")
 			{
 				if (request->arg(i) != "")
@@ -6149,7 +6126,7 @@ void handle_system(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.path[1], request->arg(i).c_str());
+					strcpy(config.path[2], request->arg(i).c_str());
 				}
 			}
 			if (request->argName(i) == "path4")
@@ -6160,16 +6137,7 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitPWR"))
 	{
@@ -6178,10 +6146,6 @@ void handle_system(AsyncWebServerRequest *request)
 
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 			if (request->argName(i) == "pwr_active")
 			{
 				if (request->arg(i) != "")
@@ -6300,16 +6264,7 @@ void handle_system(AsyncWebServerRequest *request)
 			}
 		}
 		config.pwr_en = PwrEn;
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitLOG"))
 	{
@@ -6318,11 +6273,6 @@ void handle_system(AsyncWebServerRequest *request)
 
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
-
 			if (request->argName(i) == "logStatus")
 			{
 				if (request->arg(i) != "")
@@ -6368,16 +6318,7 @@ void handle_system(AsyncWebServerRequest *request)
 				}
 			}
 		}
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitDISP"))
 	{
@@ -6392,10 +6333,6 @@ void handle_system(AsyncWebServerRequest *request)
 
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 			if (request->argName(i) == "oledEnable")
 			{
 				if (request->arg(i) != "")
@@ -6585,12 +6522,12 @@ void handle_system(AsyncWebServerRequest *request)
 		{
 			// display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
 			//  Initialising the UI will init the display too.
-// #ifdef SH1106
-// 			display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, false);
-// #else
-// 			display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false);
-// #endif
-//			display.clearDisplay();
+			// #ifdef SH1106
+			// 			display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, false);
+			// #else
+			// 			display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false);
+			// #endif
+			//			display.clearDisplay();
 		}
 		config.oled_enable = oledEN;
 		config.dispINET = dispINET;
@@ -6599,34 +6536,25 @@ void handle_system(AsyncWebServerRequest *request)
 		config.tx_display = dispTX;
 		config.disp_flip = dispFlip;
 #endif // OLED
-		// config.filterMessage = filterMessage;
-		// config.filterStatus = filterStatus;
-		// config.filterTelemetry = filterTelemetry;
-		// config.filterWeather = filterWeather;
-		// config.filterTracker = filterTracker;
-		// config.filterMove = filterMove;
-		// config.filterPosition = filterPosition;
-		const char *html = "Setup completed successfully";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+	   // config.filterMessage = filterMessage;
+	   // config.filterStatus = filterStatus;
+	   // config.filterTelemetry = filterTelemetry;
+	   // config.filterWeather = filterWeather;
+	   // config.filterTracker = filterTracker;
+	   // config.filterMove = filterMove;
+	   // config.filterPosition = filterPosition;
+		saveConfig(request);
 	}
 	else
 	{
 		struct tm tmstruct;
-		char strTime[20];
+		char strTime[30];
 		tmstruct.tm_year = 0;
 		getLocalTime(&tmstruct, 100);
 		sprintf(strTime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
 
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(22000); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(20000); // Initial buffer size, adjust as needed
 		if (!html)
 		{
 			return; // Memory allocation failed
@@ -6668,10 +6596,10 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "<td style=\"text-align: right;\">Host Name:</td>\n");
 
 		// Building form with snprintf to avoid string concatenation
-		char temp_buffer[512];
+		char temp_buffer[300];
 		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formHostName\" method=\"post\"><input name=\"SetHostName\" type=\"text\" value=\"%s\" />\n", config.host_name);
 		strcat(html, temp_buffer);
-		strcat(html, "<button type='submit' id='updateHostName'  name=\"commit\"> Apply </button>\n");
+		strcat(html, "<button type='submit' id='updateHostName'  name=\"updateHostName\"> Apply </button>\n");
 		strcat(html, "<input type=\"hidden\" name=\"updateHostName\"/></form>\n</td>\n");
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>");
@@ -6766,7 +6694,7 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>Power Save Mode</b></span></th>\n");
 		strcat(html, "<tr>");
 
-		char enFlage[20] = "";
+		char enFlage[10] = "";
 		if (config.pwr_en)
 			strcpy(enFlage, "checked");
 		strcat(html, "<td align=\"right\"><b>Enable</b></td>\n");
@@ -6775,7 +6703,7 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, temp_buffer);
 		strcat(html, "</tr>\n");
 
-		char LowFlag[30] = "", HighFlag[30] = "";
+		char LowFlag[20] = "", HighFlag[20] = "";
 		strcpy(LowFlag, "");
 		strcpy(HighFlag, "");
 		if (config.pwr_active)
@@ -6830,7 +6758,7 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "<legend>Events</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">\n");
 		strcat(html, "<tr style=\"background:unset;\">");
 
-		char filterFlageEn[20] = "";
+		char filterFlageEn[10] = "";
 		if (config.pwr_sleep_activate & ACTIVATE_TRACKER)
 			strcpy(filterFlageEn, "checked");
 		else
@@ -6990,9 +6918,7 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "<input type=\"hidden\" name=\"commitPath\"/>\n");
 		strcat(html, "</td></tr></table>\n");
 		strcat(html, "</form><br /><br />");
-		// delay(1);
-// log_d("%s",html.c_str());
-// log_d("Length: %d",html.length());
+
 #if defined OLED || defined ST7735_160x80
 		strcat(html, "<form id='formDisp' method=\"POST\" action='#' enctype='multipart/form-data'>\n");
 		// html += "<h2>Display Setting</h2>\n";
@@ -7000,15 +6926,16 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>Display Setting</b></span></th>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td style=\"text-align: right;\"><b>OLED/TFT Enable</b></td>\n");
-		char oledFlageEn[20] = "";
+		char oledFlageEn[10] = "";
 		if (config.oled_enable == true)
 			strcpy(oledFlageEn, "checked");
 		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"oledEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 		strcat(html, "</tr>\n");
-		strcpy(oledFlageEn, "");
 		if (config.disp_flip == true)
 			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td style=\"text-align: right;\"><b>Flip Rotate</b></td>\n");
 
@@ -7017,26 +6944,29 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td style=\"text-align: right;\"><b>TX Display</b></td>\n");
-		char txdispFlageEn[20] = "";
 		if (config.tx_display == true)
-			strcpy(txdispFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"txdispEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*All TX Packet for display affter filter.</i></label></td>\n", txdispFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"txdispEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*All TX Packet for display affter filter.</i></label></td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td style=\"text-align: right;\"><b>RX Display</b></td>\n");
-		char rxdispFlageEn[20] = "";
 		if (config.rx_display == true)
-			strcpy(rxdispFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"rxdispEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*All RX Packet for display affter filter.</i></label></td>\n", rxdispFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"rxdispEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*All RX Packet for display affter filter.</i></label></td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td style=\"text-align: right;\"><b>Head Up</b></td>\n");
-		char hupFlageEn[20] = "";
 		if (config.h_up == true)
-			strcpy(hupFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"hupEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*The compass will rotate in the direction of movement.</i></label></td>\n", hupFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"hupEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*The compass will rotate in the direction of movement.</i></label></td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 		strcat(html, "</tr>\n");
 
@@ -7123,59 +7053,67 @@ void handle_system(AsyncWebServerRequest *request)
 
 		// html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"dispINET\" name=\"dispINET\" type=\"checkbox\" value=\"OK\" " + inetFlageEn + "/>From INET</td>\n";
 
-		char filterMessageFlageEn[20] = "";
 		if (config.dispFilter & FILTER_MESSAGE)
-			strcpy(filterMessageFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterMessage\" name=\"filterMessage\" type=\"checkbox\" value=\"OK\" %s/>Message</td>\n", filterMessageFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterMessage\" name=\"filterMessage\" type=\"checkbox\" value=\"OK\" %s/>Message</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
-
-		char filterStatusFlageEn[20] = "";
 		if (config.dispFilter & FILTER_STATUS)
-			strcpy(filterStatusFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterStatus\" name=\"filterStatus\" type=\"checkbox\" value=\"OK\" %s/>Status</td>\n", filterStatusFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterStatus\" name=\"filterStatus\" type=\"checkbox\" value=\"OK\" %s/>Status</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
-		char filterTelemetryFlageEn[20] = "";
 		if (config.dispFilter & FILTER_TELEMETRY)
-			strcpy(filterTelemetryFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterTelemetry\" name=\"filterTelemetry\" type=\"checkbox\" value=\"OK\" %s/>Telemetry</td>\n", filterTelemetryFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterTelemetry\" name=\"filterTelemetry\" type=\"checkbox\" value=\"OK\" %s/>Telemetry</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
-		char filterWeatherFlageEn[20] = "";
 		if (config.dispFilter & FILTER_WX)
-			strcpy(filterWeatherFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterWeather\" name=\"filterWeather\" type=\"checkbox\" value=\"OK\" %s/>Weather</td>\n", filterWeatherFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterWeather\" name=\"filterWeather\" type=\"checkbox\" value=\"OK\" %s/>Weather</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
-		char filterObjectFlageEn[20] = "";
 		if (config.dispFilter & FILTER_OBJECT)
-			strcpy(filterObjectFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterObject\" name=\"filterObject\" type=\"checkbox\" value=\"OK\" %s/>Object</td>\n", filterObjectFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterObject\" name=\"filterObject\" type=\"checkbox\" value=\"OK\" %s/>Object</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
-		char filterItemFlageEn[20] = "";
 		if (config.dispFilter & FILTER_ITEM)
-			strcpy(filterItemFlageEn, "checked");
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
 		strcat(html, "</tr><tr style=\"background:unset;\"><td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterItem\" name=\"filterItem\" type=\"checkbox\" value=\"OK\" ");
-		strcat(html, filterItemFlageEn);
+		strcat(html, oledFlageEn);
 		strcat(html, "/>Item</td>\n");
 
-		char filterQueryFlageEn[20] = "";
 		if (config.dispFilter & FILTER_QUERY)
-			strcpy(filterQueryFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterQuery\" name=\"filterQuery\" type=\"checkbox\" value=\"OK\" %s/>Query</td>\n", filterQueryFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterQuery\" name=\"filterQuery\" type=\"checkbox\" value=\"OK\" %s/>Query</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
-		char filterBuoyFlageEn[20] = "";
 		if (config.dispFilter & FILTER_BUOY)
-			strcpy(filterBuoyFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterBuoy\" name=\"filterBuoy\" type=\"checkbox\" value=\"OK\" %s/>Buoy</td>\n", filterBuoyFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterBuoy\" name=\"filterBuoy\" type=\"checkbox\" value=\"OK\" %s/>Buoy</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
-		char filterPositionFlageEn[20] = "";
 		if (config.dispFilter & FILTER_POSITION)
-			strcpy(filterPositionFlageEn, "checked");
-		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterPosition\" name=\"filterPosition\" type=\"checkbox\" value=\"OK\" %s/>Position</td>\n", filterPositionFlageEn);
+			strcpy(oledFlageEn, "checked");
+		else
+			strcpy(oledFlageEn, "");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterPosition\" name=\"filterPosition\" type=\"checkbox\" value=\"OK\" %s/>Position</td>\n", oledFlageEn);
 		strcat(html, temp_buffer);
 
 		strcat(html, "<td style=\"border:unset;\"></td>\n");
@@ -12141,7 +12079,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 	response->addHeader("Tracker", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(html); // Free the allocated memory	
+	free(html); // Free the allocated memory
 }
 
 void handle_wireless(AsyncWebServerRequest *request)
@@ -12191,17 +12129,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		{
 			config.wifi_mode &= ~WIFI_AP_FIX;
 		}
-		String html_msg = "";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html_msg = "Setup completed successfully";
-			request->send(200, "text/html", html_msg); // send to someones browser when asked
-		}
-		else
-		{
-			html_msg = "Save config failed.";
-			request->send(501, "text/html", html_msg); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitWiFiClient"))
 	{
@@ -12272,17 +12200,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		{
 			config.wifi_mode &= ~WIFI_STA_FIX;
 		}
-		String html_msg2 = "";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html_msg2 = "Setup completed successfully";
-			request->send(200, "text/html", html_msg2); // send to someones browser when asked
-		}
-		else
-		{
-			html_msg2 = "Save config failed.";
-			request->send(501, "text/html", html_msg2); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitBluetooth"))
 	{
@@ -12346,21 +12264,12 @@ void handle_wireless(AsyncWebServerRequest *request)
 			}
 		}
 		config.bt_master = btMaster;
-		String html_msg3 = "";
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html_msg3 = "Setup completed successfully";
-			request->send(200, "text/html", html_msg3); // send to someones browser when asked
-		}
-		else
-		{
-			html_msg3 = "Save config failed.";
-			request->send(501, "text/html", html_msg3); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else
 	{
 		// Allocate initial memory for HTML content
+		char tempHtml[256];
 		char *html = allocateStringMemory(12000); // Start with 12KB buffer
 		if (!html)
 		{
@@ -12450,15 +12359,8 @@ void handle_wireless(AsyncWebServerRequest *request)
 		String wifiClientEnFlag = "";
 		if (config.wifi_mode & WIFI_STA_FIX)
 			wifiClientEnFlag = "checked";
-		{
-			char *temp_wifi_flag = allocateStringMemory(512);
-			if (temp_wifi_flag)
-			{
-				snprintf(temp_wifi_flag, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wificlient\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", wifiClientEnFlag);
-				strcat(html, temp_wifi_flag);
-				free(temp_wifi_flag);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wificlient\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", wifiClientEnFlag);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>WiFi RF Power:</b></td>\n");
@@ -12466,18 +12368,11 @@ void handle_wireless(AsyncWebServerRequest *request)
 		strcat(html, "<select name=\"wifi_pwr\" id=\"wifi_pwr\">\n");
 		for (int i = 0; i < 12; i++)
 		{
-			{
-				char *temp_option = allocateStringMemory(256);
-				if (temp_option)
-				{
-					if (config.wifi_power == (int8_t)wifiPwr[i][0])
-						snprintf(temp_option, 256, "<option value=\"%d\" selected>%.1f dBm</option>\n", (int8_t)wifiPwr[i][0], wifiPwr[i][1]);
-					else
-						snprintf(temp_option, 256, "<option value=\"%d\" >%.1f dBm</option>\n", (int8_t)wifiPwr[i][0], wifiPwr[i][1]);
-					strcat(html, temp_option);
-					free(temp_option);
-				}
-			}
+			if (config.wifi_power == (int8_t)wifiPwr[i][0])
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%.1f dBm</option>\n", (int8_t)wifiPwr[i][0], wifiPwr[i][1]);
+			else
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" >%.1f dBm</option>\n", (int8_t)wifiPwr[i][0], wifiPwr[i][1]);
+			strcat(html, tempHtml);
 		}
 		strcat(html, "</select>\n");
 		strcat(html, "</td>\n");
@@ -12485,71 +12380,34 @@ void handle_wireless(AsyncWebServerRequest *request)
 		for (int n = 0; n < 5; n++)
 		{
 			strcat(html, "<tr>\n");
-			{
-				char *temp_station = allocateStringMemory(256);
-				if (temp_station)
-				{
-					snprintf(temp_station, 256, "<td align=\"right\"><b>Station #%d:</b></td>\n", n + 1);
-					strcat(html, temp_station);
-					free(temp_station);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<td align=\"right\"><b>Station #%d:</b></td>\n", n + 1);
+			strcat(html, tempHtml);
 			strcat(html, "<td align=\"center\">\n");
-			{
-				char *temp_fieldset = allocateStringMemory(256);
-				if (temp_fieldset)
-				{
-					snprintf(temp_fieldset, 256, "<fieldset id=\"filterDispGrp%d\">\n", n + 1);
-					strcat(html, temp_fieldset);
-					free(temp_fieldset);
-				}
-			}
-			{
-				char *temp_legend = allocateStringMemory(256);
-				if (temp_legend)
-				{
-					snprintf(temp_legend, 256, "<legend>WiFi Station #%d</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">", n + 1);
-					strcat(html, temp_legend);
-					free(temp_legend);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<fieldset id=\"filterDispGrp%d\">\n", n + 1);
+			strcat(html, tempHtml);
+			snprintf(tempHtml, sizeof(tempHtml), "<legend>WiFi Station #%d</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">", n + 1);
+			strcat(html, tempHtml);
 			strcat(html, "<tr style=\"background:unset;\">");
 			// strcat(html, "<tr>\n";
 			strcat(html, "<td align=\"right\" width=\"120\"><b>Enable:</b></td>\n");
-			const char *wifiClientEnFlag = config.wifi_sta[n].enable ? "checked" : "";
-			{
-				char *temp_wifi_station = allocateStringMemory(256);
-				if (temp_wifi_station)
-				{
-					snprintf(temp_wifi_station, 256, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wifiStation%d\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", n, wifiClientEnFlag);
-					strcat(html, temp_wifi_station);
-					free(temp_wifi_station);
-				}
-			}
+			char wifiClientEnFlag[10];
+			if (config.wifi_sta[n].enable)
+				strcpy(wifiClientEnFlag, "checked");
+			else
+				strcpy(wifiClientEnFlag, "");
+
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wifiStation%d\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", n, wifiClientEnFlag);
+			strcat(html, tempHtml);
 			strcat(html, "</tr>\n");
 			strcat(html, "<tr>\n");
 			strcat(html, "<td align=\"right\"><b>WiFi SSID:</b></td>\n");
-			{
-				char *temp_wifi_ssid = allocateStringMemory(512);
-				if (temp_wifi_ssid)
-				{
-					snprintf(temp_wifi_ssid, 512, "<td style=\"text-align: left;\"><input size=\"32\" maxlength=\"32\" name=\"wifi_ssid%d\" type=\"text\" value=\"%s\" /></td>\n", n, config.wifi_sta[n].wifi_ssid);
-					strcat(html, temp_wifi_ssid);
-					free(temp_wifi_ssid);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input size=\"32\" maxlength=\"32\" name=\"wifi_ssid%d\" type=\"text\" value=\"%s\" /></td>\n", n, config.wifi_sta[n].wifi_ssid);
+			strcat(html, tempHtml);
 			strcat(html, "</tr>\n");
 			strcat(html, "<tr>\n");
 			strcat(html, "<td align=\"right\"><b>WiFi PASSWORD:</b></td>\n");
-			{
-				char *temp_wifi_pass = allocateStringMemory(512);
-				if (temp_wifi_pass)
-				{
-					snprintf(temp_wifi_pass, 512, "<td style=\"text-align: left;\"><input size=\"63\" maxlength=\"63\" name=\"wifi_pass%d\" type=\"password\" value=\"%s\" /></td>\n", n, config.wifi_sta[n].wifi_pass);
-					strcat(html, temp_wifi_pass);
-					free(temp_wifi_pass);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input size=\"63\" maxlength=\"63\" name=\"wifi_pass%d\" type=\"password\" value=\"%s\" /></td>\n", n, config.wifi_sta[n].wifi_pass);
+			strcat(html, tempHtml);
 			strcat(html, "</tr>\n");
 			strcat(html, "</tr></table></fieldset>\n");
 			strcat(html, "</td></tr>\n");
@@ -12572,93 +12430,49 @@ void handle_wireless(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>Bluetooth Master (BLE)</b></span></th>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Enable:</b></td>\n");
-		const char* btEnFlag = config.bt_master ? "checked" : "";
-		{
-			char *temp_bt_flag = allocateStringMemory(256);
-			if (temp_bt_flag)
-			{
-				snprintf(temp_bt_flag, 256, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"btMaster\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", btEnFlag);
-				strcat(html, temp_bt_flag);
-				free(temp_bt_flag);
-			}
-		}
+
+		char btFlag[10];
+		if (config.bt_master)
+			strcpy(btFlag, "checked");
+		else
+			strcpy(btFlag, "");
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"btMaster\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", btFlag);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>NAME:</b></td>\n");
-		{
-			char *temp_bt_name = allocateStringMemory(256);
-			if (temp_bt_name)
-			{
-				snprintf(temp_bt_name, 256, "<td style=\"text-align: left;\"><input maxlength=\"20\" id=\"bt_name\" name=\"bt_name\" type=\"text\" value=\"%s\" /></td>\n", config.bt_name);
-				strcat(html, temp_bt_name);
-				free(temp_bt_name);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"20\" id=\"bt_name\" name=\"bt_name\" type=\"text\" value=\"%s\" /></td>\n", config.bt_name);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>PIN:</b></td>\n");
-		{
-			char *temp_bt_pin = allocateStringMemory(256);
-			if (temp_bt_pin)
-			{
-				snprintf(temp_bt_pin, 256, "<td style=\"text-align: left;\"><input min=\"0\" max=\"999999\" id=\"bt_pin\" name=\"bt_pin\" type=\"number\" value=\"%d\" /></td> <i>*Value 0 is no auth.</i>\n", config.bt_pin);
-				strcat(html, temp_bt_pin);
-				free(temp_bt_pin);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input min=\"0\" max=\"999999\" id=\"bt_pin\" name=\"bt_pin\" type=\"number\" value=\"%d\" /></td> <i>*Value 0 is no auth.</i>\n", config.bt_pin);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>UUID:</b></td>\n");
-		{
-			char *temp_bt_uuid = allocateStringMemory(512);
-			if (temp_bt_uuid)
-			{
-				snprintf(temp_bt_uuid, 512, "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid\" name=\"bt_uuid\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid);
-				strcat(html, temp_bt_uuid);
-				free(temp_bt_uuid);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid\" name=\"bt_uuid\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>UUID RX:</b></td>\n");
-		{
-			char *temp_bt_uuid_rx = allocateStringMemory(512);
-			if (temp_bt_uuid_rx)
-			{
-				snprintf(temp_bt_uuid_rx, 512, "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_rx\" name=\"bt_uuid_rx\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid_rx);
-				strcat(html, temp_bt_uuid_rx);
-				free(temp_bt_uuid_rx);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_rx\" name=\"bt_uuid_rx\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid_rx);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>UUID TX:</b></td>\n");
-		{
-			char *temp_bt_uuid_tx = allocateStringMemory(512);
-			if (temp_bt_uuid_tx)
-			{
-				snprintf(temp_bt_uuid_tx, 512, "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_tx\" name=\"bt_uuid_tx\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid_tx);
-				strcat(html, temp_bt_uuid_tx);
-				free(temp_bt_uuid_tx);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_tx\" name=\"bt_uuid_tx\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid_tx);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 
 		strcat(html, "<td align=\"right\"><b>MODE:</b></td>\n");
 		strcat(html, "<td style=\"text-align: left;\">\n");
 		strcat(html, "<select name=\"bt_mode\" id=\"bt_mode\">\n");
-		const char* btModeOff = (config.bt_mode == 0) ? "selected" : "";
-		const char* btModeTNC2 = (config.bt_mode == 1) ? "selected" : "";
-		const char* btModeKISS = (config.bt_mode == 2) ? "selected" : "";
-		{
-			char *temp_bt_options = allocateStringMemory(512);
-			if (temp_bt_options)
-			{
-				snprintf(temp_bt_options, 512, "<option value=\"0\" %s>NONE</option>\n<option value=\"1\" %s>TNC2</option>\n<option value=\"2\" %s>KISS</option>\n", btModeOff, btModeTNC2, btModeKISS);
-				strcat(html, temp_bt_options);
-				free(temp_bt_options);
-			}
-		}
+		const char *btModeOff = (config.bt_mode == 0) ? "selected" : "";
+		const char *btModeTNC2 = (config.bt_mode == 1) ? "selected" : "";
+		const char *btModeKISS = (config.bt_mode == 2) ? "selected" : "";
+		snprintf(tempHtml, sizeof(tempHtml), "<option value=\"0\" %s>NONE</option>\n<option value=\"1\" %s>TNC2</option>\n<option value=\"2\" %s>KISS</option>\n", btModeOff, btModeTNC2, btModeKISS);
+		strcat(html, tempHtml);
 		strcat(html, "</select>\n");
 
 		strcat(html, "<label style=\"font-size: 8pt;text-align: right;\">*See the following for generating UUIDs: <a href=\"https://www.uuidgenerator.net\" target=\"_blank\">https://www.uuidgenerator.net</a></label></td>\n");
@@ -12670,12 +12484,11 @@ void handle_wireless(AsyncWebServerRequest *request)
 		strcat(html, "</form>");
 #endif
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
-	response->addHeader("wifi", "content");
-	response->addHeader("Cache-Control", "no-cache");
-	request->send(response);
-	free(html); // Free the allocated memory
-
+		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		response->addHeader("wifi", "content");
+		response->addHeader("Cache-Control", "no-cache");
+		request->send(response);
+		free(html); // Free the allocated memory
 	}
 }
 
@@ -12925,7 +12738,7 @@ void handle_about(AsyncWebServerRequest *request)
 #elif defined(T_BEAM_S3_BPF)
 	strcat(webString, "LilyGo T-Beam-BPF");
 #elif defined(T_BEAM_S3_1W)
-	strcat(webString, "LilyGo T-Beam-1W");	
+	strcat(webString, "LilyGo T-Beam-1W");
 #elif defined(HELTEC_V3_GPS)
 	strcat(webString, "HELTEC_V3_GPS,ESP32 DIY");
 #elif defined(HELTEC_HTIT_TRACKER)
@@ -13149,8 +12962,8 @@ void handle_about(AsyncWebServerRequest *request)
 	strcat(webString, "</table>\n");
 	strcat(webString, "</td></tr></table><br />");
 
-	// strcat(webString, "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;\"><td width=\"96%\" style=\"border:unset;\">");
-	#ifndef NO_OTA
+// strcat(webString, "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;\"><td width=\"96%\" style=\"border:unset;\">");
+#ifndef NO_OTA
 	strcat(webString, "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form' class=\"form-horizontal\">\n");
 	strcat(webString, "<table>");
 	strcat(webString, "<th colspan=\"2\"><span><b>Firmware Update</b></span></th>\n");
@@ -13198,7 +13011,7 @@ void handle_about(AsyncWebServerRequest *request)
 					  "});"
 					  "});"
 					  "</script>");
-	#endif
+#endif
 	strcat(webString, "</body></html>\n");
 
 	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
@@ -13363,26 +13176,32 @@ void handle_default()
 	defaultSetting = false;
 }
 
-void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-    if (!index) {
-        // Open the file in write mode on the first chunk
-        request->_tempFile = LITTLEFS.open("/" + filename, "w");
-    }
-    if (len < (LITTLEFS.totalBytes()-LITTLEFS.usedBytes())) {
-        // Write the data chunk to the file
-        request->_tempFile.write(data, len);
-    }else{
+void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+{
+	if (!index)
+	{
+		// Open the file in write mode on the first chunk
+		request->_tempFile = LITTLEFS.open("/" + filename, "w");
+	}
+	if (len < (LITTLEFS.totalBytes() - LITTLEFS.usedBytes()))
+	{
+		// Write the data chunk to the file
+		request->_tempFile.write(data, len);
+	}
+	else
+	{
 		// Not enough space to write the file
 		request->_tempFile.close();
 		LITTLEFS.remove("/" + filename); // Remove the incomplete file
 		request->send(500, "text/plain", "Not enough space to upload the file");
 		return;
 	}
-    if (final) {
-        // Close the file on the last chunk and redirect
-        request->_tempFile.close();
-        request->redirect("/"); // Redirect back to the main page
-    }
+	if (final)
+	{
+		// Close the file on the last chunk and redirect
+		request->_tempFile.close();
+		request->redirect("/"); // Redirect back to the main page
+	}
 }
 
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
@@ -13482,9 +13301,8 @@ void webService()
 					{ handle_format(request); });
 
 	// Route to handle the file upload
-    async_server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
-        request->send(200, "text/plain", "File uploaded successfully!");
-    }, handleUpload); // Pass the handleUpload function as the upload handler
+	async_server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request)
+					{ request->send(200, "text/plain", "File uploaded successfully!"); }, handleUpload); // Pass the handleUpload function as the upload handler
 
 	async_server.on(
 		"/update", HTTP_POST, [](AsyncWebServerRequest *request)
@@ -13540,30 +13358,32 @@ void webService()
 
 	lastheard_events.onConnect([](AsyncEventSourceClient *client)
 							   {
-    if(client->lastId()){
-	  #if (CORE_DEBUG_LEVEL > 0)
-      log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
-	  #endif
-    }
-    // send event with message "hello!", id current millis
-    // and set reconnect delay to 1 second
-	//String html = event_lastHeard(true);
-    //client->send(html.c_str(), "lastHeard", time(NULL), 5000); 
-	});
+								   if (client->lastId())
+								   {
+#if (CORE_DEBUG_LEVEL > 0)
+									   log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+#endif
+								   }
+								   // send event with message "hello!", id current millis
+								   // and set reconnect delay to 1 second
+								   // String html = event_lastHeard(true);
+								   // client->send(html.c_str(), "lastHeard", time(NULL), 5000);
+							   });
 	async_server.addHandler(&lastheard_events);
 
 	message_events.onConnect([](AsyncEventSourceClient *client)
 							 {
-    if(client->lastId()){
-		#if (CORE_DEBUG_LEVEL > 0)
-      log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
-	  #endif
-    }
-    // send event with message "hello!", id current millis
-    // and set reconnect delay to 1 second
-	//String html = event_chatMessage(true);
-    //client->send(html.c_str(), "chatMsg", time(NULL), 5000); 
-	});
+								 if (client->lastId())
+								 {
+#if (CORE_DEBUG_LEVEL > 0)
+									 log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+#endif
+								 }
+								 // send event with message "hello!", id current millis
+								 // and set reconnect delay to 1 second
+								 // String html = event_chatMessage(true);
+								 // client->send(html.c_str(), "chatMsg", time(NULL), 5000);
+							 });
 	async_server.addHandler(&message_events);
 
 	async_server.onNotFound(notFound);
