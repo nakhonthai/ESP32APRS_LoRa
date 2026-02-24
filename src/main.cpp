@@ -6639,11 +6639,17 @@ void loop()
         digitalWrite(37, HIGH);
         VBat = (double)analogReadMilliVolts(1) / 201.15357F;
 #elif defined(APRS_LORA_HT)
+        analogReadResolution(12);
+        analogSetAttenuation(ADC_11db);
         VBat = (double)analogReadMilliVolts(3) / 595.24F;
 #elif defined(T_BEAM_S3_1W)
+        analogReadResolution(12);
+        analogSetAttenuation(ADC_11db);
         VBat = (double)analogReadMilliVolts(4) / 333.289F;        
 #elif defined(BUOY)
         // #ifdef BUOY
+        analogReadResolution(12);
+        analogSetAttenuation(ADC_11db);
         VBat = (double)analogReadMilliVolts(0) * 0.0028F;
         // TempNTC = getTempNTC();
 
@@ -7294,7 +7300,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskNetwork,        /* Function to implement the task */
                             "taskNetwork",      /* Name of the task */
-                            12000,              /* Stack size in words */
+                            8192,              /* Stack size in words */
                             NULL,               /* Task input parameter */
                             0,                  /* Priority of the task */
                             &taskNetworkHandle, /* Task handle. */
@@ -7311,7 +7317,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskNetwork,        /* Function to implement the task */
                             "taskNetwork",      /* Name of the task */
-                            12000,              /* Stack size in words */
+                            8192,              /* Stack size in words */
                             NULL,               /* Task input parameter */
                             1,                  /* Priority of the task */
                             &taskNetworkHandle, /* Task handle. */

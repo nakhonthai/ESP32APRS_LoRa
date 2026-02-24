@@ -3206,22 +3206,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 		}
 
 		config.vpn = vpnEn;
-		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(256); // Buffer for response message
-		if (html)
-		{
-			if (saveConfiguration("/default.cfg", config))
-			{
-				strcpy(html, "Setup completed successfully");
-				request->send(200, "text/html", html); // send to someones browser when asked
-			}
-			else
-			{
-				strcpy(html, "Save config failed.");
-				request->send(501, "text/html", html); // Not Implemented
-			}
-			free(html); // Free the allocated memory
-		}
+		saveConfig(request);
 	}
 	else
 	{
@@ -4156,28 +4141,12 @@ void handle_mod(AsyncWebServerRequest *request)
 
 		config.gnss_enable = En;
 		saveConfig(request);
-		// String html;
-		// if (saveConfiguration("/default.cfg", config))
-		// {
-		// 	html = "Setup completed successfully";
-		// 	request->send(200, "text/html", html); // send to someones browser when asked
-		// }
-		// else
-		// {
-		// 	html = "Save config failed.";
-		// 	request->send(501, "text/html", html); // Not Implemented
-		// }
 	}
 	else if (request->hasArg("commitUART0"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
-
 			if (request->argName(i) == "Enable")
 			{
 				if (request->arg(i) != "")
@@ -4238,10 +4207,6 @@ void handle_mod(AsyncWebServerRequest *request)
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4303,10 +4268,6 @@ void handle_mod(AsyncWebServerRequest *request)
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4361,10 +4322,6 @@ void handle_mod(AsyncWebServerRequest *request)
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4411,10 +4368,6 @@ void handle_mod(AsyncWebServerRequest *request)
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4452,10 +4405,6 @@ void handle_mod(AsyncWebServerRequest *request)
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "rx_active")
 			{
@@ -4605,17 +4554,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.i2c_enable = En;
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 #if SOC_I2C_NUM > 1
 	else if (request->hasArg("commitI2C1"))
@@ -4623,10 +4562,6 @@ void handle_mod(AsyncWebServerRequest *request)
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4661,17 +4596,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.i2c1_enable = En;
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 #endif
 	else if (request->hasArg("commitCOUNTER0"))
@@ -4679,10 +4604,6 @@ void handle_mod(AsyncWebServerRequest *request)
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4710,27 +4631,13 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.counter0_enable = En;
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitCOUNTER1"))
 	{
 		bool En = false;
 		for (uint8_t i = 0; i < request->args(); i++)
 		{
-			// Serial.print("SERVER ARGS ");
-			// Serial.print(request->argName(i));
-			// Serial.print("=");
-			// Serial.println(request->arg(i));
 
 			if (request->argName(i) == "Enable")
 			{
@@ -4758,17 +4665,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.counter0_enable = En;
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else if (request->hasArg("commitCMD"))
 	{
@@ -4822,17 +4719,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		config.at_cmd_mqtt = mqtt;
 		config.at_cmd_msg = msg;
 		config.at_cmd_bluetooth = bluetooth;
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 #ifdef PPPOS
 	else if (request->hasArg("commitPPPoS"))
@@ -4971,17 +4858,7 @@ void handle_mod(AsyncWebServerRequest *request)
 				config.uart2_enable = false;
 			}
 		}
-		String html;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html = "Setup completed successfully";
-			request->send(200, "text/html", html); // send to someones browser when asked
-		}
-		else
-		{
-			html = "Save config failed.";
-			request->send(501, "text/html", html); // Not Implemented
-		}
+		saveConfig(request);
 	}
 #endif
 	else
@@ -7633,7 +7510,7 @@ void handle_igate(AsyncWebServerRequest *request)
 	else
 	{
 		// Allocate initial memory for HTML content
-		char tempHtml[500]; // Temporary buffer for small HTML snippets
+		char tempHtml[500];						  // Temporary buffer for small HTML snippets
 		char *html = allocateStringMemory(25000); // Start with 8KB buffer
 		if (!html)
 		{
@@ -8497,17 +8374,7 @@ void handle_digi(AsyncWebServerRequest *request)
 		config.digi_timestamp = timeStamp;
 
 		initInterval = true;
-		String html_msg;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html_msg = "Setup completed successfully";
-			request->send(200, "text/html", html_msg); // send to someones browser when asked
-		}
-		else
-		{
-			html_msg = "Save config failed.";
-			request->send(501, "text/html", html_msg); // Not Implemented
-		}
+		saveConfig(request);
 	}
 	else
 	{
@@ -8519,7 +8386,7 @@ void handle_digi(AsyncWebServerRequest *request)
 			return;
 		}
 		memset(html, 0, 20000);
-		char tempHtml[256];
+		char tempHtml[512];
 		strcpy(html, "<script type=\"text/javascript\">\n");
 		strcat(html, "$('form').submit(function (e) {\n");
 		strcat(html, "e.preventDefault();\n");
@@ -8581,19 +8448,23 @@ void handle_digi(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>[DIGI] Digital Repeater Mode</b></span></th>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Enable:</b></td>\n");
-		String digiEnFlag = "";
+		char digiFlag[10] = "";
 		if (config.digi_en)
-			digiEnFlag = "checked";
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", digiEnFlag);
+			strcpy(digiFlag, "checked");
+		else
+			strcpy(digiFlag, "");
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", digiFlag);
 		strcat(html, tempHtml);
 
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Auto Enable:</b></td>\n");
-		String digiAutoFlag = "";
+
 		if (config.digi_auto)
-			digiAutoFlag = "checked";
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiAuto\" value=\"OK\" %s><span class=\"slider round\"></span></label> <i>*Automatic enable when APRS-IS disconnected</i></td>\n", digiAutoFlag);
+			strcpy(digiFlag, "checked");
+		else
+			strcpy(digiFlag, "");
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiAuto\" value=\"OK\" %s><span class=\"slider round\"></span></label> <i>*Automatic enable when APRS-IS disconnected</i></td>\n", digiFlag);
 		strcat(html, tempHtml);
 
 		strcat(html, "</tr>\n");
@@ -8622,11 +8493,11 @@ void handle_digi(AsyncWebServerRequest *request)
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Station Symbol:</b></td>\n");
-		String table = "1";
+		char table[3] = "1";
 		if (config.digi_symbol[0] == 47)
-			table = "1";
+			strcpy(table, "1");
 		if (config.digi_symbol[0] == 92)
-			table = "2";
+			strcpy(table, "2");
 		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"digiTable\" name=\"digiTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"digiSymbol\" name=\"digiSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"digiImgSymbol\" onclick=\"openWindowSymbol();\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
 				 config.digi_symbol[0], config.digi_symbol[1], (int)config.digi_symbol[1], table);
 		strcat(html, tempHtml);
@@ -8681,11 +8552,13 @@ void handle_digi(AsyncWebServerRequest *request)
 		strcat(html, "<tr><td align=\"right\"><b>POSITION:</b></td>\n");
 		strcat(html, "<td align=\"center\">\n");
 		strcat(html, "<table>");
-		String digiBcnEnFlag = "";
-		if (config.digi_bcn)
-			digiBcnEnFlag = "checked";
 
-		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Beacon:</td><td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiBcnEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\">  Interval:<input min=\"0\" max=\"3600\" step=\"1\" id=\"digiPosInv\" name=\"digiPosInv\" type=\"number\" value=\"%d\" />Sec.</label></td></tr>", digiBcnEnFlag, config.digi_interval);
+		if (config.digi_bcn)
+			strcpy(digiFlag, "checked");
+		else
+			strcpy(digiFlag, "");
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Beacon:</td><td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiBcnEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\">  Interval:<input min=\"0\" max=\"3600\" step=\"1\" id=\"digiPosInv\" name=\"digiPosInv\" type=\"number\" value=\"%d\" />Sec.</label></td></tr>", digiFlag, config.digi_interval);
 		strcat(html, tempHtml);
 
 		String digiPosFixFlag = "";
@@ -8702,36 +8575,23 @@ void handle_digi(AsyncWebServerRequest *request)
 		if (config.digi_loc2inet)
 			digiPos2INETFlag = "checked";
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"digiPosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"digiPosSel\" value=\"1\" %s/>GPS </td></tr>\n",
-				 digiPosFixFlag, digiPosGPSFlag);
+				 digiPosFixFlag.c_str(), digiPosGPSFlag.c_str());
 		strcat(html, tempHtml);
 
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"digiPos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"digiPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n",
-				 digiPos2RFFlag, digiPos2INETFlag);
+				 digiPos2RFFlag.c_str(), digiPos2INETFlag.c_str());
 		strcat(html, tempHtml);
 
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"digiPosLat\" name=\"digiPosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.digi_lat);
 		strcat(html, tempHtml);
-		{
-			char *temp_lon = allocateStringMemory(512);
-			if (temp_lon)
-			{
-				snprintf(temp_lon, 512, "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"digiPosLon\" name=\"digiPosLon\" type=\"number\" value=\"%.5f\" />degrees (positive for East, negative for West)</td></tr>\n", config.digi_lon);
-				strcat(html, temp_lon);
-				free(temp_lon);
-			}
-		}
-		{
-			char *temp_alt = allocateStringMemory(512);
-			if (temp_alt)
-			{
-				snprintf(temp_alt, 512, "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"digiPosAlt\" name=\"digiPosAlt\" type=\"number\" value=\"%.2f\" /> meter. *Value 0 is not send height</td></tr>\n", config.digi_alt);
-				strcat(html, temp_alt);
-				free(temp_alt);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"digiPosLon\" name=\"digiPosLon\" type=\"number\" value=\"%.5f\" />degrees (positive for East, negative for West)</td></tr>\n", config.digi_lon);
+		strcat(html, tempHtml);
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"digiPosAlt\" name=\"digiPosAlt\" type=\"number\" value=\"%.2f\" /> meter. *Value 0 is not send height</td></tr>\n", config.digi_alt);
+		strcat(html, tempHtml);
 		strcat(html, "</table></td>");
 		strcat(html, "</tr>\n");
-		delay(1);
+
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>PHG:</b></td>\n");
 		strcat(html, "<td align=\"center\">\n");
@@ -8759,22 +8619,15 @@ void handle_digi(AsyncWebServerRequest *request)
 		int k = 10;
 		for (uint8_t w = 0; w < 10; w++)
 		{
+			if (w == 0)
 			{
-				char *temp_opt = allocateStringMemory(256);
-				if (temp_opt)
-				{
-					if (w == 0)
-					{
-						snprintf(temp_opt, 256, "<option value=\"%d\" selected>%d</option>\n", k, k);
-					}
-					else
-					{
-						snprintf(temp_opt, 256, "<option value=\"%d\">%d</option>\n", k, k);
-					}
-					strcat(html, temp_opt);
-					free(temp_opt);
-				}
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%d</option>\n", k, k);
 			}
+			else
+			{
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">%d</option>\n", k, k);
+			}
+			strcat(html, tempHtml);
 			k += k;
 		}
 		strcat(html, "</select> Feet</td>\n");
@@ -8786,15 +8639,9 @@ void handle_digi(AsyncWebServerRequest *request)
 		strcat(html, "<option>Omni</option><option>NE</option><option>E</option><option>SE</option><option>S</option><option>SW</option><option>W</option><option>NW</option><option>N</option>\n");
 		strcat(html, "</select></td>\n");
 		strcat(html, "</tr>\n");
-		{
-			char *temp_phg = allocateStringMemory(512);
-			if (temp_phg)
-			{
-				snprintf(temp_phg, 512, "<tr><td align=\"right\"><b>PHG Text</b></td><td align=\"left\"><input name=\"texttouse\" type=\"text\" size=\"6\" style=\"background-color: rgb(97, 239, 170);\" value=\"%s\"/> <input type=\"button\" value=\"Calculate PHG\" onclick=\"javascript:calculatePHGR()\" /></td></tr>\n", config.digi_phg);
-				strcat(html, temp_phg);
-				free(temp_phg);
-			}
-		}
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td align=\"right\"><b>PHG Text</b></td><td align=\"left\"><input name=\"texttouse\" type=\"text\" size=\"6\" style=\"background-color: rgb(97, 239, 170);\" value=\"%s\"/> <input type=\"button\" value=\"Calculate PHG\" onclick=\"javascript:calculatePHGR()\" /></td></tr>\n", config.digi_phg);
+		strcat(html, tempHtml);
 
 		strcat(html, "</table></tr>");
 		strcat(html, "<tr>\n");
@@ -8848,125 +8695,63 @@ void handle_digi(AsyncWebServerRequest *request)
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Telemetry:</b><br />(v=0->8280)</td>\n");
 		strcat(html, "<td align=\"center\"><table>\n");
-		{
-			char *temp_intv = allocateStringMemory(512);
-			if (temp_intv)
-			{
-				snprintf(temp_intv, 512, "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"1000\" step=\"1\" id=\"digiTlmInv\" name=\"digiTlmInv\" type=\"number\" value=\"%d\" /> *Number of packets interval,<i>Example: 0 not send,1 send every packet</i></label></td></tr>", config.digi_tlm_interval);
-				strcat(html, temp_intv);
-				free(temp_intv);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"1000\" step=\"1\" id=\"digiTlmInv\" name=\"digiTlmInv\" type=\"number\" value=\"%d\" /> *Number of packets interval,<i>Example: 0 not send,1 send every packet</i></label></td></tr>", config.digi_tlm_interval);
+		strcat(html, tempHtml);
 		for (int ax = 0; ax < 5; ax++)
 		{
-			{
-				char *temp_ch = allocateStringMemory(256);
-				if (temp_ch)
-				{
-					snprintf(temp_ch, 256, "<tr><td align=\"right\"><b>CH A%d:</b></td>\n", ax + 1);
-					strcat(html, temp_ch);
-					free(temp_ch);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<tr><td align=\"right\"><b>CH A%d:</b></td>\n", ax + 1);
+			strcat(html, tempHtml);
 			strcat(html, "<td align=\"center\">\n");
 			strcat(html, "<table>");
 
 			strcat(html, "<tr><td style=\"text-align: right;\">Sensor:</td>\n");
 			strcat(html, "<td style=\"text-align: left;\">CH: ");
 
-			{
-				char *temp_select = allocateStringMemory(256);
-				if (temp_select)
-				{
-					snprintf(temp_select, 256, "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
-					strcat(html, temp_select);
-					free(temp_select);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
+			strcat(html, tempHtml);
 
 			for (uint8_t idx = 0; idx < 11; idx++)
 			{
-				char *temp_opt = allocateStringMemory(256);
-				if (temp_opt)
+				if (idx == 0)
 				{
-					if (idx == 0)
+					if (config.digi_tlm_sensor[ax] == idx)
 					{
-						if (config.digi_tlm_sensor[ax] == idx)
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\" selected>NONE</option>\n", idx);
-						}
-						else
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\">NONE</option>\n", idx);
-						}
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>NONE</option>\n", idx);
 					}
 					else
 					{
-						if (config.digi_tlm_sensor[ax] == idx)
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\" selected>SENSOR#%d</option>\n", idx, idx);
-						}
-						else
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\">SENSOR#%d</option>\n", idx, idx);
-						}
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">NONE</option>\n", idx);
 					}
-					strcat(html, temp_opt);
-					free(temp_opt);
 				}
+				else
+				{
+					if (config.digi_tlm_sensor[ax] == idx)
+					{
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>SENSOR#%d</option>\n", idx, idx);
+					}
+					else
+					{
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">SENSOR#%d</option>\n", idx, idx);
+					}
+				}
+				strcat(html, tempHtml);
 			}
 			strcat(html, "</select></td>\n");
 
-			{
-				char *temp_param = allocateStringMemory(512);
-				if (temp_param)
-				{
-					snprintf(temp_param, 512, "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.digi_tlm_PARM[ax]);
-					strcat(html, temp_param);
-					free(temp_param);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.digi_tlm_PARM[ax]);
+			strcat(html, tempHtml);
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.digi_tlm_UNIT[ax]);
+			strcat(html, tempHtml);
 
-			{
-				char *temp_unit = allocateStringMemory(512);
-				if (temp_unit)
-				{
-					snprintf(temp_unit, 512, "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.digi_tlm_UNIT[ax]);
-					strcat(html, temp_unit);
-					free(temp_unit);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision%d\" type=\"text\" value=\"%d\" onchange=\"selPrecision(%d)\"/></td></tr>\n", ax, config.digi_tlm_precision[ax], ax);
+			strcat(html, tempHtml);
 
-			{
-				char *temp_prec = allocateStringMemory(512);
-				if (temp_prec)
-				{
-					snprintf(temp_prec, 512, "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision%d\" type=\"text\" value=\"%d\" onchange=\"selPrecision(%d)\"/></td></tr>\n", ax, config.digi_tlm_precision[ax], ax);
-					strcat(html, temp_prec);
-					free(temp_prec);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%da\" type=\"number\" value=\"%.5f\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%db\" type=\"number\" value=\"%.5f\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%dc\" type=\"number\" value=\"%.5f\" /> (av<sup>2</sup>+bv+c) </td>\n",
+					 ax, config.digi_tlm_EQNS[ax][0], ax, config.digi_tlm_EQNS[ax][1], ax, config.digi_tlm_EQNS[ax][2]);
+			strcat(html, tempHtml);
 
-			{
-				char *temp_eqns = allocateStringMemory(1024);
-				if (temp_eqns)
-				{
-					snprintf(temp_eqns, 1024, "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%da\" type=\"number\" value=\"%.5f\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%db\" type=\"number\" value=\"%.5f\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%dc\" type=\"number\" value=\"%.5f\" /> (av<sup>2</sup>+bv+c) </td>\n",
-							 ax, config.digi_tlm_EQNS[ax][0], ax, config.digi_tlm_EQNS[ax][1], ax, config.digi_tlm_EQNS[ax][2]);
-					strcat(html, temp_eqns);
-					free(temp_eqns);
-				}
-			}
-
-			{
-				char *temp_offset = allocateStringMemory(512);
-				if (temp_offset)
-				{
-					snprintf(temp_offset, 512, "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset%d\" type=\"text\" value=\"%.5f\" onchange=\"selOffset(%d)\" /></td></tr>\n", ax, config.digi_tlm_offset[ax], ax);
-					strcat(html, temp_offset);
-					free(temp_offset);
-				}
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset%d\" type=\"text\" value=\"%.5f\" onchange=\"selOffset(%d)\" /></td></tr>\n", ax, config.digi_tlm_offset[ax], ax);
+			strcat(html, tempHtml);
 
 			strcat(html, "</table></td>");
 			strcat(html, "</tr>\n");
@@ -9195,6 +8980,7 @@ void handle_wx(AsyncWebServerRequest *request)
 	else
 	{
 		// Allocate initial memory for HTML content
+		char tempHtml[300];
 		char *html = allocateStringMemory(26000); // Start with 8KB buffer
 		if (!html)
 		{
@@ -9228,30 +9014,17 @@ void handle_wx(AsyncWebServerRequest *request)
 		strcat(html, "<th colspan=\"2\"><span><b>[WX] Weather Station</b></span></th>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Enable:</b></td>\n");
-		String EnFlag = "";
+		char EnFlag[10] = "";
 		if (config.wx_en)
-			EnFlag = "checked";
-		{
-			char *temp_flag = allocateStringMemory(512);
-			if (temp_flag)
-			{
-				snprintf(temp_flag, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"Enable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", EnFlag);
-				strcat(html, temp_flag);
-				free(temp_flag);
-			}
-		}
+			strcpy(EnFlag, "checked");
+
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"Enable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", EnFlag);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Station Callsign:</b></td>\n");
-		{
-			char *temp_callsign = allocateStringMemory(512);
-			if (temp_callsign)
-			{
-				snprintf(temp_callsign, 512, "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"%s\" /></td>\n", config.wx_mycall);
-				strcat(html, temp_callsign);
-				free(temp_callsign);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"%s\" /></td>\n", config.wx_mycall);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Station SSID:</b></td>\n");
@@ -9259,36 +9032,22 @@ void handle_wx(AsyncWebServerRequest *request)
 		strcat(html, "<select name=\"mySSID\" id=\"mySSID\">\n");
 		for (uint8_t ssid = 0; ssid <= 15; ssid++)
 		{
+			if (config.wx_ssid == ssid)
 			{
-				char *temp_option = allocateStringMemory(256);
-				if (temp_option)
-				{
-					if (config.wx_ssid == ssid)
-					{
-						snprintf(temp_option, 256, "<option value=\"%d\" selected>%d</option>\n", ssid, ssid);
-					}
-					else
-					{
-						snprintf(temp_option, 256, "<option value=\"%d\">%d</option>\n", ssid, ssid);
-					}
-					strcat(html, temp_option);
-					free(temp_option);
-				}
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%d</option>\n", ssid, ssid);
 			}
+			else
+			{
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">%d</option>\n", ssid, ssid);
+			}
+			strcat(html, tempHtml);
 		}
 		strcat(html, "</select></td>\n");
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Object Name:</b></td>\n");
-		{
-			char *temp_object = allocateStringMemory(512);
-			if (temp_object)
-			{
-				snprintf(temp_object, 512, "<td style=\"text-align: left;\"><input maxlength=\"9\" size=\"9\" name=\"Object\" type=\"text\" value=\"%s\" /><i> *If not used, leave it blank.In use 3-9 charactor</i></td>\n", config.wx_object);
-				strcat(html, temp_object);
-				free(temp_object);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"9\" size=\"9\" name=\"Object\" type=\"text\" value=\"%s\" /><i> *If not used, leave it blank.In use 3-9 charactor</i></td>\n", config.wx_object);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>PATH:</b></td>\n");
@@ -9296,37 +9055,23 @@ void handle_wx(AsyncWebServerRequest *request)
 		strcat(html, "<select name=\"Path\" id=\"Path\">\n");
 		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
 		{
+			if (config.wx_path == pthIdx)
 			{
-				char *temp_path = allocateStringMemory(256);
-				if (temp_path)
-				{
-					if (config.wx_path == pthIdx)
-					{
-						snprintf(temp_path, 256, "<option value=\"%d\" selected>%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
-					}
-					else
-					{
-						snprintf(temp_path, 256, "<option value=\"%d\">%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
-					}
-					strcat(html, temp_path);
-					free(temp_path);
-				}
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
 			}
+			else
+			{
+				snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
+			}
+			strcat(html, tempHtml);
 		}
 		strcat(html, "</select></td>\n");
 		// strcat(html, "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" name=\"Path\" type=\"text\" value=\"" + String(config.wx_path) + "\" /></td>\n");
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Text Comment:</b></td>\n");
-		{
-			char *temp_comment = allocateStringMemory(512);
-			if (temp_comment)
-			{
-				snprintf(temp_comment, 512, "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" name=\"Comment\" type=\"text\" value=\"%s\" /></td>\n", config.wx_comment);
-				strcat(html, temp_comment);
-				free(temp_comment);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" name=\"Comment\" type=\"text\" value=\"%s\" /></td>\n", config.wx_comment);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 
 		strcat(html, "<tr>\n");
@@ -9336,29 +9081,16 @@ void handle_wx(AsyncWebServerRequest *request)
 			strcpy(timeStampFlag, "checked");
 		else
 			strcpy(timeStampFlag, "");
-		{
-			char *temp_flag = allocateStringMemory(512);
-			if (temp_flag)
-			{
-				snprintf(temp_flag, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wxTimeStamp\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", timeStampFlag);
-				strcat(html, temp_flag);
-				free(temp_flag);
-			}
-		}
+
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wxTimeStamp\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", timeStampFlag);
+		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 
 		strcat(html, "<tr><td align=\"right\"><b>POSITION:</b></td>\n");
 		strcat(html, "<td align=\"center\">\n");
 		strcat(html, "<table>");
-		{
-			char *temp_interval = allocateStringMemory(512);
-			if (temp_interval)
-			{
-				snprintf(temp_interval, 512, "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" id=\"PosInv\" name=\"PosInv\" type=\"number\" value=\"%d\" />Sec.</td></tr>", config.wx_interval);
-				strcat(html, temp_interval);
-				free(temp_interval);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" id=\"PosInv\" name=\"PosInv\" type=\"number\" value=\"%d\" />Sec.</td></tr>", config.wx_interval);
+		strcat(html, tempHtml);
 		String PosFixFlag = "";
 		String PosGPSFlag = "";
 		String Pos2RFFlag = "";
@@ -9372,51 +9104,21 @@ void handle_wx(AsyncWebServerRequest *request)
 			Pos2RFFlag = "checked";
 		if (config.wx_2inet)
 			Pos2INETFlag = "checked";
-		{
-			char *temp_location = allocateStringMemory(1024);
-			if (temp_location)
-			{
-				snprintf(temp_location, 1024, "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"PosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"PosSel\" value=\"1\" %s/>GPS </td></tr>\n", PosFixFlag, PosGPSFlag);
-				strcat(html, temp_location);
-				free(temp_location);
-			}
-		}
-		{
-			char *temp_channel = allocateStringMemory(1024);
-			if (temp_channel)
-			{
-				snprintf(temp_channel, 1024, "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag, Pos2INETFlag);
-				strcat(html, temp_channel);
-				free(temp_channel);
-			}
-		}
-		{
-			char *temp_lat = allocateStringMemory(512);
-			if (temp_lat)
-			{
-				snprintf(temp_lat, 512, "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" name=\"PosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.wx_lat);
-				strcat(html, temp_lat);
-				free(temp_lat);
-			}
-		}
-		{
-			char *temp_lon = allocateStringMemory(512);
-			if (temp_lon)
-			{
-				snprintf(temp_lon, 512, "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" name=\"PosLon\" type=\"number\" value=\"%.5f\" />degrees (positive for East, negative for West)</td></tr>\n", config.wx_lon);
-				strcat(html, temp_lon);
-				free(temp_lon);
-			}
-		}
-		{
-			char *temp_alt = allocateStringMemory(512);
-			if (temp_alt)
-			{
-				snprintf(temp_alt, 512, "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" name=\"PosAlt\" type=\"number\" value=\"%.2f\" /> meter. *The altitude in meters(m) above sea level</td></tr>\n", config.wx_alt);
-				strcat(html, temp_alt);
-				free(temp_alt);
-			}
-		}
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"PosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"PosSel\" value=\"1\" %s/>GPS </td></tr>\n", PosFixFlag.c_str(), PosGPSFlag.c_str());
+		strcat(html, tempHtml);
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag.c_str(), Pos2INETFlag.c_str());
+		strcat(html, tempHtml);
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" name=\"PosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.wx_lat);
+		strcat(html, tempHtml);
+
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" name=\"PosLon\" type=\"number\" value=\"%.5f\" />degrees (positive for East, negative for West)</td></tr>\n", config.wx_lon);
+		strcat(html, tempHtml);
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" name=\"PosAlt\" type=\"number\" value=\"%.2f\" /> meter. *The altitude in meters(m) above sea level</td></tr>\n", config.wx_alt);
+		strcat(html, tempHtml);
+
 		strcat(html, "</table></td>");
 		strcat(html, "</tr>\n");
 
@@ -9445,72 +9147,48 @@ void handle_wx(AsyncWebServerRequest *request)
 
 		for (int ax = 0; ax < WX_SENSOR_NUM; ax++)
 		{
-			{
-				char *temp_sensor = allocateStringMemory(512);
-				if (temp_sensor)
-				{
-					snprintf(temp_sensor, 512, "<tr><td align=\"right\"><b>%s:</b> \n", WX_SENSOR[ax]);
-					strcat(html, temp_sensor);
-					free(temp_sensor);
-				}
-			}
-			EnFlag = "";
+			snprintf(tempHtml, sizeof(tempHtml), "<tr><td align=\"right\"><b>%s:</b> \n", WX_SENSOR[ax]);
+			strcat(html, tempHtml);
+
+			char EnFlag[16] = "";
 			if (config.wx_sensor_enable[ax])
-				EnFlag = "checked";
-			{
-				char *temp_checkbox = allocateStringMemory(512);
-				if (temp_checkbox)
-				{
-					snprintf(temp_checkbox, 512, "<label class=\"switch\"><input type=\"checkbox\" name=\"senEn%d\" value=\"OK\" %s><span class=\"slider round\"></span></label>", ax, EnFlag);
-					strcat(html, temp_checkbox);
-					free(temp_checkbox);
-				}
-			}
+				snprintf(EnFlag, sizeof(EnFlag), "checked");
+
+			snprintf(tempHtml, sizeof(tempHtml), "<label class=\"switch\"><input type=\"checkbox\" name=\"senEn%d\" value=\"OK\" %s><span class=\"slider round\"></span></label>", ax, EnFlag);
+			strcat(html, tempHtml);
+
 			strcat(html, "</td>\n");
 
 			// strcat(html, "<td style=\"text-align: lefe;\">Sensor:</td>\n");
 			strcat(html, "<td style=\"text-align: left;\">Sensor Channel: ");
-			{
-				char *temp_select = allocateStringMemory(256);
-				if (temp_select)
-				{
-					snprintf(temp_select, 256, "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
-					strcat(html, temp_select);
-					free(temp_select);
-				}
-			}
+
+			snprintf(tempHtml, sizeof(tempHtml), "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
+			strcat(html, tempHtml);
 			for (uint8_t idx = 0; idx < 11; idx++)
 			{
+				if (idx == 0)
 				{
-					char *temp_option = allocateStringMemory(256);
-					if (temp_option)
+					if (config.wx_sensor_ch[ax] == idx)
 					{
-						if (idx == 0)
-						{
-							if (config.wx_sensor_ch[ax] == idx)
-							{
-								snprintf(temp_option, 256, "<option value=\"%d\" selected>NONE</option>\n", idx);
-							}
-							else
-							{
-								snprintf(temp_option, 256, "<option value=\"%d\">NONE</option>\n", idx);
-							}
-						}
-						else
-						{
-							if (config.wx_sensor_ch[ax] == idx)
-							{
-								snprintf(temp_option, 256, "<option value=\"%d\" selected>SENSOR#%d</option>\n", idx, idx);
-							}
-							else
-							{
-								snprintf(temp_option, 256, "<option value=\"%d\">SENSOR#%d</option>\n", idx, idx);
-							}
-						}
-						strcat(html, temp_option);
-						free(temp_option);
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>NONE</option>\n", idx);
+					}
+					else
+					{
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">NONE</option>\n", idx);
 					}
 				}
+				else
+				{
+					if (config.wx_sensor_ch[ax] == idx)
+					{
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>SENSOR#%d</option>\n", idx, idx);
+					}
+					else
+					{
+						snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">SENSOR#%d</option>\n", idx, idx);
+					}
+				}
+				strcat(html, tempHtml);
 			}
 			strcat(html, "</select>\n");
 			String avgFlag = "";
@@ -9519,15 +9197,9 @@ void handle_wx(AsyncWebServerRequest *request)
 				avgFlag = "checked=\"checked\"";
 			else
 				sampleFlag = "checked=\"checked\"";
-			{
-				char *temp_radio = allocateStringMemory(512);
-				if (temp_radio)
-				{
-					snprintf(temp_radio, 512, "<input type=\"radio\" name=\"avgSel%d\" value=\"0\" %s/>Sample <input type=\"radio\" name=\"avgSel%d\" value=\"1\" %s/>Average", ax, sampleFlag, ax, avgFlag);
-					strcat(html, temp_radio);
-					free(temp_radio);
-				}
-			}
+
+			snprintf(tempHtml, sizeof(tempHtml), "<input type=\"radio\" name=\"avgSel%d\" value=\"0\" %s/>Sample <input type=\"radio\" name=\"avgSel%d\" value=\"1\" %s/>Average", ax, sampleFlag, ax, avgFlag);
+			strcat(html, tempHtml);
 			strcat(html, "</td></tr>");
 		}
 		strcat(html, "</table></td></tr>\n");
@@ -10982,20 +10654,11 @@ void handle_tracker(AsyncWebServerRequest *request)
 		config.trk_timestamp = timeStamp;
 
 		initInterval = true;
-		String html_msg;
-		if (saveConfiguration("/default.cfg", config))
-		{
-			html_msg = "Setup completed successfully";
-			request->send(200, "text/html", html_msg); // send to someones browser when asked
-		}
-		else
-		{
-			html_msg = "Save config failed.";
-			request->send(501, "text/html", html_msg); // Not Implemented
-		}
+		saveConfig(request);
 	}
 
 	// Allocate initial memory for HTML content
+	char tempHtml[500];
 	char *html = allocateStringMemory(22000); // Start with 8KB buffer
 	if (!html)
 	{
@@ -11087,27 +10750,18 @@ void handle_tracker(AsyncWebServerRequest *request)
 	char trackerEnFlag[10] = "";
 	if (config.trk_en)
 		strcpy(trackerEnFlag, "checked");
-	{
-		char *temp_flag = allocateStringMemory(512);
-		if (temp_flag)
-		{
-			snprintf(temp_flag, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", trackerEnFlag);
-			strcat(html, temp_flag);
-			free(temp_flag);
-		}
-	}
+	else
+		strcpy(trackerEnFlag, "");
+
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", trackerEnFlag);
+	strcat(html, tempHtml);
+
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Station Callsign:</b></td>\n");
-	{
-		char *temp_call = allocateStringMemory(512);
-		if (temp_call)
-		{
-			snprintf(temp_call, 512, "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"%s\" /></td>\n", config.trk_mycall);
-			strcat(html, temp_call);
-			free(temp_call);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"%s\" /></td>\n", config.trk_mycall);
+	strcat(html, tempHtml);
+
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Station SSID:</b></td>\n");
@@ -11115,37 +10769,23 @@ void handle_tracker(AsyncWebServerRequest *request)
 	strcat(html, "<select name=\"mySSID\" id=\"mySSID\">\n");
 	for (uint8_t ssid = 0; ssid <= 15; ssid++)
 	{
+		if (config.trk_ssid == ssid)
 		{
-			char *temp_option = allocateStringMemory(256);
-			if (temp_option)
-			{
-				if (config.trk_ssid == ssid)
-				{
-					snprintf(temp_option, 256, "<option value=\"%d\" selected>%d</option>\n", ssid, ssid);
-				}
-				else
-				{
-					snprintf(temp_option, 256, "<option value=\"%d\">%d</option>\n", ssid, ssid);
-				}
-				strcat(html, temp_option);
-				free(temp_option);
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%d</option>\n", ssid, ssid);
 		}
+		else
+		{
+			snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">%d</option>\n", ssid, ssid);
+		}
+		strcat(html, tempHtml);
 	}
 	strcat(html, "</select></td>\n");
 	strcat(html, "</tr>\n");
 
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Item/Obj Name:</b></td>\n");
-	{
-		char *temp_item = allocateStringMemory(512);
-		if (temp_item)
-		{
-			snprintf(temp_item, 512, "<td style=\"text-align: left;\"><input maxlength=\"9\" size=\"9\" id=\"trackerObject\" name=\"trackerObject\" type=\"text\" value=\"%s\" /><i> *If not used, leave it blank.In use 3-9 charactor</i></td>\n", config.trk_item);
-			strcat(html, temp_item);
-			free(temp_item);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"9\" size=\"9\" id=\"trackerObject\" name=\"trackerObject\" type=\"text\" value=\"%s\" /><i> *If not used, leave it blank.In use 3-9 charactor</i></td>\n", config.trk_item);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>PATH:</b></td>\n");
@@ -11153,22 +10793,15 @@ void handle_tracker(AsyncWebServerRequest *request)
 	strcat(html, "<select name=\"trackerPath\" id=\"trackerPath\">\n");
 	for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
 	{
+		if (config.trk_path == pthIdx)
 		{
-			char *temp_path = allocateStringMemory(256);
-			if (temp_path)
-			{
-				if (config.trk_path == pthIdx)
-				{
-					snprintf(temp_path, 256, "<option value=\"%d\" selected>%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
-				}
-				else
-				{
-					snprintf(temp_path, 256, "<option value=\"%d\">%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
-				}
-				strcat(html, temp_path);
-				free(temp_path);
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
 		}
+		else
+		{
+			snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
+		}
+		strcat(html, tempHtml);
 	}
 	strcat(html, "</select></td>\n");
 	// strcat(html, "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"trackerPath\" name=\"trackerPath\" type=\"text\" value=\"" + String(config.trk_path) + "\" /></td>\n";
@@ -11176,57 +10809,31 @@ void handle_tracker(AsyncWebServerRequest *request)
 
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Text Comment:</b></td>\n");
-	{
-		char *temp_comment = allocateStringMemory(512);
-		if (temp_comment)
-		{
-			snprintf(temp_comment, 512, "<td style=\"text-align: left;\"><input maxlength=\"25\" size=\"30\" id=\"trackerComment\" name=\"trackerComment\" type=\"text\" value=\"%s\" /></td>\n", config.trk_comment);
-			strcat(html, temp_comment);
-			free(temp_comment);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"25\" size=\"30\" id=\"trackerComment\" name=\"trackerComment\" type=\"text\" value=\"%s\" /></td>\n", config.trk_comment);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Text Status:</b></td>\n");
-	{
-		char *temp_status = allocateStringMemory(512);
-		if (temp_status)
-		{
-			snprintf(temp_status, 512, "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"60\" id=\"trkStatus\" name=\"trkStatus\" type=\"text\" value=\"%s\" />  Interval:<input min=\"0\" max=\"3600\" step=\"1\" name=\"trkSTSInv\" type=\"number\" value=\"%d\" />Sec.</td>\n", config.trk_status, config.trk_sts_interval);
-			strcat(html, temp_status);
-			free(temp_status);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"60\" id=\"trkStatus\" name=\"trkStatus\" type=\"text\" value=\"%s\" />  Interval:<input min=\"0\" max=\"3600\" step=\"1\" name=\"trkSTSInv\" type=\"number\" value=\"%d\" />Sec.</td>\n", config.trk_status, config.trk_sts_interval);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Smart Beacon:</b></td>\n");
 	char smartBcnEnFlag[10] = "";
 	if (config.trk_smartbeacon)
 		strcpy(smartBcnEnFlag, "checked");
-	{
-		char *temp_smart = allocateStringMemory(512);
-		if (temp_smart)
-		{
-			snprintf(temp_smart, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" id=\"smartBcnEnable\" name=\"smartBcnEnable\" onclick=\"onSmartCheck()\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch use to smart beacon mode</i></label></td>\n", smartBcnEnFlag);
-			strcat(html, temp_smart);
-			free(temp_smart);
-		}
-	}
+
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" id=\"smartBcnEnable\" name=\"smartBcnEnable\" onclick=\"onSmartCheck()\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch use to smart beacon mode</i></label></td>\n", smartBcnEnFlag);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Compress:</b></td>\n");
 	char compressEnFlag[10] = "";
 	if (config.trk_compress)
 		strcpy(compressEnFlag, "checked");
-	{
-		char *temp_compress = allocateStringMemory(512);
-		if (temp_compress)
-		{
-			snprintf(temp_compress, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"compressEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch compress packet</i></label></td>\n", compressEnFlag);
-			strcat(html, temp_compress);
-			free(temp_compress);
-		}
-	}
+
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"compressEnable\" value=\"OK\" %s><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch compress packet</i></label></td>\n", compressEnFlag);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Mic-E Type:</b></td>\n");
@@ -11234,38 +10841,27 @@ void handle_tracker(AsyncWebServerRequest *request)
 	strcat(html, "<select name=\"trkMicEType\" id=\"trkMicEType\">\n");
 	for (uint8_t micEIdx = 0; micEIdx < 8; micEIdx++)
 	{
+		if (config.trk_mice_type == micEIdx)
 		{
-			char *temp_mice = allocateStringMemory(256);
-			if (temp_mice)
-			{
-				if (config.trk_mice_type == micEIdx)
-				{
-					snprintf(temp_mice, 256, "<option value=\"%d\" selected>%s</option>\n", micEIdx, MIC_E_MSG[micEIdx]);
-				}
-				else
-				{
-					snprintf(temp_mice, 256, "<option value=\"%d\">%s</option>\n", micEIdx, MIC_E_MSG[micEIdx]);
-				}
-				strcat(html, temp_mice);
-				free(temp_mice);
-			}
+			snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>%s</option>\n", micEIdx, MIC_E_MSG[micEIdx]);
 		}
+		else
+		{
+			snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">%s</option>\n", micEIdx, MIC_E_MSG[micEIdx]);
+		}
+		strcat(html, tempHtml);
 	}
 	strcat(html, "</select><label style=\"vertical-align: bottom;font-size: 8pt;\"><i>*Support if Compress is enabled and not use Item/Obj,Time Stamp</i></label></td>\n");
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Time Stamp:</b></td>\n");
+
 	char timeStampFlag[10] = "";
 	if (config.trk_timestamp)
 		strcpy(timeStampFlag, "checked");
 	{
-		char *temp_time = allocateStringMemory(512);
-		if (temp_time)
-		{
-			snprintf(temp_time, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerTimeStamp\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", timeStampFlag);
-			strcat(html, temp_time);
-			free(temp_time);
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerTimeStamp\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", timeStampFlag);
+		strcat(html, tempHtml);
 	}
 	strcat(html, "</tr>\n");
 	char trackerPos2RFFlag[10] = "";
@@ -11274,15 +10870,8 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(trackerPos2RFFlag, "checked");
 	if (config.trk_loc2inet)
 		strcpy(trackerPos2INETFlag, "checked");
-	{
-		char *temp_channels = allocateStringMemory(512);
-		if (temp_channels)
-		{
-			snprintf(temp_channels, 512, "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", trackerPos2RFFlag, trackerPos2INETFlag);
-			strcat(html, temp_channels);
-			free(temp_channels);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", trackerPos2RFFlag, trackerPos2INETFlag);
+	strcat(html, tempHtml);
 	char trackerOptBatFlag[10] = "";
 	char trackerOptSatFlag[10] = "";
 	char trackerOptAltFlag[10] = "";
@@ -11295,30 +10884,17 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(trackerOptAltFlag, "checked");
 	if (config.trk_log)
 		strcpy(trackerOptCSTFlag, "checked");
-	{
-		char *temp_options = allocateStringMemory(1024);
-		if (temp_options)
-		{
-			snprintf(temp_options, 1024, "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" %s/>Telemetry <input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" %s/>Altutude <input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" %s/>RSSI Request </td></tr>\n",
-					 trackerOptCSTFlag, trackerOptAltFlag, trackerOptBatFlag);
-			strcat(html, temp_options);
-			free(temp_options);
-		}
-	}
+
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" %s/>Telemetry <input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" %s/>Altutude <input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" %s/>RSSI Request </td></tr>\n",
+			 trackerOptCSTFlag, trackerOptAltFlag, trackerOptBatFlag);
+	strcat(html, tempHtml);
 
 	strcat(html, "<tr>");
 	strcat(html, "<td align=\"right\"><b>POSITION:</b></td>\n");
 	strcat(html, "<td align=\"center\">\n");
 	strcat(html, "<table>");
-	{
-		char *temp_interval = allocateStringMemory(512);
-		if (temp_interval)
-		{
-			snprintf(temp_interval, 512, "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" id=\"trackerPosInv\" name=\"trackerPosInv\" type=\"number\" value=\"%d\" />Sec.</label></td></tr>", config.trk_interval);
-			strcat(html, temp_interval);
-			free(temp_interval);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" id=\"trackerPosInv\" name=\"trackerPosInv\" type=\"number\" value=\"%d\" />Sec.</label></td></tr>", config.trk_interval);
+	strcat(html, tempHtml);
 	char trackerPosFixFlag[20] = "";
 	char trackerPosGPSFlag[20] = "";
 
@@ -11327,16 +10903,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 	else
 		strcpy(trackerPosFixFlag, "checked=\"checked\"");
 
-	{
-		char *temp_location = allocateStringMemory(1024);
-		if (temp_location)
-		{
-			snprintf(temp_location, 1024, "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"trackerPosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"trackerPosSel\" value=\"1\" %s/>GPS </td></tr>\n",
-					 trackerPosFixFlag, trackerPosGPSFlag);
-			strcat(html, temp_location);
-			free(temp_location);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"trackerPosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"trackerPosSel\" value=\"1\" %s/>GPS </td></tr>\n",
+			 trackerPosFixFlag, trackerPosGPSFlag);
+	strcat(html, tempHtml);
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\">Symbol Icon:</td>\n");
 	char table[5] = "1";
@@ -11344,44 +10913,16 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(table, "1");
 	if (config.trk_symbol[0] == 92)
 		strcpy(table, "2");
-	{
-		char *temp_symbol = allocateStringMemory(1024);
-		if (temp_symbol)
-		{
-			snprintf(temp_symbol, 1024, "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"trackerTable\" name=\"trackerTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"trackerSymbol\" name=\"trackerSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"trackerImgSymbol\" onclick=\"openWindowSymbol(0);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
-					 config.trk_symbol[0], config.trk_symbol[1], (int)config.trk_symbol[1], table);
-			strcat(html, temp_symbol);
-			free(temp_symbol);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"trackerTable\" name=\"trackerTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"trackerSymbol\" name=\"trackerSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"trackerImgSymbol\" onclick=\"openWindowSymbol(0);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
+			 config.trk_symbol[0], config.trk_symbol[1], (int)config.trk_symbol[1], table);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
-	{
-		char *temp_lat = allocateStringMemory(512);
-		if (temp_lat)
-		{
-			snprintf(temp_lat, 512, "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"trackerPosLat\" name=\"trackerPosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.trk_lat);
-			strcat(html, temp_lat);
-			free(temp_lat);
-		}
-	}
-	{
-		char *temp_lon = allocateStringMemory(512);
-		if (temp_lon)
-		{
-			snprintf(temp_lon, 512, "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"trackerPosLon\" name=\"trackerPosLon\" type=\"number\" value=\"%.5f\" />degrees (positive for East, negative for West)</td></tr>\n", config.trk_lon);
-			strcat(html, temp_lon);
-			free(temp_lon);
-		}
-	}
-	{
-		char *temp_alt = allocateStringMemory(512);
-		if (temp_alt)
-		{
-			snprintf(temp_alt, 512, "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"trackerPosAlt\" name=\"trackerPosAlt\" type=\"number\" value=\"%.2f\" /> meter. *Value 0 is not send height</td></tr>\n", config.trk_alt);
-			strcat(html, temp_alt);
-			free(temp_alt);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"trackerPosLat\" name=\"trackerPosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.trk_lat);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"trackerPosLon\" name=\"trackerPosLon\" type=\"number\" value=\"%.5f\" />degrees (positive for East, negative for West)</td></tr>\n", config.trk_lon);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"trackerPosAlt\" name=\"trackerPosAlt\" type=\"number\" value=\"%.2f\" /> meter. *Value 0 is not send height</td></tr>\n", config.trk_alt);
+	strcat(html, tempHtml);
 	strcat(html, "</table></td>");
 	strcat(html, "</tr>\n");
 
@@ -11400,16 +10941,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(table, "1");
 	if (config.trk_symmove[0] == 92)
 		strcpy(table, "2");
-	{
-		char *temp_move = allocateStringMemory(1024);
-		if (temp_move)
-		{
-			snprintf(temp_move, 1024, "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"moveTable\" name=\"moveTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"moveSymbol\" name=\"moveSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"moveImgSymbol\" onclick=\"openWindowSymbol(1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select MOVE symbol</i></td>\n",
-					 config.trk_symmove[0], config.trk_symmove[1], (int)config.trk_symmove[1], table);
-			strcat(html, temp_move);
-			free(temp_move);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"moveTable\" name=\"moveTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"moveSymbol\" name=\"moveSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"moveImgSymbol\" onclick=\"openWindowSymbol(1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select MOVE symbol</i></td>\n",
+			 config.trk_symmove[0], config.trk_symmove[1], (int)config.trk_symmove[1], table);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\">Stop Symbol:</td>\n");
@@ -11418,193 +10952,79 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(table, "1");
 	if (config.trk_symstop[0] == 92)
 		strcpy(table, "2");
-	{
-		char *temp_stop = allocateStringMemory(1024);
-		if (temp_stop)
-		{
-			snprintf(temp_stop, 1024, "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"stopTable\" name=\"stopTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"stopSymbol\" name=\"stopSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"stopImgSymbol\" onclick=\"openWindowSymbol(2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select STOP symbol</i></td>\n",
-					 config.trk_symstop[0], config.trk_symstop[1], (int)config.trk_symstop[1], table);
-			strcat(html, temp_stop);
-			free(temp_stop);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"stopTable\" name=\"stopTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"stopSymbol\" name=\"stopSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"stopImgSymbol\" onclick=\"openWindowSymbol(2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select STOP symbol</i></td>\n",
+			 config.trk_symstop[0], config.trk_symstop[1], (int)config.trk_symstop[1], table);
+	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
-	{
-		char *temp_speed = allocateStringMemory(512);
-		if (temp_speed)
-		{
-			snprintf(temp_speed, 512, "<tr><td style=\"text-align: right;\">High Speed:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"10\" max=\"1000\" step=\"1\" id=\"hspeed\" name=\"hspeed\" type=\"number\" value=\"%d\" /> km/h</td></tr>\n", config.trk_hspeed);
-			strcat(html, temp_speed);
-			free(temp_speed);
-		}
-	}
-	{
-		char *temp_lspeed = allocateStringMemory(512);
-		if (temp_lspeed)
-		{
-			snprintf(temp_lspeed, 512, "<tr><td style=\"text-align: right;\">Low Speed:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"250\" step=\"1\" id=\"lspeed\" name=\"lspeed\" type=\"number\" value=\"%d\" /> km/h</td></tr>\n", config.trk_lspeed);
-			strcat(html, temp_lspeed);
-			free(temp_lspeed);
-		}
-	}
-	{
-		char *temp_slow = allocateStringMemory(512);
-		if (temp_slow)
-		{
-			snprintf(temp_slow, 512, "<tr><td style=\"text-align: right;\">Slow Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"60\" max=\"3600\" step=\"1\" id=\"slowInterval\" name=\"slowInterval\" type=\"number\" value=\"%d\" /> Sec.</td></tr>\n", config.trk_slowinterval);
-			strcat(html, temp_slow);
-			free(temp_slow);
-		}
-	}
-	{
-		char *temp_max = allocateStringMemory(512);
-		if (temp_max)
-		{
-			snprintf(temp_max, 512, "<tr><td style=\"text-align: right;\">Max Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"10\" max=\"255\" step=\"1\" id=\"maxInterval\" name=\"maxInterval\" type=\"number\" value=\"%d\" /> Sec.</td></tr>\n", config.trk_maxinterval);
-			strcat(html, temp_max);
-			free(temp_max);
-		}
-	}
-	{
-		char *temp_min = allocateStringMemory(512);
-		if (temp_min)
-		{
-			snprintf(temp_min, 512, "<tr><td style=\"text-align: right;\">Min Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"100\" step=\"1\" id=\"minInterval\" name=\"minInterval\" type=\"number\" value=\"%d\" /> Sec.</td></tr>\n", config.trk_mininterval);
-			strcat(html, temp_min);
-			free(temp_min);
-		}
-	}
-	{
-		char *temp_angle = allocateStringMemory(512);
-		if (temp_angle)
-		{
-			snprintf(temp_angle, 512, "<tr><td style=\"text-align: right;\">Min Angle:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"359\" step=\"1\" id=\"minAngle\" name=\"minAngle\" type=\"number\" value=\"%d\" /> Degree.</td></tr>\n", config.trk_minangle);
-			strcat(html, temp_angle);
-			free(temp_angle);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">High Speed:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"10\" max=\"1000\" step=\"1\" id=\"hspeed\" name=\"hspeed\" type=\"number\" value=\"%d\" /> km/h</td></tr>\n", config.trk_hspeed);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Low Speed:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"250\" step=\"1\" id=\"lspeed\" name=\"lspeed\" type=\"number\" value=\"%d\" /> km/h</td></tr>\n", config.trk_lspeed);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Slow Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"60\" max=\"3600\" step=\"1\" id=\"slowInterval\" name=\"slowInterval\" type=\"number\" value=\"%d\" /> Sec.</td></tr>\n", config.trk_slowinterval);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Max Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"10\" max=\"255\" step=\"1\" id=\"maxInterval\" name=\"maxInterval\" type=\"number\" value=\"%d\" /> Sec.</td></tr>\n", config.trk_maxinterval);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Min Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"100\" step=\"1\" id=\"minInterval\" name=\"minInterval\" type=\"number\" value=\"%d\" /> Sec.</td></tr>\n", config.trk_mininterval);
+	strcat(html, tempHtml);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Min Angle:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"359\" step=\"1\" id=\"minAngle\" name=\"minAngle\" type=\"number\" value=\"%d\" /> Degree.</td></tr>\n", config.trk_minangle);
+	strcat(html, tempHtml);
 
 	strcat(html, "</table></fieldset></tr>");
 
 	strcat(html, "<tr>\n");
 	strcat(html, "<td align=\"right\"><b>Telemetry:</b><br />(v=0->8280)</td>\n");
 	strcat(html, "<td align=\"center\"><table>\n");
-	{
-		char *temp_tlm = allocateStringMemory(512);
-		if (temp_tlm)
-		{
-			snprintf(temp_tlm, 512, "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"1000\" step=\"1\" id=\"trkTlmInv\" name=\"trkTlmInv\" type=\"number\" value=\"%d\" /> *Number of packets interval,<i>Example: 0 not send,1 send every packet</i></label></td></tr>", config.trk_tlm_interval);
-			strcat(html, temp_tlm);
-			free(temp_tlm);
-		}
-	}
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"1000\" step=\"1\" id=\"trkTlmInv\" name=\"trkTlmInv\" type=\"number\" value=\"%d\" /> *Number of packets interval,<i>Example: 0 not send,1 send every packet</i></label></td></tr>", config.trk_tlm_interval);
+	strcat(html, tempHtml);
 	for (int ax = 0; ax < 5; ax++)
 	{
-		{
-			char *temp_ch = allocateStringMemory(256);
-			if (temp_ch)
-			{
-				snprintf(temp_ch, 256, "<tr><td align=\"right\"><b>CH A%d:</b></td>\n", ax + 1);
-				strcat(html, temp_ch);
-				free(temp_ch);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td align=\"right\"><b>CH A%d:</b></td>\n", ax + 1);
+		strcat(html, tempHtml);
 		strcat(html, "<td align=\"center\">\n");
 		strcat(html, "<table>");
 
 		strcat(html, "<tr><td style=\"text-align: right;\">Sensor:</td>\n");
 		strcat(html, "<td style=\"text-align: left;\">CH: ");
-		{
-			char *temp_select = allocateStringMemory(256);
-			if (temp_select)
-			{
-				snprintf(temp_select, 256, "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
-				strcat(html, temp_select);
-				free(temp_select);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
+		strcat(html, tempHtml);
 		for (uint8_t idx = 0; idx < 11; idx++)
 		{
+			if (idx == 0)
 			{
-				char *temp_opt = allocateStringMemory(256);
-				if (temp_opt)
+				if (config.trk_tlm_sensor[ax] == idx)
 				{
-					if (idx == 0)
-					{
-						if (config.trk_tlm_sensor[ax] == idx)
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\" selected>NONE</option>\n", idx);
-						}
-						else
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\">NONE</option>\n", idx);
-						}
-					}
-					else
-					{
-						if (config.trk_tlm_sensor[ax] == idx)
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\" selected>SENSOR#%d</option>\n", idx, idx);
-						}
-						else
-						{
-							snprintf(temp_opt, 256, "<option value=\"%d\">SENSOR#%d</option>\n", idx, idx);
-						}
-					}
-					strcat(html, temp_opt);
-					free(temp_opt);
+					snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>NONE</option>\n", idx);
+				}
+				else
+				{
+					snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">NONE</option>\n", idx);
 				}
 			}
+			else
+			{
+				if (config.trk_tlm_sensor[ax] == idx)
+				{
+					snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\" selected>SENSOR#%d</option>\n", idx, idx);
+				}
+				else
+				{
+					snprintf(tempHtml, sizeof(tempHtml), "<option value=\"%d\">SENSOR#%d</option>\n", idx, idx);
+				}
+			}
+			strcat(html, tempHtml);
 		}
 		strcat(html, "</select></td>\n");
-
-		{
-			char *temp_name = allocateStringMemory(512);
-			if (temp_name)
-			{
-				snprintf(temp_name, 512, "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.trk_tlm_PARM[ax]);
-				strcat(html, temp_name);
-				free(temp_name);
-			}
-		}
-		{
-			char *temp_unit = allocateStringMemory(512);
-			if (temp_unit)
-			{
-				snprintf(temp_unit, 512, "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.trk_tlm_UNIT[ax]);
-				strcat(html, temp_unit);
-				free(temp_unit);
-			}
-		}
-		{
-			char *temp_prec = allocateStringMemory(512);
-			if (temp_prec)
-			{
-				snprintf(temp_prec, 512, "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision%d\" type=\"text\" value=\"%d\" onchange=\"selPrecision(%d)\" /></td></tr>\n", ax, config.trk_tlm_precision[ax], ax);
-				strcat(html, temp_prec);
-				free(temp_prec);
-			}
-		}
-
-		{
-			char *temp_eqns = allocateStringMemory(1024);
-			if (temp_eqns)
-			{
-				snprintf(temp_eqns, 1024, "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%da\" type=\"number\" value=\"%.5f\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%db\" type=\"number\" value=\"%.5f\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%dc\" type=\"number\" value=\"%.5f\" /> (av<sup>2</sup>+bv+c) </td>\n",
-						 ax, config.trk_tlm_EQNS[ax][0], ax, config.trk_tlm_EQNS[ax][1], ax, config.trk_tlm_EQNS[ax][2]);
-				strcat(html, temp_eqns);
-				free(temp_eqns);
-			}
-		}
-		{
-			char *temp_offset = allocateStringMemory(512);
-			if (temp_offset)
-			{
-				snprintf(temp_offset, 512, "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset%d\" type=\"text\" value=\"%.5f\"  onchange=\"selOffset(%d)\" /></td></tr>\n", ax, config.trk_tlm_offset[ax], ax);
-				strcat(html, temp_offset);
-				free(temp_offset);
-			}
-		}
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Name: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.trk_tlm_PARM[ax]);
+		strcat(html, tempHtml);
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.trk_tlm_UNIT[ax]);
+		strcat(html, tempHtml);
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Precision: <input min=\"0\" max=\"5\" step=\"1\" type=\"number\" style=\"width: 2em\" name=\"precision%d\" type=\"text\" value=\"%d\" onchange=\"selPrecision(%d)\" /></td></tr>\n", ax, config.trk_tlm_precision[ax], ax);
+		strcat(html, tempHtml);
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%da\" type=\"number\" value=\"%.5f\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%db\" type=\"number\" value=\"%.5f\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" name=\"eqns%dc\" type=\"number\" value=\"%.5f\" /> (av<sup>2</sup>+bv+c) </td>\n",
+				 ax, config.trk_tlm_EQNS[ax][0], ax, config.trk_tlm_EQNS[ax][1], ax, config.trk_tlm_EQNS[ax][2]);
+		strcat(html, tempHtml);
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Offset: <input min=\"-9999\" max=\"9999\" step=\"0.00001\" style=\"width: 5em\" type=\"number\" name=\"offset%d\" type=\"text\" value=\"%.5f\"  onchange=\"selOffset(%d)\" /></td></tr>\n", ax, config.trk_tlm_offset[ax], ax);
+		strcat(html, tempHtml);
 		strcat(html, "</table></td>");
 		strcat(html, "</tr>\n");
 	}
