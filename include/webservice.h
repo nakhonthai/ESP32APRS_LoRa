@@ -135,7 +135,7 @@ void webService();
 void handle_ws();
 //void handle_ws_gnss(char *nmea);
 void handle_ws_gnss(char *nmea, size_t size);
-String event_lastHeard(bool gethtml=false);
+void event_lastHeard(bool gethtml=false);
 String event_chatMessage(bool gethtml=false);
 
 #endif

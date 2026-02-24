@@ -4263,7 +4263,6 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         }
     }
     psramBusy = false;
-    // event_lastHeard();
     lastHeard_Flag = true;
     lastHeardTimeout = millis() + 1000;
     return i;
@@ -9202,8 +9201,10 @@ void taskAPRS(void *pvParameters)
 
                         if (config.rx_display && config.dispRF && (type & config.dispFilter))
                         {
-                            dispBuffer.push(rawP);
-                            //log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
+                            if(!dispBuffer.isFull()){
+                                dispBuffer.push(rawP);
+                                //log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
+                            }
                         }
                     }
 #endif
@@ -10366,6 +10367,8 @@ void taskNetwork(void *pvParameters)
     bluetooth_init(); // Initialize Bluetooth if enabled
     #endif
 
+    char infoData[512];
+
     for (;;)
     {
         unsigned long now = millis();
@@ -10572,8 +10575,12 @@ void taskNetwork(void *pvParameters)
                                             // Put queue affter filter for display popup
                                             if (config.rx_display && config.dispINET && (type & config.dispFilter))
                                             {
-                                                dispBuffer.push(line.c_str());
-                                                log_d("INET_putQueueDisp:[pkgList_idx=%d/queue=%d,Type=%d] %s\n", idx, dispBuffer.getCount(), type, call);
+                                                if(!dispBuffer.isFull()){
+                                                    log_d("INET_dispBuffer is FULL");
+                                                } else {
+                                                    dispBuffer.push(line.c_str());
+                                                    log_d("INET_putQueueDisp:[pkgList_idx=%d/queue=%d,Type=%d] %s\n", idx, dispBuffer.getCount(), type, call);
+                                                }
                                             }
                                         }
 #endif

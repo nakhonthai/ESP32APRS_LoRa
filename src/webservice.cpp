@@ -713,9 +713,6 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	strcat(webString, "\n");
 	strcat(webString, "<div class=\"content\">\n");
 	strcat(webString, "<div id=\"lastHeard\">\n");
-	// String lastHeardString = event_lastHeard(true);
-	// strcat(webString, lastHeardString.c_str());
-	// lastHeardString.clear();
 	strcat(webString, "<table id=\"aprsTable\">\n<thread>\n");
 	strcat(webString, "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n");
 	strcat(webString, "<tr>\n");
@@ -1076,7 +1073,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	free(html); // Free the allocated memory
 }
 
-String event_lastHeard(bool gethtml)
+void event_lastHeard(bool gethtml)
 {
 	// log_d("Event count: %d",lastheard_events.count());
 	// if (lastheard_events.count() == 0)
@@ -1087,48 +1084,13 @@ String event_lastHeard(bool gethtml)
 	struct tm tmstruct, tmNow;
 
 	// Using dynamic memory allocation instead of String
+	char temp_html[100];
+	char line[300];
 	char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
-	char *line = allocateStringMemory(1024);  // Buffer for individual lines
-	char temp_buffer[1024];					  // Temporary buffer for string operations
-	if (!html || !line)
+	if (html==nullptr)
 	{
-		if (html)
-			free(html);
-		if (line)
-			free(line);
-		return ""; // Memory allocation failed
+		return; // Memory allocation failed
 	}
-
-	// strcpy(html, "<table id=\"aprsTable\">\n");
-	// strcat(html, "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n");
-	// strcat(html, "<tr>\n");
-	// strcat(html, "<th data-sort=\"time\" style=\"min-width:10ch\"><span><b>Time (");
-	// if (config.timeZone >= 0)
-	// 	strcat(html, "+");
-	// // else
-	// //	strcat(html, "-");
-
-	// if (config.timeZone == (int)config.timeZone)
-	// {
-	// 	sprintf(temp_buffer, "%d", (int)config.timeZone);
-	// 	strcat(html, temp_buffer);
-	// 	strcat(html, ")</b></span></th>\n");
-	// }
-	// else
-	// {
-	// 	sprintf(temp_buffer, "%.1f", config.timeZone);
-	// 	strcat(html, temp_buffer);
-	// 	strcat(html, ")</b></span></th>\n");
-	// }
-	// strcat(html, "<th style=\"min-width:16px\">ICON</th>\n");
-	// strcat(html, "<th data-sort=\"callsign\" style=\"min-width:10ch\">Callsign</th>\n");
-	// strcat(html, "<th>VIA LAST PATH</th>\n");
-	// strcat(html, "<th data-sort=\"dx\" style=\"min-width:5ch\">DX</th>\n");
-	// strcat(html, "<th data-sort=\"packet\" style=\"min-width:5ch\">PACKET</th>\n");
-	// strcat(html, "<th data-sort=\"audio\" style=\"min-width:5ch\">AUDIO</th>\n");
-	// strcat(html, "</tr>\n");
-
-	// sort(pkgList, PKGLISTSIZE);
 	time_t timeNow = time(NULL);
 
 	// log_d("Create html last heard");
@@ -1142,7 +1104,8 @@ String event_lastHeard(bool gethtml)
 		pkgListType pkg = getPkgList(i);
 		if (pkg.time > 0)
 		{
-			snprintf(line, 1024, "%s", pkg.raw);
+			memset(line, 0, sizeof(line));
+			snprintf(line, sizeof(line), "%s", pkg.raw);
 			// log_d("IDX=%d RAW:%s",i,line);
 			// char *html_ptr = html;
 			int packet = pkg.pkg;
@@ -1209,7 +1172,7 @@ String event_lastHeard(bool gethtml)
 
 					// Append to html
 					// strcat(html, "  { time: \"21:54:23\", icon: \"91-1.png\", callsign: \"HS5TQA-7\", path: \"RF: WIDE1-1\", dx: 0.0, packet: 2, rssi: -19.6 },\n");
-					char temp_html[200];
+					
 					snprintf(temp_html, sizeof(temp_html), "{\"time\":\"%s\",", strTime);
 					strcat(html, temp_html);
 					char fileImg[64] = "";
@@ -1370,15 +1333,6 @@ String event_lastHeard(bool gethtml)
 	html[strlen(html) - 1] = '\0'; // Remove the last comma
 	if (html[0] == '[')
 		strcat(html, "]");
-	// strcat(html, "</table>\n");
-	//  log_d("HTML Length=%d Byte", strlen(html));
-	//  if (gethtml)
-	//  {
-	//  	String result = String(html); // Convert back to String for return
-	//  	free(html);
-	//  	free(line);
-	//  	return result;
-	//  }
 
 	size_t len = strlen(html);
 	// char *info = (char *)calloc(len + 1, sizeof(char));
@@ -1391,9 +1345,6 @@ String event_lastHeard(bool gethtml)
 	// }
 
 	free(html);
-	free(line);
-	// lastheard_events.send(html.c_str(), "lastHeard", millis());
-	return "";
 }
 
 String event_chatMessage(bool gethtml)
@@ -12324,10 +12275,6 @@ void webService()
 									   log_d("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
 #endif
 								   }
-								   // send event with message "hello!", id current millis
-								   // and set reconnect delay to 1 second
-								   // String html = event_lastHeard(true);
-								   // client->send(html.c_str(), "lastHeard", time(NULL), 5000);
 							   });
 	async_server.addHandler(&lastheard_events);
 
