@@ -19,10 +19,15 @@
 #include "esp_wifi.h"
 #include "esp_heap_caps.h"
 
+extern bool psramBusy;
+
 // Helper function to allocate memory with PSRAM support
 char *allocateStringMemory(size_t size)
 {
 #ifdef BOARD_HAS_PSRAM
+    while (psramBusy)
+        delay(1);
+    psramBusy = true;
 	// Try to allocate in PSRAM first
 	size *= 2; // overallocation to reduce fragmentation
 	// char *ptr = (char *)ps_calloc(size, sizeof(char));
@@ -32,19 +37,20 @@ char *allocateStringMemory(size_t size)
 	int retry_count = 3;
 	int delay_ms = 10;
 
-	while (retry_count > 0 && ptr == NULL)
-	{
+	// while (retry_count > 0 && ptr == NULL)
+	// {
 		ptr = (char *)ps_malloc(size);
-		if (ptr == NULL)
-		{
-			retry_count--;
-			if (retry_count > 0)
-			{
-				vTaskDelay(pdMS_TO_TICKS(delay_ms));
-				delay_ms *= 2; // Exponential backoff
-			}
-		}
-	}
+	// 	if (ptr == NULL)
+	// 	{
+	// 		retry_count--;
+	// 		if (retry_count > 0)
+	// 		{
+	// 			vTaskDelay(pdMS_TO_TICKS(delay_ms));
+	// 			delay_ms *= 2; // Exponential backoff
+	// 		}
+	// 	}
+	// }
+	psramBusy = false;
 
 	if (ptr != NULL)
 	{
@@ -134,6 +140,7 @@ extern unsigned long upTimeStamp;
 bool defaultSetting = false;
 extern float VBat;
 extern bool VBat_Flag;
+extern bool VbatRead;
 
 // ประกาศ global semaphore
 static SemaphoreHandle_t cfg_mutex = NULL;
@@ -1012,8 +1019,10 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	strcat(html, "<th><span>PSRAM(KByte)</span></th>\n");
 #endif
 	strcat(html, "<th><span>SPIFFS(KByte)</span></th>\n");
-	if (VBat_Flag)
+	if (VBat_Flag){
+		VbatRead=true;
 		strcat(html, "<th><span>VBat(V)</span></th>\n");
+	}
 	strcat(html, "<th><span>CPU(Mhz)</span></th>\n");
 	strcat(html, "<th><span>CPU.Temp(°C)</span></th>\n");
 
@@ -1085,7 +1094,6 @@ void event_lastHeard(bool gethtml)
 
 	// Using dynamic memory allocation instead of String
 	char temp_html[100];
-	char line[300];
 	char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 	if (html==nullptr)
 	{
@@ -1104,41 +1112,37 @@ void event_lastHeard(bool gethtml)
 		pkgListType pkg = getPkgList(i);
 		if (pkg.time > 0)
 		{
-			memset(line, 0, sizeof(line));
-			snprintf(line, sizeof(line), "%s", pkg.raw);
-			// log_d("IDX=%d RAW:%s",i,line);
-			// char *html_ptr = html;
 			int packet = pkg.pkg;
-			char *pos_gt = strchr(line, '>'); // Find first position of '>'
-			int start_val = pos_gt ? (pos_gt - line) : -1;
+			char *pos_gt = strchr(pkg.raw, '>'); // Find first position of '>'
+			int start_val = pos_gt ? (pos_gt - pkg.raw) : -1;
 			if (start_val > 3)
 			{
 				// Extract src_call substring
-				char src_call[64];
-				strncpy(src_call, line, start_val);
+				char src_call[11];
+				strncpy(src_call, pkg.raw, start_val);
 				src_call[start_val] = '\0';
 
 				memset(&aprs, 0, sizeof(pbuf_t));
 				aprs.buf_len = 300;
-				aprs.packet_len = strlen(line);
-				strncpy((char *)aprs.data, line, aprs.packet_len < sizeof(aprs.data) ? aprs.packet_len : sizeof(aprs.data) - 1);
+				aprs.packet_len = pkg.length;
+				strncpy((char *)aprs.data, pkg.raw, aprs.packet_len < sizeof(aprs.data) ? aprs.packet_len : sizeof(aprs.data) - 1);
 
-				char *pos_colon = strchr(line, ':');
-				char *pos_comma = strchr(line, ',');
-				char *pos_gt2 = strstr(line + 2, ">"); // Find '>' starting from position 2
+				char *pos_colon = strchr(pkg.raw, ':');
+				char *pos_comma = strchr(pkg.raw, ',');
+				char *pos_gt2 = strstr(pkg.raw + 2, ">"); // Find '>' starting from position 2
 				char *pos_dash = pos_gt2 ? strchr(pos_gt2, '-') : NULL;
 
-				int start_info = pos_colon ? (pos_colon - line) : -1;
-				int end_ssid = pos_comma ? (pos_comma - line) : -1;
-				int start_dst = pos_gt2 ? (pos_gt2 - line) : -1;
-				int start_dstssid = pos_dash ? (pos_dash - line) : -1;
+				int start_info = pos_colon ? (pos_colon - pkg.raw) : -1;
+				int end_ssid = pos_comma ? (pos_comma - pkg.raw) : -1;
+				int start_dst = pos_gt2 ? (pos_gt2 - pkg.raw) : -1;
+				int start_dstssid = pos_dash ? (pos_dash - pkg.raw) : -1;
 
 				char path[256] = "";
 
-				if ((end_ssid > start_dst) && (end_ssid < start_info) && (end_ssid < (int)strlen(line)))
+				if ((end_ssid > start_dst) && (end_ssid < start_info) && (end_ssid < (int)strlen(pkg.raw)))
 				{
 					int path_len = start_info - end_ssid - 1;
-					strncpy(path, line + end_ssid + 1, path_len);
+					strncpy(path, pkg.raw + end_ssid + 1, path_len);
 					path[path_len] = '\0';
 				}
 				if (end_ssid < 5)

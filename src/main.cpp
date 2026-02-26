@@ -470,7 +470,7 @@ void pushTxDisp(uint8_t ch, const char *name, char *info)
 #endif
 
 statusType status;
-//RTC_DATA_ATTR igateTLMType igateTLM;
+// RTC_DATA_ATTR igateTLMType igateTLM;
 RTC_DATA_ATTR dataTLMType systemTLM;
 txQueueType *txQueue;
 RTC_DATA_ATTR double LastLat, LastLng;
@@ -493,6 +493,7 @@ RTC_DATA_ATTR TelemetryType *Telemetry;
 RTC_DATA_ATTR float VBat;
 RTC_DATA_ATTR bool VBat_Flag = false;
 RTC_DATA_ATTR float TempNTC;
+bool VbatRead = true;
 
 RTC_NOINIT_ATTR uint16_t TLM_SEQ;
 RTC_NOINIT_ATTR uint16_t IGATE_TLM_SEQ;
@@ -552,11 +553,18 @@ void convertSecondsToDHMS(char *dmhs, unsigned long totalSeconds)
     sprintf(dmhs, "%dD[%d:%d:%d]", days, hours, minutes, seconds);
 }
 
+// #include "esp_heap_monitor.h"
+
+void checkHeap()
+{
+    log_d("Free Heap: %d", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    log_d("Min Free Heap: %d", heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT));
+}
 
 #ifdef NAWS4
 bool setupPower()
 {
-    Wire.begin(PMU_I2C_SDA, PMU_I2C_SCL,100000);
+    Wire.begin(PMU_I2C_SDA, PMU_I2C_SCL, 100000);
     delay(10);
     Wire.beginTransmission(0x30);
     byte error = Wire.endTransmission();
@@ -623,12 +631,12 @@ bool setupPower()
     {
         delay(1000);
         log_d("PMU is online");
-        PMU.writeRegister(0x32, 0b00000100); //Power off
-        PMU.writeRegister(0x36, 0); // PEK parameter
+        PMU.writeRegister(0x32, 0b00000100); // Power off
+        PMU.writeRegister(0x36, 0);          // PEK parameter
         PMU.writeRegister(0x93, 0b00001001); // GPIO3
-        //PMU.disablePwrOk();               // Disable PWR_OK pin, not used
+        // PMU.disablePwrOk();               // Disable PWR_OK pin, not used
         PMU.setSysPowerDownVoltage(2600); // Set VSYS off voltage as 2800mV, Adjustment range 2600mV ~ 3300mV
-        //PMU.setPowerKeyPressOnTime(0b10010101);
+        // PMU.setPowerKeyPressOnTime(0b10010101);
         delay(500);
         PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
         delay(500);
@@ -645,7 +653,7 @@ bool setupPower()
         PMU.writeRegister(0x90, 0b00000001); // GPIO0 GSM_PWR
         PMU.writeRegister(0x91, 0b00000011); // GPIO1
         PMU.writeRegister(0x92, 0b00000011); // GPIO2
-        //PMU.writeRegister(0x93, 0b00001000); // GPIO3
+        // PMU.writeRegister(0x93, 0b00001000); // GPIO3
         PMU.writeRegister(0x81, 0);
         PMU.writeRegister(0x36, 0b00001000); // PEK parameter
         delay(500);
@@ -945,17 +953,17 @@ void setupPower()
     PMU.setSysPowerDownVoltage(3000);
 
     //! DC1 ESP32S3 Core VDD , Don't change
-    PMU.setDC1Voltage(3300); //ESP32-S3
+    PMU.setDC1Voltage(3300); // ESP32-S3
     PMU.enableDC1();         // Enable DC1
 
     //! DC3 Radio & Pixels VDD , Don't change
-    PMU.setDC3Voltage(3300); //External pin header
+    PMU.setDC3Voltage(3300); // External pin header
 
     //! ALDO2 MICRO TF Card VDD, Don't change
-    PMU.setALDO2Voltage(3300); //SD Card
+    PMU.setALDO2Voltage(3300); // SD Card
 
     //! ALDO4 GNSS VDD, Don't change
-    PMU.setALDO4Voltage(3300); //GNSS
+    PMU.setALDO4Voltage(3300); // GNSS
 
     //! BLDO1 MIC VDD, Don't change
     PMU.setBLDO1Voltage(3300);
@@ -964,19 +972,19 @@ void setupPower()
     // DC5 IMAX=2A
     // 1200mV
     // 1400~3700mV,100mV/step,24steps
-    PMU.setDC5Voltage(3300); //External pin header
+    PMU.setDC5Voltage(3300); // External pin header
 
     // ALDO1 IMAX=300mA
     // 500~3500mV, 100mV/step,31steps
-    PMU.setALDO1Voltage(3300); //External pin header
+    PMU.setALDO1Voltage(3300); // External pin header
 
     // ALDO3 IMAX=300mA
     // 500~3500mV, 100mV/step,31steps
-    PMU.setALDO3Voltage(3300); //External pin header
+    PMU.setALDO3Voltage(3300); // External pin header
 
     // BLDO2 IMAX=300mA
     // 500~3500mV, 100mV/step,31steps
-    PMU.setBLDO2Voltage(3300); //External pin header
+    PMU.setBLDO2Voltage(3300); // External pin header
 
     //! END
 
@@ -988,13 +996,13 @@ void setupPower()
     PMU.enableDC5();
     PMU.enableALDO1();
     PMU.enableALDO3();
-    PMU.enableBLDO2(); //SD Card
+    PMU.enableBLDO2(); // SD Card
 
     //! ALDO2 MICRO TF Card VDD
     PMU.enableALDO2();
 
     //! ALDO4 GNSS VDD
-    PMU.enableALDO4(); //GNSS
+    PMU.enableALDO4(); // GNSS
 
     PMU.enableBLDO2();
 
@@ -2353,8 +2361,8 @@ void defaultConfig()
     config.rf_ax25 = true;
     config.rf_br = 9.7;
     config.rf_dio2_gpio = -1;
-    config.rf_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
-    config.rf_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+    config.rf_shaping = 0x02;  // RADIOLIB_SHAPING_0_5;
+    config.rf_encoding = 0x00; // RADIOLIB_ENCODING_NRZ;
     config.rf_rx_boost = true;
 
 #ifdef NAWS4
@@ -2372,10 +2380,9 @@ void defaultConfig()
     config.rf_mode = 1;
     config.rf_ax25 = true;
     config.rf_br = 9.7;
-    config.rf_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
-    config.rf_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+    config.rf_shaping = 0x02;  // RADIOLIB_SHAPING_0_5;
+    config.rf_encoding = 0x00; // RADIOLIB_ENCODING_NRZ;
     config.rf_rx_boost = false;
-
 
     config.rf1_en = true;
     config.rf1_type = RF_SX1278;
@@ -2392,8 +2399,8 @@ void defaultConfig()
     config.rf1_mode = 1;
     config.rf1_ax25 = true;
     config.rf1_br = 9.7;
-    config.rf1_shaping = 0x02; //RADIOLIB_SHAPING_0_5;
-    config.rf1_encoding = 0x00; //RADIOLIB_ENCODING_NRZ;
+    config.rf1_shaping = 0x02;  // RADIOLIB_SHAPING_0_5;
+    config.rf1_encoding = 0x00; // RADIOLIB_ENCODING_NRZ;
     config.rf1_rx_boost = false;
 
 #endif
@@ -2412,7 +2419,7 @@ void defaultConfig()
     config.aprs_port = 14580;
     sprintf(config.igate_mycall, "NOCALL");
     sprintf(config.igate_host, "aprs.nakhonthai.net");
-    //memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
+    // memset(config.aprs_passcode, 0, sizeof(config.aprs_passcode));
     sprintf(config.igate_moniCall, "%s-%d", config.igate_mycall, config.igate_ssid);
     sprintf(config.igate_filter, "m/10");
     //--Position
@@ -2743,20 +2750,20 @@ void defaultConfig()
     sprintf(config.sensor[9].parm, "Wind Speed");
     sprintf(config.sensor[9].unit, "kPh");
 
-#if (CORE_DEBUG_LEVEL>0)
-    #ifdef ARDUINO_USB_CDC_ON_BOOT
+#if (CORE_DEBUG_LEVEL > 0)
+#ifdef ARDUINO_USB_CDC_ON_BOOT
     config.uart0_enable = false;
     config.uart0_baudrate = 115200;
     config.uart0_rx_gpio = -1;
     config.uart0_tx_gpio = -1;
     config.uart0_rts_gpio = -1;
-    #else
+#else
     config.uart0_enable = true;
     config.uart0_baudrate = 115200;
     config.uart0_rx_gpio = 20;
     config.uart0_tx_gpio = 21;
     config.uart0_rts_gpio = -1;
-    #endif
+#endif
 #else
     config.uart0_enable = false;
     config.uart0_baudrate = 9600;
@@ -2775,7 +2782,7 @@ void defaultConfig()
     config.uart2_baudrate = 9600;
     config.uart2_rx_gpio = -1;
     config.uart2_tx_gpio = -1;
-    //config.uart2_rts_gpio = -1;
+    // config.uart2_rts_gpio = -1;
 
     config.modbus_enable = false;
     config.modbus_de_gpio = -1;
@@ -2855,16 +2862,16 @@ void defaultConfig()
     config.i2c1_sck_pin = -1;
     config.i2c1_freq = 100000;
 
-    #ifdef BLUETOOTH
+#ifdef BLUETOOTH
     config.at_cmd_bluetooth = true;
-    #else
+#else
     config.at_cmd_bluetooth = false;
-    #endif
-    #ifdef MQTT
+#endif
+#ifdef MQTT
     config.at_cmd_mqtt = true;
-    #else
+#else
     config.at_cmd_mqtt = false;
-    #endif
+#endif
     config.at_cmd_msg = true;
     config.at_cmd_uart = 0;
 
@@ -2986,9 +2993,9 @@ void defaultConfig()
     config.sensor[0].address = 0;
     config.sensor[0].samplerate = 10;
     config.sensor[0].averagerate = 600;
-    config.sensor[0].eqns[0] = 0; // a
+    config.sensor[0].eqns[0] = 0;        // a
     config.sensor[0].eqns[1] = 0.00768F; // b
-    config.sensor[0].eqns[2] = 0; // c
+    config.sensor[0].eqns[2] = 0;        // c
     config.sensor[0].type = 27;
     sprintf(config.sensor[0].parm, "Battery");
     sprintf(config.sensor[0].unit, "V");
@@ -3003,8 +3010,8 @@ void defaultConfig()
     config.sensor[1].eqns[2] = 0; // c
     config.sensor[1].type = 25;
     sprintf(config.sensor[1].parm, "Satellite");
-    config.sensor[1].unit[0]=0;
-    
+    config.sensor[1].unit[0] = 0;
+
     config.trk_interval = 10;
     config.trk_tlm_avg[0] = false;
     config.trk_tlm_sensor[0] = 1;
@@ -3022,18 +3029,18 @@ void defaultConfig()
     config.trk_tlm_offset[1] = 0;
     sprintf(config.trk_tlm_UNIT[1], "");
     sprintf(config.trk_tlm_PARM[1], "SAT");
-    config.trk_tlm_EQNS[1][0] = 0;    // a av2 + bv + c
+    config.trk_tlm_EQNS[1][0] = 0; // a av2 + bv + c
     config.trk_tlm_EQNS[1][1] = 1; // b
-    config.trk_tlm_EQNS[1][2] = 0;    // c
+    config.trk_tlm_EQNS[1][2] = 0; // c
     char strCID[13];
-	uint64_t chipid = ESP.getEfuseMac();
-	sprintf(strCID, "0%03X", (uint16_t)(chipid >> 28) & 0x000FFFFF);
-    sprintf(config.igate_mycall,"%s",strCID);
-    sprintf(config.trk_mycall,"%s",strCID);
-    sprintf(config.digi_mycall,"%s",strCID);
-    sprintf(config.msg_mycall,"%s",strCID);
-    sprintf(config.tlm0_mycall,"%s",strCID);
-    sprintf(config.wx_mycall,"%s",strCID);
+    uint64_t chipid = ESP.getEfuseMac();
+    sprintf(strCID, "0%03X", (uint16_t)(chipid >> 28) & 0x000FFFFF);
+    sprintf(config.igate_mycall, "%s", strCID);
+    sprintf(config.trk_mycall, "%s", strCID);
+    sprintf(config.digi_mycall, "%s", strCID);
+    sprintf(config.msg_mycall, "%s", strCID);
+    sprintf(config.tlm0_mycall, "%s", strCID);
+    sprintf(config.wx_mycall, "%s", strCID);
 #elif defined(HT_CT62)
     config.rf_en = true;
     config.rf_type = RF_SX1262;
@@ -3228,7 +3235,7 @@ void defaultConfig()
     config.i2c_sck_pin = PMU_I2C_SCL;
     config.i2c1_enable = false;
     config.i2c1_sda_pin = -1;
-    config.i2c1_sck_pin = -1;    
+    config.i2c1_sck_pin = -1;
     config.oled_enable = true;
     config.at_cmd_msg = true;
     config.at_cmd_uart = 4;
@@ -3258,16 +3265,16 @@ void defaultConfig()
     config.uart1_rx_gpio = 5;
     config.uart1_tx_gpio = 6;
     config.uart1_rts_gpio = -1;
-    config.uart2_enable=false;
+    config.uart2_enable = false;
     config.uart2_rx_gpio = -1;
     config.uart2_tx_gpio = -1;
-    //config.uart2_rts_gpio = -1;
+    // config.uart2_rts_gpio = -1;
     config.i2c_enable = true;
     config.i2c_sda_pin = 8;
     config.i2c_sck_pin = 9;
     config.i2c1_enable = false;
     config.i2c1_sda_pin = -1;
-    config.i2c1_sck_pin = -1;    
+    config.i2c1_sck_pin = -1;
     config.oled_enable = true;
     config.at_cmd_msg = true;
     config.at_cmd_uart = 4;
@@ -3468,7 +3475,7 @@ void defaultConfig()
     sprintf(config.sensor[0].parm, "Temperature");
     sprintf(config.sensor[0].unit, "°C");
     config.sensor[1].enable = true;
-    config.sensor[1].port = 15; 
+    config.sensor[1].port = 15;
     config.sensor[1].address = 1;
     config.sensor[1].samplerate = 60;
     config.sensor[1].averagerate = 600;
@@ -3494,20 +3501,20 @@ void defaultConfig()
     config.sensor[3].address = 1;
     config.sensor[3].samplerate = 60;
     config.sensor[3].averagerate = 600;
-    config.sensor[3].eqns[0] = 0; // a
+    config.sensor[3].eqns[0] = 0;   // a
     config.sensor[3].eqns[1] = 0.2; // b
-    config.sensor[3].eqns[2] = 0; // c
+    config.sensor[3].eqns[2] = 0;   // c
     config.sensor[3].type = 11;
     sprintf(config.sensor[3].parm, "Rain");
     sprintf(config.sensor[3].unit, "mm");
-    config.sensor[4].enable = true; //Davis Anemometer PN#6410
+    config.sensor[4].enable = true; // Davis Anemometer PN#6410
     config.sensor[4].port = 6;
     config.sensor[4].address = 2;
     config.sensor[4].samplerate = 60;
     config.sensor[4].averagerate = 600;
-    config.sensor[4].eqns[0] = 0; // a
+    config.sensor[4].eqns[0] = 0;    // a
     config.sensor[4].eqns[1] = 0.06; // b
-    config.sensor[4].eqns[2] = 0; // c
+    config.sensor[4].eqns[2] = 0;    // c
     config.sensor[4].type = 9;
     sprintf(config.sensor[4].parm, "WindSpeed");
     sprintf(config.sensor[4].unit, "kPh");
@@ -3516,9 +3523,9 @@ void defaultConfig()
     config.sensor[5].address = 0;
     config.sensor[5].samplerate = 60;
     config.sensor[5].averagerate = 600;
-    config.sensor[5].eqns[0] = 0; // a
+    config.sensor[5].eqns[0] = 0;       // a
     config.sensor[5].eqns[1] = 0.00271; // b
-    config.sensor[5].eqns[2] = 0; // c
+    config.sensor[5].eqns[2] = 0;       // c
     config.sensor[5].type = 10;
     sprintf(config.sensor[5].parm, "WindCourse");
     sprintf(config.sensor[5].unit, "°");
@@ -3527,9 +3534,9 @@ void defaultConfig()
     config.sensor[6].address = 1;
     config.sensor[6].samplerate = 60;
     config.sensor[6].averagerate = 600;
-    config.sensor[6].eqns[0] = 0; // a
+    config.sensor[6].eqns[0] = 0;       // a
     config.sensor[6].eqns[1] = 0.01412; // b
-    config.sensor[6].eqns[2] = 0; // c
+    config.sensor[6].eqns[2] = 0;       // c
     config.sensor[6].type = 12;
     sprintf(config.sensor[6].parm, "Luminosity");
     sprintf(config.sensor[6].unit, "W/m³");
@@ -3560,9 +3567,9 @@ void defaultConfig()
     config.sensor[9].address = 3;
     config.sensor[9].samplerate = 60;
     config.sensor[9].averagerate = 600;
-    config.sensor[9].eqns[0] = 0; // a
+    config.sensor[9].eqns[0] = 0;       // a
     config.sensor[9].eqns[1] = 0.00018; // b
-    config.sensor[9].eqns[2] = 0; // c
+    config.sensor[9].eqns[2] = 0;       // c
     config.sensor[9].type = 19;
     sprintf(config.sensor[9].parm, "Voltage");
     sprintf(config.sensor[9].unit, "V");
@@ -3591,12 +3598,12 @@ void defaultConfig()
     config.en_mqtt = false;
     sprintf(config.mqtt_host, "mqtt.nakhonthai.net");
     char strCID[13];
-	uint64_t chipid = ESP.getEfuseMac();
-	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
-    sprintf(config.mqtt_topic, "/%s/TX",strCID);
-    sprintf(config.mqtt_subscribe, "/%s/RX",strCID);
-    config.mqtt_user[0]=0;
-    config.mqtt_pass[0]=0;
+    uint64_t chipid = ESP.getEfuseMac();
+    sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
+    sprintf(config.mqtt_topic, "/%s/TX", strCID);
+    sprintf(config.mqtt_subscribe, "/%s/RX", strCID);
+    config.mqtt_user[0] = 0;
+    config.mqtt_pass[0] = 0;
     config.mqtt_port = 1883;
 #endif
 
@@ -3846,11 +3853,11 @@ void sort(pkgListType a[], int size)
     char *ptr2;
     char *ptr3;
     ptr1 = (char *)&t;
-#ifdef BOARD_HAS_PSRAM
-    while (psramBusy)
-        delay(1);
-    psramBusy = true;
-#endif
+    // #ifdef BOARD_HAS_PSRAM
+    //     while (psramBusy)
+    //         delay(1);
+    //     psramBusy = true;
+    // #endif
     for (int i = 0; i < (size - 1); i++)
     {
         for (int o = 0; o < (size - (i + 1)); o++)
@@ -3865,7 +3872,7 @@ void sort(pkgListType a[], int size)
             }
         }
     }
-    psramBusy = false;
+    // psramBusy = false;
 }
 
 void sortPkgDesc(pkgListType a[], int size)
@@ -3875,11 +3882,11 @@ void sortPkgDesc(pkgListType a[], int size)
     char *ptr2;
     char *ptr3;
     ptr1 = (char *)&t;
-#ifdef BOARD_HAS_PSRAM
-    while (psramBusy)
-        delay(1);
-    psramBusy = true;
-#endif
+    // #ifdef BOARD_HAS_PSRAM
+    //     while (psramBusy)
+    //         delay(1);
+    //     psramBusy = true;
+    // #endif
     for (int i = 0; i < (size - 1); i++)
     {
         for (int o = 0; o < (size - (i + 1)); o++)
@@ -3894,7 +3901,7 @@ void sortPkgDesc(pkgListType a[], int size)
             }
         }
     }
-    psramBusy = false;
+    // psramBusy = false;
 }
 
 uint16_t pkgType(const char *raw)
@@ -3976,7 +3983,7 @@ uint16_t pkgType(const char *raw)
     case ';':
         type |= FILTER_OBJECT;
         if (body[35] == '_')
-            type |= FILTER_WX;            
+            type |= FILTER_WX;
         break;
     case ')':
         type |= FILTER_ITEM;
@@ -4005,61 +4012,31 @@ uint16_t pkgType(const char *raw)
     return type;
 }
 
-// uint16_t TNC2Raw[PKGLISTSIZE];
-// int raw_count = 0, raw_idx_rd = 0, raw_idx_rw = 0;
-
-// int pushTNC2Raw(int raw)
-// {
-//   if (raw < 0)
-//     return -1;
-//   if (raw_count > PKGLISTSIZE)
-//     return -1;
-//   if (++raw_idx_rw >= PKGLISTSIZE)
-//     raw_idx_rw = 0;
-//   TNC2Raw[raw_idx_rw] = raw;
-//   raw_count++;
-//   return raw_count;
-// }
-
-// int popTNC2Raw(int &ret)
-// {
-//   String raw = "";
-//   int idx = 0;
-//   if (raw_count <= 0)
-//     return -1;
-//   if (++raw_idx_rd >= PKGLISTSIZE)
-//     raw_idx_rd = 0;
-//   idx = TNC2Raw[raw_idx_rd];
-//   if (idx < PKGLISTSIZE)
-//     ret = idx;
-//   if (raw_count > 0)
-//     raw_count--;
-//   return raw_count;
-// }
-
 pkgListType getPkgList(int idx)
 {
     pkgListType ret;
-#ifdef BOARD_HAS_PSRAM
-    while (psramBusy)
-        delay(1);
-    psramBusy = true;
-#endif
+    // #ifdef BOARD_HAS_PSRAM
+    //     while (psramBusy)
+    //         delay(1);
+    //     psramBusy = true;
+    // #endif
     memset(&ret, 0, sizeof(pkgListType));
     if (idx < PKGLISTSIZE)
         memcpy(&ret, &pkgList[idx], sizeof(pkgListType));
-    psramBusy = false;
+    // psramBusy = false;
     return ret;
 }
 
 int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
 {
     size_t len;
-    if (*call == 0){
+    if (*call == 0)
+    {
         log_d("call Fail!");
         return -1;
     }
-    if (*raw == 0){
+    if (*raw == 0)
+    {
         log_d("raw Fail!");
         return -1;
     }
@@ -4067,7 +4044,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     // int start_info = strchr(':',0);
 
     char callsign[11];
-    char object[10];
+    char object[11];
     size_t sz = strlen(call);
     memset(callsign, 0, 11);
     if (sz > 10)
@@ -4079,16 +4056,12 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     //     log_d("CheckValidCall Fail!");
     //     return -1;
     // }
-    if(!isValidToken(callsign,false)){
+    if (!isValidToken(callsign, false))
+    {
         log_d("CheckValidCall Fail!");
         return -1;
     }
 
-// #ifdef BOARD_HAS_PSRAM
-//     while (psramBusy)
-//         delay(1);
-//     psramBusy = true;
-// #endif
     int i = -1;
 
     memset(object, 0, sizeof(object));
@@ -4104,13 +4077,14 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 if (body[z] < 0x30 || body[z] > 0x7A)
                 {
-                    #if (CORE_DEBUG_LEVEL > 0)
+#if (CORE_DEBUG_LEVEL > 0)
                     log_d("\titem name has unprintable characters");
-                    #endif
+#endif
                     break; /* non-printable */
                 }
                 object[x++] = body[z];
             }
+            object[x] = 0;
         }
         i = pkgList_Find(callsign, object, type);
     }
@@ -4126,15 +4100,16 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 if (body[z] < 0x30 || body[z] > 0x7A)
                 {
-                    #if (CORE_DEBUG_LEVEL > 0)
+#if (CORE_DEBUG_LEVEL > 0)
                     log_d("\tobject name has unprintable characters");
-                    #endif
+#endif
                     break; // non-printable
                 }
                 object[x++] = body[z];
                 // if (raw[i] != ' ')
                 //     namelen = i;
             }
+            object[x] = 0;
         }
         i = pkgList_Find(callsign, object, type);
     }
@@ -4146,7 +4121,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     if (i > PKGLISTSIZE)
     {
         psramBusy = false;
-        log_d("pkgListSize>%d",PKGLISTSIZE);
+        log_d("pkgListSize>%d", PKGLISTSIZE);
         return -1;
     }
     if (i > -1)
@@ -4171,12 +4146,6 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             }
             len = strlen(raw);
             pkgList[i].length = len + 1;
-            #ifdef BOARD_HAS_PSRAM
-            if (pkgList[i].raw == NULL)
-            {
-                pkgList[i].raw = (char *)ps_calloc(pkgList[i].length, sizeof(char));
-            }
-            #else
             if (pkgList[i].raw != NULL)
             {
                 pkgList[i].raw = (char *)realloc(pkgList[i].raw, pkgList[i].length);
@@ -4185,15 +4154,14 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 pkgList[i].raw = (char *)calloc(pkgList[i].length, sizeof(char));
             }
-            #endif
             if (pkgList[i].raw)
             {
                 memset(pkgList[i].raw, 0, pkgList[i].length);
                 memcpy(pkgList[i].raw, raw, len);
                 pkgList[i].raw[len] = 0;
-                #if (CORE_DEBUG_LEVEL > 0)
+#if (CORE_DEBUG_LEVEL > 0)
                 log_d("Update: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
-                #endif
+#endif
             }
         }
     }
@@ -4203,7 +4171,7 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         if (i > PKGLISTSIZE || i < 0)
         {
             psramBusy = false;
-            log_d("pkgListSize>%d",PKGLISTSIZE);
+            log_d("pkgListSize>%d", PKGLISTSIZE);
             return -1;
         }
         // memset(&pkgList[i], 0, sizeof(pkgListType));
@@ -4237,12 +4205,6 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         memcpy(pkgList[i].calsign, callsign, strlen(callsign));
         len = strlen(raw);
         pkgList[i].length = len + 1;
-        #ifdef BOARD_HAS_PSRAM
-             if (pkgList[i].raw == NULL)
-            {
-                pkgList[i].raw = (char *)ps_calloc(pkgList[i].length, sizeof(char));
-            }
-        #else
         if (pkgList[i].raw != NULL)
         {
             pkgList[i].raw = (char *)realloc(pkgList[i].raw, pkgList[i].length);
@@ -4251,18 +4213,16 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
         {
             pkgList[i].raw = (char *)calloc(pkgList[i].length, sizeof(char));
         }
-        #endif
         if (pkgList[i].raw)
         {
             memset(pkgList[i].raw, 0, pkgList[i].length);
             memcpy(pkgList[i].raw, raw, len);
             pkgList[i].raw[len] = 0;
-            #if (CORE_DEBUG_LEVEL > 0)
+#if (CORE_DEBUG_LEVEL > 0)
             log_d("New: pkgList_idx=%d callsign:%s object:%s", i, callsign, object);
-            #endif
+#endif
         }
     }
-    psramBusy = false;
     lastHeard_Flag = true;
     lastHeardTimeout = millis() + 1000;
     return i;
@@ -4397,15 +4357,17 @@ bool pkgTxSend()
                         {
                             if (aprsClient.connected())
                             {
-                                if((config.aprs_port != 24580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
+                                if ((config.aprs_port != 24580) && (txQueue[i].Info[0] == '0' || txQueue[i].Info[0] == '1')) // unidentified callsign to use CB Radio
                                 {
-                                    //String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
+                                    // String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
                                     uint8_t packet[400];
-                                    sprintf((char *)packet,"user APRSCB pass 9123\n%s\r\n",txQueue[i].Info);
-                                    aprsUDP.beginPacket("aprs.nakhonthai.net", 8081); // Send packet to APRS-IS (udp)
+                                    sprintf((char *)packet, "user APRSCB pass 9123\n%s\r\n", txQueue[i].Info);
+                                    aprsUDP.beginPacket("aprs.nakhonthai.net", 8081);               // Send packet to APRS-IS (udp)
                                     aprsUDP.write((const uint8_t *)packet, strlen((char *)packet)); // Send binary frame packet to APRS-IS (udp)
                                     aprsUDP.endPacket();
-                                }else{
+                                }
+                                else
+                                {
                                     aprsClient.write(txQueue[i].Info, txQueue[i].length); // Send binary frame packet to APRS-IS (aprsc)
                                     aprsClient.write("\r\n");                             // Send CR LF the end frame packet
                                 }
@@ -4437,9 +4399,9 @@ bool pkgTxSend()
                                 status.txCount++;
                                 log_d("TX->RF: %s", txQueue[i].Info);
                                 // APRS_sendTNC2Pkt("<\xff\x01"+String(info)); // Send packet to RF
-                                APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);                                
-                                //igateTLM.TX++;
-                                
+                                APRS_sendTNC2Pkt((uint8_t *)info, txQueue[i].length);
+                                // igateTLM.TX++;
+
                                 if (config.trk_en)
                                 {
                                     timeSleep = millis() + 5000;
@@ -4493,15 +4455,17 @@ void aprs_msg_callback(struct AX25Msg *msg)
         info.clear();
     }
     memcpy(&pkg, msg, sizeof(AX25Msg));
-    if(!PacketBuffer.isFull())
+    if (!PacketBuffer.isFull())
     {
         PacketBuffer.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
-        status.rxCount++;    
-    }else{
+        status.rxCount++;
+    }
+    else
+    {
         status.dropCount++;
     }
-    status.allCount++;    
-    //igateTLM.RX++;
+    status.allCount++;
+    // igateTLM.RX++;
 }
 
 void printTime()
@@ -4635,23 +4599,23 @@ bool AFSKInitAct = false;
 unsigned long timeTask;
 void setup()
 {
-    //pinMode(19,INPUT);
-    //pinMode(20,INPUT);
-    // byte *ptr;
+    // pinMode(19,INPUT);
+    // pinMode(20,INPUT);
+    //  byte *ptr;
     int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
     // if (psramInit())
     // {
-        psramAddToHeap();
-        pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
-        Telemetry = (TelemetryType *)ps_malloc(sizeof(TelemetryType) * TLMLISTSIZE);
-        txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
-        msgQueue = (msgType *)ps_malloc(sizeof(msgType) * PKGLISTSIZE);
-        // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
-    for(int i=0;i<PKGLISTSIZE;i++)
-    {
-        pkgList[i].raw = (char *)ps_malloc(512);
-    }
+    psramAddToHeap();
+    pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
+    Telemetry = (TelemetryType *)ps_malloc(sizeof(TelemetryType) * TLMLISTSIZE);
+    txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
+    msgQueue = (msgType *)ps_malloc(sizeof(msgType) * PKGLISTSIZE);
+    // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
+    // for(int i=0;i<PKGLISTSIZE;i++)
+    // {
+    //     pkgList[i].raw = (char *)ps_malloc(300);
+    // }
     // }
     // else
     // {
@@ -4679,13 +4643,13 @@ void setup()
     if (LED_TX > -1)
         pinMode(LED_TX, OUTPUT);
 
-    // pinMode(0, INPUT);
-    // pinMode(1, INPUT);
-    //  Set the CPU frequency to 80 MHz for power optimization
-    // setCpuFrequencyMhz(80);
-    #ifdef NAWS4
+// pinMode(0, INPUT);
+// pinMode(1, INPUT);
+//  Set the CPU frequency to 80 MHz for power optimization
+// setCpuFrequencyMhz(80);
+#ifdef NAWS4
     setCpuFrequencyMhz(160);
-    #endif
+#endif
 
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
@@ -4714,10 +4678,10 @@ void setup()
 
     // Set up serial port
     // #ifdef CORE_DEBUG_LEVEL
-    //Serial.begin(115200); // debug
-                          // #else
-    //Serial.begin(9600);   // monitor
-                          // #endif
+    // Serial.begin(115200); // debug
+    // #else
+    // Serial.begin(9600);   // monitor
+    //  #endif
 
     if (!LITTLEFS.begin(FORMAT_LITTLEFS_IF_FAILED))
     {
@@ -4751,7 +4715,7 @@ void setup()
     // }
 #ifdef STRIP_PIN
     strip.begin();
-    LED_Status(200,200,200);
+    LED_Status(200, 200, 200);
 #endif
 
     if (!LITTLEFS.exists("/default.cfg"))
@@ -4783,10 +4747,10 @@ void setup()
             config.uart2_enable = false;
         }
     }
-#endif    
+#endif
 
 #ifdef STRIP_PIN
-    LED_Status(0,0,0);
+    LED_Status(0, 0, 0);
 #endif
 
 #ifdef BUOY
@@ -4950,29 +4914,29 @@ void setup()
             delay(1000);
 #endif
 
-//             if (digitalRead(BOOT_PIN) == LOW)
-//             {
-//                 defaultConfig();
-//                 log_d("Manual Default configure!");
-// #ifdef OLED
-//                 display.clearDisplay();
-// #ifdef SSD1306_72x40
-//                 display.setCursor(5, 25);
-//                 display.print("RST!");
-// #else
-//                 display.setCursor(10, 22);
-//                 display.print("Factory Reset!");
-// #endif
-//                 display.display();
-// #endif
-//                 while (digitalRead(BOOT_PIN) == LOW)
-//                 {
-//                     delay(500);
-//                     LED_Status(255, 255, 255);
-//                     delay(500);
-//                     LED_Status(0, 0, 0);
-//                 }
-//             }
+            //             if (digitalRead(BOOT_PIN) == LOW)
+            //             {
+            //                 defaultConfig();
+            //                 log_d("Manual Default configure!");
+            // #ifdef OLED
+            //                 display.clearDisplay();
+            // #ifdef SSD1306_72x40
+            //                 display.setCursor(5, 25);
+            //                 display.print("RST!");
+            // #else
+            //                 display.setCursor(10, 22);
+            //                 display.print("Factory Reset!");
+            // #endif
+            //                 display.display();
+            // #endif
+            //                 while (digitalRead(BOOT_PIN) == LOW)
+            //                 {
+            //                     delay(500);
+            //                     LED_Status(255, 255, 255);
+            //                     delay(500);
+            //                     LED_Status(0, 0, 0);
+            //                 }
+            //             }
         }
         else
         {
@@ -5040,7 +5004,7 @@ void setup()
             display.display();
 
             delay(1000);
-            //digitalWrite(LED_RX, HIGH);
+            // digitalWrite(LED_RX, HIGH);
             LED_Status(0, 255, 0);
             display.fillRect(69, 59, 50, 8, 0);
             display.setCursor(90, 60);
@@ -5057,24 +5021,24 @@ void setup()
             delay(1000);
             LED_Status(0, 0, 0);
 
-//             if (digitalRead(BOOT_PIN) == LOW)
-//             {
-//                 defaultConfig();
-//                 log_d("Manual Default configure!");
-// #ifdef ST7735_160x80
-//                 display.fillRect(69, 59, 50, 8, 0);
-//                 display.setCursor(70, 60);
-//                 display.print("Factory Reset!");
-//                 display.display();
-// #endif
-//                 while (digitalRead(BOOT_PIN) == LOW)
-//                 {
-//                     delay(500);
-//                     LED_Status(255, 255, 255);
-//                     delay(500);
-//                     LED_Status(0, 0, 0);
-//                 }
-//             }
+            //             if (digitalRead(BOOT_PIN) == LOW)
+            //             {
+            //                 defaultConfig();
+            //                 log_d("Manual Default configure!");
+            // #ifdef ST7735_160x80
+            //                 display.fillRect(69, 59, 50, 8, 0);
+            //                 display.setCursor(70, 60);
+            //                 display.print("Factory Reset!");
+            //                 display.display();
+            // #endif
+            //                 while (digitalRead(BOOT_PIN) == LOW)
+            //                 {
+            //                     delay(500);
+            //                     LED_Status(255, 255, 255);
+            //                     delay(500);
+            //                     LED_Status(0, 0, 0);
+            //                 }
+            //             }
         }
         else
         {
@@ -5083,9 +5047,10 @@ void setup()
         LED_Status(0, 0, 0);
 #endif
 
-        
 #endif
-    }else{
+    }
+    else
+    {
         if (!config.pwr_en)
         {
             LED_Status(200, 0, 0);
@@ -5100,54 +5065,55 @@ void setup()
     if (BootReason != ESP_RST_DEEPSLEEP)
     {
         pinMode(BOOT_PIN, INPUT_PULLUP);
-                if (digitalRead(BOOT_PIN) == LOW)
-                {
-                    defaultConfig();
-                    log_d("Manual Default configure!");
-        #ifdef OLED
-                display.clearDisplay();
+        if (digitalRead(BOOT_PIN) == LOW)
+        {
+            defaultConfig();
+            log_d("Manual Default configure!");
+#ifdef OLED
+            display.clearDisplay();
 #ifdef SSD1306_72x40
-                display.setCursor(5, 25);
-                display.print("RST!");
+            display.setCursor(5, 25);
+            display.print("RST!");
 #else
-                display.setCursor(10, 22);
-                display.print("Factory Reset!");
+            display.setCursor(10, 22);
+            display.print("Factory Reset!");
 #endif
-                display.display();
+            display.display();
 #endif
-                    while (digitalRead(BOOT_PIN) == LOW)
-                    {
-                        delay(500);
-                        LED_Status(255, 255, 255);
-                        delay(500);
-                        LED_Status(0, 0, 0);
-                    }
-                }
+            while (digitalRead(BOOT_PIN) == LOW)
+            {
+                delay(500);
+                LED_Status(255, 255, 255);
+                delay(500);
+                LED_Status(0, 0, 0);
+            }
+        }
     }
     LED_Status(0, 0, 0);
 
 #if ARDUINO_USB_CDC_ON_BOOT
-        Serial.begin(115200);
+    Serial.begin(115200);
 #endif
-    if(config.uart0_enable)
-    {        
+    if (config.uart0_enable)
+    {
         pinMode(config.uart0_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
         pinMode(config.uart0_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial0.begin(config.uart0_baudrate, SERIAL_8N1, config.uart0_rx_gpio, config.uart0_tx_gpio);
     }
     if (config.uart1_enable)
-    {        
+    {
         pinMode(config.uart1_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
         pinMode(config.uart1_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial1.begin(config.uart1_baudrate, SERIAL_8N1, config.uart1_rx_gpio, config.uart1_tx_gpio);
     }
-    #if SOC_UART_NUM > 2
-    if (config.uart2_enable){
+#if SOC_UART_NUM > 2
+    if (config.uart2_enable)
+    {
         pinMode(config.uart2_rx_gpio, INPUT_PULLUP); // Set RX pin to INPUT_PULLUP
         pinMode(config.uart2_tx_gpio, OUTPUT);       // Set TX pin to OUTPUT
         Serial2.begin(config.uart2_baudrate, SERIAL_8N1, config.uart2_rx_gpio, config.uart2_tx_gpio);
     }
-    #endif
+#endif
 
     log_d("MODBUS config");
     if (config.modbus_enable)
@@ -5209,16 +5175,16 @@ void setup()
     // enableLoopWDT();
     // enableCore0WDT();
     // enableCore1WDT();
-//     esp_task_wdt_config_t twdt_config = {
-//         .timeout_ms = 30000,                             // 30 seconds
-//         .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Bitmask of all cores
-//         .trigger_panic = false,
-//     };
-// #if !defined(CONFIG_IDF_TARGET_ESP32C6)
-//     esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
-// #else
-//     esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
-// #endif
+    //     esp_task_wdt_config_t twdt_config = {
+    //         .timeout_ms = 30000,                             // 30 seconds
+    //         .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // Bitmask of all cores
+    //         .trigger_panic = false,
+    //     };
+    // #if !defined(CONFIG_IDF_TARGET_ESP32C6)
+    //     esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+    // #else
+    //     esp_task_wdt_init(&twdt_config); // enable panic so ESP32 restarts
+    // #endif
 
     oledSleepTimeout = millis() + (config.oled_timeout * 1000);
     AFSKInitAct = false;
@@ -5237,12 +5203,12 @@ void setup()
                 {
                     Serial1.println(config.gnss_at_command);
                 }
-                #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                 else if (config.gnss_channel == 3)
                 {
                     Serial2.println(config.gnss_at_command);
                 }
-                #endif
+#endif
             }
         }
     }
@@ -5264,7 +5230,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        8192,               /* Stack size in words */
+        12000,              /* Stack size in words */
         NULL,               /* Task input parameter */
         0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -5282,7 +5248,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        8192,              /* Stack size in words */
+        12000,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -5332,10 +5298,10 @@ void setup()
             0);                /* Core where the task should run */
     }
 
-        pinMode(BOOT_PIN, INPUT_PULLUP);
-    //esp_task_wdt_add(taskAPRSPollHandle);
-    // esp_task_wdt_add(NULL);
-    // esp_task_wdt_status(NULL);
+    pinMode(BOOT_PIN, INPUT_PULLUP);
+    // esp_task_wdt_add(taskAPRSPollHandle);
+    //  esp_task_wdt_add(NULL);
+    //  esp_task_wdt_status(NULL);
 #ifdef APRS_LORA_HT
     attachInterrupt(ROTARY_ENCODER_A_PIN, doEncoder, CHANGE);
     attachInterrupt(ROTARY_ENCODER_B_PIN, doEncoder, CHANGE);
@@ -5408,33 +5374,45 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
 
     // latitude: 90 degrees - latitude
     ltemp64 = (int64_t)1073741824LL - (int64_t)latitude; // 2^30 - latitude
-    if (ltemp64 < 0) ltemp64 = 0;
-    if (ltemp64 > INT32_MAX) ltemp64 = INT32_MAX;
+    if (ltemp64 < 0)
+        ltemp64 = 0;
+    if (ltemp64 > INT32_MAX)
+        ltemp64 = INT32_MAX;
     base91encode((long)ltemp64, aprs_position); // write 4 chars
 
     // longitude: 180 degrees + longitude (divide by 2 as original intended)
     // Avoid using >> on signed values; use integer division
     ltemp64 = (int64_t)1073741824LL + ((int64_t)longitude / 2LL);
-    if (ltemp64 < 0) ltemp64 = 0;
-    if (ltemp64 > INT32_MAX) ltemp64 = INT32_MAX;
+    if (ltemp64 < 0)
+        ltemp64 = 0;
+    if (ltemp64 > INT32_MAX)
+        ltemp64 = INT32_MAX;
     base91encode((long)ltemp64, aprs_position + 4); // write next 4 chars
 
     // Encode heading (course/4) and speed
     int c = (int)(course / 4.0);
-    if (c < 0) c = 0;
-    if (c > 90) c = 90; // cap into valid range
+    if (c < 0)
+        c = 0;
+    if (c > 90)
+        c = 90; // cap into valid range
 
     // compute speed index (same formula as before) but cap it
     int s = 0;
-    if (spdKnot > 0) {
+    if (spdKnot > 0)
+    {
         double tmp = log((double)spdKnot + 1.0) / log(1.08);
-        if (tmp < 0) tmp = 0;
+        if (tmp < 0)
+            tmp = 0;
         s = (int)tmp;
-    } else {
+    }
+    else
+    {
         s = 0;
     }
-    if (s < 0) s = 0;
-    if (s > 90) s = 90; // cap into safe range
+    if (s < 0)
+        s = 0;
+    if (s > 90)
+        s = 90; // cap into safe range
 
     if ((spdKnot <= 5) && (alt_feed > 0) && config.trk_altitude)
     {
@@ -5444,14 +5422,18 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
             aprs_position[11] = (char)('!' + 0x30); // t current,GGA
             int alt = (int)alt_feed;
             int cs = 0;
-            if (alt > 0) {
+            if (alt > 0)
+            {
                 cs = (int)(log((double)alt) / log(1.002));
             }
-            if (cs < 0) cs = 0;
+            if (cs < 0)
+                cs = 0;
             int cc = cs / 91;
             int ss = cs - (cc * 91);
-            if (ss > 90) ss = 90;
-            if (cc > 90) cc = 90;
+            if (ss > 90)
+                ss = 90;
+            if (cc > 90)
+                cc = 90;
             aprs_position[9] = (char)('!' + cc);
             aprs_position[10] = (char)('!' + ss);
         }
@@ -5468,7 +5450,8 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
             {
                 s = 30;
             }
-            if (s > 90) s = 90;
+            if (s > 90)
+                s = 90;
             aprs_position[10] = (char)('!' + s);
         }
     }
@@ -5488,8 +5471,8 @@ String compress_position(double nowLat, double nowLng, int alt_feed, double cour
         }
     }
 
-    aprs_position[12] = 0;      // terminator
-    aprs_position[8] = symbol;  // symbol code at index 8
+    aprs_position[12] = 0;     // terminator
+    aprs_position[8] = symbol; // symbol code at index 8
 
     // Compose final: table char + compressed 12 bytes
     str_comp = String(table) + String(aprs_position);
@@ -5518,11 +5501,14 @@ void mqtt_reconnect()
         //     strcat(idMqtt, "_");
         //     strcat(idMqtt, config.wx_object);
         // }
-        bool res=false;
-        if(config.mqtt_user[0]!=0){
-            res=clientMQTT.connect(idMqtt, config.mqtt_user, config.mqtt_pass);
-        }else{
-            res=clientMQTT.connect(idMqtt);
+        bool res = false;
+        if (config.mqtt_user[0] != 0)
+        {
+            res = clientMQTT.connect(idMqtt, config.mqtt_user, config.mqtt_pass);
+        }
+        else
+        {
+            res = clientMQTT.connect(idMqtt);
         }
         if (res)
         {
@@ -5550,21 +5536,23 @@ void mqtt_reconnect()
 
 void mqtt_callback(char *topic, byte *payload, unsigned int length)
 {
-    byte *payload_ptr=(byte *)calloc(1,length+1);
-    if(payload_ptr==NULL){
+    byte *payload_ptr = (byte *)calloc(1, length + 1);
+    if (payload_ptr == NULL)
+    {
         log_d("MQTT No memory");
         return;
     }
-    memset(payload_ptr,0,length+1);
+    memset(payload_ptr, 0, length + 1);
     memcpy(payload_ptr, payload, length);
     log_d("MQTT Message arrived on topic [%s] with length %d", topic, length);
     if (payload_ptr[0] == 'A' && payload_ptr[1] == 'T')
     {
-        if(config.at_cmd_mqtt){
+        if (config.at_cmd_mqtt)
+        {
             log_d("AT-Command received: %s", payload_ptr);
             String ret = handleATCommand(String((char *)payload_ptr));
             log_d("AT-Command response: %s", ret.c_str());
-            clientMQTT.publish(config.mqtt_topic, ret.c_str());        
+            clientMQTT.publish(config.mqtt_topic, ret.c_str());
         }
     }
     else
@@ -6626,30 +6614,54 @@ void loop()
     {
         timeTask = millis() + 30000;
 #if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
-        VBat = (double)PMU.getBattVoltage() / 1000;
+        if (VbatRead)
+        {
+            VbatRead = false;
+            VBat = (double)PMU.getBattVoltage() / 1000;
+        }
 #elif defined(HELTEC_HTIT_TRACKER)
-        analogReadResolution(12);
-        analogSetAttenuation(ADC_11db);
-        digitalWrite(2, HIGH);
-        VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+        if (VbatRead)
+        {
+            VbatRead = false;
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            digitalWrite(2, HIGH);
+            VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+        }
 #elif defined(HELTEC_V3_GPS)
-        analogReadResolution(12);
-        analogSetAttenuation(ADC_11db);
-        digitalWrite(37, HIGH);
-        VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+        if (VbatRead)
+        {
+            VbatRead = false;
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            digitalWrite(37, HIGH);
+            VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+        }
 #elif defined(APRS_LORA_HT)
-        analogReadResolution(12);
-        analogSetAttenuation(ADC_11db);
-        VBat = (double)analogReadMilliVolts(3) / 595.24F;
+        if (VbatRead)
+        {
+            VbatRead = false;
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            VBat = (double)analogReadMilliVolts(3) / 595.24F;
+        }
 #elif defined(T_BEAM_S3_1W)
-        analogReadResolution(12);
-        analogSetAttenuation(ADC_11db);
-        VBat = (double)analogReadMilliVolts(4) / 333.289F;        
+        if (VbatRead)
+        {
+            VbatRead = false;
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            VBat = (double)analogReadMilliVolts(4) / 333.289F;
+        }
 #elif defined(BUOY)
         // #ifdef BUOY
-        analogReadResolution(12);
-        analogSetAttenuation(ADC_11db);
-        VBat = (double)analogReadMilliVolts(0) * 0.0028F;
+        if (VbatRead)
+        {
+            VbatRead = false;
+            analogReadResolution(12);
+            analogSetAttenuation(ADC_11db);
+            VBat = (double)analogReadMilliVolts(0) * 0.0028F;
+        }
         // TempNTC = getTempNTC();
 
         // if (WiFi.isConnected() || WiFi.softAPgetStationNum()){
@@ -6694,14 +6706,14 @@ void loop()
         // VBat = (double)analogReadMilliVolts(3) / 595.24F;
         // log_d("mV=%.3f",analogReadMilliVolts(3));
 #endif
-        //float tempCpu;
-        // temp_sensor_start();
-        // delay(1);
-        // temp_sensor_read_celsius(&tempCpu);
-        // temp_sensor_stop();
+        // float tempCpu;
+        //  temp_sensor_start();
+        //  delay(1);
+        //  temp_sensor_read_celsius(&tempCpu);
+        //  temp_sensor_stop();
         log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\t \n", timerAPRS, timerNetwork, timerGPS, timerSerial);
-        log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
-        // log_d("Free heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
+        log_d("Free heap: %s KB \tMin Heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String((float)ESP.getMinFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
+        // log_d("Free Heap: %s KB \tMin Heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
 #ifdef NAWS4
 // int i2c_timeout = 0;
 //         while (i2c_busy)
@@ -6777,8 +6789,9 @@ void loop()
         //     log_d("===========================================================================");
         // }
 
-        if((config.reset_timeout > 0) && (millis() > autoResetTimeout)){
-            autoResetTimeout=millis() + (config.reset_timeout*60000);
+        if ((config.reset_timeout > 0) && (millis() > autoResetTimeout))
+        {
+            autoResetTimeout = millis() + (config.reset_timeout * 60000);
             log_d("Auto Reset System");
             vTaskSuspendAll();
             WiFi.disconnect(true); // Disconnect from the network
@@ -7299,7 +7312,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskNetwork,        /* Function to implement the task */
                             "taskNetwork",      /* Name of the task */
-                            8192,              /* Stack size in words */
+                            8192,               /* Stack size in words */
                             NULL,               /* Task input parameter */
                             0,                  /* Priority of the task */
                             &taskNetworkHandle, /* Task handle. */
@@ -7316,7 +7329,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskNetwork,        /* Function to implement the task */
                             "taskNetwork",      /* Name of the task */
-                            8192,              /* Stack size in words */
+                            8192,               /* Stack size in words */
                             NULL,               /* Task input parameter */
                             1,                  /* Priority of the task */
                             &taskNetworkHandle, /* Task handle. */
@@ -7541,7 +7554,7 @@ void sendTelemetry_0(char *raw, bool header)
 
         if (aprsClient.connected())
         {
-            //status.txCount++;
+            // status.txCount++;
             aprsClient.printf("%s\r\n", str); // Send packet to Inet
             // pushTxDisp(TXCH_TCP, "TX DIGI POS", sts);
         }
@@ -7820,11 +7833,11 @@ bool getBits(int ch)
         val = wireguard_active();
         break;
     case 7: // 4G LTE
-    #ifdef PPPOS
+#ifdef PPPOS
         if (PPP.connected())
             val = 1;
         else
-    #endif
+#endif
             val = 0;
         break;
     case 8: // MQTT
@@ -8143,18 +8156,21 @@ void taskGPS(void *pvParameters)
                     c = -1;
                     if (config.gnss_channel == 1)
                     {
-                        if(Serial0.available()) c = Serial0.read();
+                        if (Serial0.available())
+                            c = Serial0.read();
                     }
                     else if (config.gnss_channel == 2)
                     {
-                        if(Serial1.available()) c = Serial1.read();
+                        if (Serial1.available())
+                            c = Serial1.read();
                     }
-                    #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                     else if (config.gnss_channel == 3)
                     {
-                        if(Serial2.available()) c = Serial2.read();
+                        if (Serial2.available())
+                            c = Serial2.read();
                     }
-                    #endif
+#endif
                     if (c > -1)
                     {
                         gps.encode((char)c);
@@ -8373,33 +8389,37 @@ void taskSerial(void *pvParameters)
             // else if(config.wx_channel == 4){
             //     bool result=getM702Modbus(modbus);
             // }
-        }        
+        }
 
         if (config.ext_tnc_enable && (config.ext_tnc_mode > 0 && config.ext_tnc_mode < 5))
         {
             if (config.ext_tnc_mode == 1)
             { // KISS
-                // KISS MODE                
+                // KISS MODE
                 do
                 {
                     c = -1;
                     if (config.ext_tnc_channel == 1)
                     {
-                        if(Serial0.available()) c = Serial0.read();
+                        if (Serial0.available())
+                            c = Serial0.read();
                     }
                     else if (config.ext_tnc_channel == 2)
                     {
-                        if(Serial1.available()) c = Serial1.read();
+                        if (Serial1.available())
+                            c = Serial1.read();
                     }
-                    #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                     else if (config.ext_tnc_channel == 3)
                     {
-                        if(Serial2.available()) c = Serial2.read();
+                        if (Serial2.available())
+                            c = Serial2.read();
                     }
-                    #endif
+#endif
                     else if (config.ext_tnc_channel == 4)
                     {
-                        if(Serial.available()) c = Serial.read();
+                        if (Serial.available())
+                            c = Serial.read();
                     }
 
                     if (c > -1)
@@ -8413,21 +8433,25 @@ void taskSerial(void *pvParameters)
                 raw.clear();
                 if (config.ext_tnc_channel == 1)
                 {
-                    if(Serial0.available()) raw = Serial0.readStringUntil(0x0D);
+                    if (Serial0.available())
+                        raw = Serial0.readStringUntil(0x0D);
                 }
                 else if (config.ext_tnc_channel == 2)
                 {
-                    if(Serial1.available()) raw = Serial1.readStringUntil(0x0D);
+                    if (Serial1.available())
+                        raw = Serial1.readStringUntil(0x0D);
                 }
-                #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                 else if (config.ext_tnc_channel == 3)
                 {
-                    if(Serial2.available()) raw = Serial2.readStringUntil(0x0D);
+                    if (Serial2.available())
+                        raw = Serial2.readStringUntil(0x0D);
                 }
-                #endif
-                else if(config.ext_tnc_channel == 4)
+#endif
+                else if (config.ext_tnc_channel == 4)
                 {
-                    if(Serial.available()) raw = Serial.readStringUntil(0x0D);
+                    if (Serial.available())
+                        raw = Serial.readStringUntil(0x0D);
                 }
 
                 log_d("Ext TNC2RAW RX:%s", raw.c_str());
@@ -8445,8 +8469,8 @@ void taskSerial(void *pvParameters)
                         aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
                         aprsClient.write("\r\n");                 // Send CR LF the end frame packet
                         status.rf2inet++;
-                        //igateTLM.RF2INET++;
-                        //igateTLM.RX++;
+                        // igateTLM.RF2INET++;
+                        // igateTLM.RX++;
                     }
                 }
             }
@@ -8455,21 +8479,25 @@ void taskSerial(void *pvParameters)
                 String info = "";
                 if (config.ext_tnc_channel == 1)
                 {
-                    if(Serial0.available()) info = Serial0.readStringUntil(0x0D);
+                    if (Serial0.available())
+                        info = Serial0.readStringUntil(0x0D);
                 }
                 else if (config.ext_tnc_channel == 2)
                 {
-                    if(Serial1.available()) info = Serial1.readStringUntil(0x0D);
+                    if (Serial1.available())
+                        info = Serial1.readStringUntil(0x0D);
                 }
-                #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                 else if (config.ext_tnc_channel == 3)
                 {
-                    if(Serial2.available()) info = Serial2.readStringUntil(0x0D);
+                    if (Serial2.available())
+                        info = Serial2.readStringUntil(0x0D);
                 }
-                #endif
-                else if(config.ext_tnc_channel == 4)
+#endif
+                else if (config.ext_tnc_channel == 4)
                 {
-                    if(Serial.available()) info = Serial.readStringUntil(0x0D);
+                    if (Serial.available())
+                        info = Serial.readStringUntil(0x0D);
                 }
 
                 //  log_d("Ext Yaesu Packet >> %s",info.c_str());
@@ -8523,8 +8551,8 @@ void taskSerial(void *pvParameters)
                                     aprsClient.write(&rawP[0], strlen(rawP)); // Send binary frame packet to APRS-IS (aprsc)
                                     aprsClient.write("\r\n");                 // Send CR LF the end frame packet
                                     status.rf2inet++;
-                                    //igateTLM.RF2INET++;
-                                    //igateTLM.RX++;
+                                    // igateTLM.RF2INET++;
+                                    // igateTLM.RX++;
                                 }
                             }
                         }
@@ -8534,42 +8562,55 @@ void taskSerial(void *pvParameters)
             //}
         }
 
-        if(config.at_cmd_uart>0){
-            if(config.at_cmd_uart == 1){ // UART0
-                if(Serial0.available()){
-                    String cmd=Serial0.readStringUntil('\n');
+        if (config.at_cmd_uart > 0)
+        {
+            if (config.at_cmd_uart == 1)
+            { // UART0
+                if (Serial0.available())
+                {
+                    String cmd = Serial0.readStringUntil('\n');
                     cmd.trim();
                     String ret = handleATCommand(String((char *)cmd.c_str()));
-                    if(ret!="") Serial0.println(ret);
+                    if (ret != "")
+                        Serial0.println(ret);
                     log_d("AT-Command response: %s", ret.c_str());
                 }
             }
-            else if(config.at_cmd_uart == 2){ // UART1
-                if(Serial1.available()){
-                    String cmd=Serial1.readStringUntil('\n');
+            else if (config.at_cmd_uart == 2)
+            { // UART1
+                if (Serial1.available())
+                {
+                    String cmd = Serial1.readStringUntil('\n');
                     cmd.trim();
                     String ret = handleATCommand(String((char *)cmd.c_str()));
-                    if(ret!="") Serial1.println(ret);
+                    if (ret != "")
+                        Serial1.println(ret);
                     log_d("AT-Command response: %s", ret.c_str());
                 }
             }
-            #if SOC_UART_NUM > 2
-            else if(config.at_cmd_uart == 3){ // UART2
-                if(Serial2.available()){
-                    String cmd=Serial2.readStringUntil('\n');
+#if SOC_UART_NUM > 2
+            else if (config.at_cmd_uart == 3)
+            { // UART2
+                if (Serial2.available())
+                {
+                    String cmd = Serial2.readStringUntil('\n');
                     cmd.trim();
                     String ret = handleATCommand(String((char *)cmd.c_str()));
-                    if(ret!="") Serial2.println(ret);
+                    if (ret != "")
+                        Serial2.println(ret);
                     log_d("AT-Command response: %s", ret.c_str());
                 }
             }
-            #endif
-            else if(config.at_cmd_uart == 4){ // USB-CDC
-                if(Serial.available()){
-                    String cmd=Serial.readStringUntil('\n');
+#endif
+            else if (config.at_cmd_uart == 4)
+            { // USB-CDC
+                if (Serial.available())
+                {
+                    String cmd = Serial.readStringUntil('\n');
                     cmd.trim();
                     String ret = handleATCommand(String((char *)cmd.c_str()));
-                    if(ret!="") Serial.println(ret);
+                    if (ret != "")
+                        Serial.println(ret);
                     log_d("AT-Command response: %s", ret.c_str());
                 }
             }
@@ -8600,30 +8641,30 @@ void taskAPRS(void *pvParameters)
     log_d("Task APRS has been start");
     PacketBuffer.clean();
 
-    #ifdef T_BEAM_S3_BPF
-    pinMode(16,OUTPUT);
-    digitalWrite(16,HIGH);
-    #endif
+#ifdef T_BEAM_S3_BPF
+    pinMode(16, OUTPUT);
+    digitalWrite(16, HIGH);
+#endif
     APRS_init(&config);
-    #ifdef RF2
+#ifdef RF2
     APRS_init2(&config);
-    #endif
+#endif
     // APRS_setCallsign(config.igate_mycall, config.igate_ssid);
     sendTimer = millis() - (config.igate_interval * 1000) + 30000;
-    //igateTLM.TeleTimeout = millis() + 60000; // 1Min
+    // igateTLM.TeleTimeout = millis() + 60000; // 1Min
 
     timeSlot = millis();
     timeAprs = 0;
 
     timeSlot = millis();
 
-    msgInterval=millis()+30000;
+    msgInterval = millis() + 30000;
 
     tx_interval = config.trk_interval;
     initInterval = true;
     AFSKInitAct = true;
     WxIntervalAvg = millis() + (600 * 1000);
-    WxInterval= millis() + (config.wx_interval * 1000);
+    WxInterval = millis() + (config.wx_interval * 1000);
     log_d("Task APRS init susses....");
     for (;;)
     {
@@ -8654,9 +8695,9 @@ void taskAPRS(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerAPRS_old = micros();
 
-        if(now>msgInterval)
+        if (now > msgInterval)
         {
-            msgInterval=millis()+config.msg_interval;
+            msgInterval = millis() + config.msg_interval;
             sendAPRSMessageRetry();
         }
 
@@ -8688,11 +8729,12 @@ void taskAPRS(void *pvParameters)
                 }
                 else if (config.bt_mode == 3)
                 { // AT COMMAND
-                        String cmd=NuSerial.readStringUntil('\n');
-                        cmd.trim();
-                        String ret = handleATCommand(String((char *)cmd.c_str()));
-                        if(ret!="") NuSerial.println(ret);
-                        log_d("AT-Command response: %s", ret.c_str());
+                    String cmd = NuSerial.readStringUntil('\n');
+                    cmd.trim();
+                    String ret = handleATCommand(String((char *)cmd.c_str()));
+                    if (ret != "")
+                        NuSerial.println(ret);
+                    log_d("AT-Command response: %s", ret.c_str());
                 }
             }
         }
@@ -8721,10 +8763,11 @@ void taskAPRS(void *pvParameters)
             }
             else if (config.bt_mode == 3)
             { // AT COMMAND
-                String cmd=SerialBT.readStringUntil('\n');
+                String cmd = SerialBT.readStringUntil('\n');
                 cmd.trim();
                 String ret = handleATCommand(String((char *)cmd.c_str()));
-                if(ret!="") SerialBT.println(ret);
+                if (ret != "")
+                    SerialBT.println(ret);
                 log_d("AT-Command response: %s", ret.c_str());
             }
         }
@@ -9007,22 +9050,22 @@ void taskAPRS(void *pvParameters)
                 if (config.trk_gps) // TRACKER by GPS
                 {
                     rawData = trk_gps_postion(cmn);
-                    #ifdef LOG_FILE
+#ifdef LOG_FILE
                     if (config.log & LOG_TRACKER)
                     {
                         logTracker(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                     }
-                    #endif
+#endif
                 }
                 else // TRACKER by FIX position
                 {
                     rawData = trk_fix_position(cmn);
-                    #ifdef LOG_FILE
+#ifdef LOG_FILE
                     if (config.log & LOG_TRACKER)
                     {
                         logTracker(config.trk_lat, config.trk_lon, 0, 0);
                     }
-                    #endif
+#endif
                 }
 
                 log_d("TRACKER RAW: %s\n", rawData.c_str());
@@ -9098,12 +9141,12 @@ void taskAPRS(void *pvParameters)
                         {
                             Serial1.write(pkg, sz);
                         }
-                        #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                         else if (config.ext_tnc_channel == 3)
                         {
                             Serial2.write(pkg, sz);
                         }
-                        #endif
+#endif
                         else if (config.ext_tnc_channel == 4)
                         {
                             Serial.write(pkg, sz);
@@ -9120,12 +9163,12 @@ void taskAPRS(void *pvParameters)
                         {
                             Serial1.println(tnc2);
                         }
-                        #if SOC_UART_NUM > 2
+#if SOC_UART_NUM > 2
                         else if (config.ext_tnc_channel == 3)
                         {
                             Serial2.println(tnc2);
                         }
-                        #endif
+#endif
                         else if (config.ext_tnc_channel == 4)
                         {
                             Serial.println(tnc2);
@@ -9137,7 +9180,7 @@ void taskAPRS(void *pvParameters)
             if (config.bt_master)
             { // Output TNC2RAW to BT Serial
               // SerialBT.println(tnc2);
-                if (config.bt_mode == 1 || config.bt_mode ==3)
+                if (config.bt_mode == 1 || config.bt_mode == 3)
                 {
                     char *rawP = (char *)malloc(tnc2.length());
                     memcpy(rawP, tnc2.c_str(), tnc2.length());
@@ -9168,11 +9211,11 @@ void taskAPRS(void *pvParameters)
 #endif
 
 #ifdef MQTT
-                if (config.en_mqtt && clientMQTT.connected() && (config.mqtt_topic_flag & MQTT_TOPIC_TNC))
-                {
-                    log_d("Publish MQTT Topic: %s Payload: %s", config.mqtt_topic, tnc2.c_str());
-                    clientMQTT.publish(config.mqtt_topic, tnc2.c_str());
-                }
+            if (config.en_mqtt && clientMQTT.connected() && (config.mqtt_topic_flag & MQTT_TOPIC_TNC))
+            {
+                log_d("Publish MQTT Topic: %s Payload: %s", config.mqtt_topic, tnc2.c_str());
+                clientMQTT.publish(config.mqtt_topic, tnc2.c_str());
+            }
 #endif
 
             log_d("RX: %s", tnc2.c_str());
@@ -9187,10 +9230,10 @@ void taskAPRS(void *pvParameters)
                 else
                     sprintf(call, "%s", incomingPacket.src.call);
 
-                char *rawP = (char *)calloc(tnc2.length()+1, sizeof(char));
+                char *rawP = (char *)calloc(tnc2.length() + 1, sizeof(char));
                 if (rawP)
                 {
-                    memset(rawP, 0, tnc2.length()+1);
+                    memset(rawP, 0, tnc2.length() + 1);
                     tnc2.toCharArray(rawP, tnc2.length(), 0);
                     // memcpy(rawP, tnc2.c_str(), tnc2.length());
                     int idx = pkgListUpdate(call, rawP, type, 0);
@@ -9201,9 +9244,10 @@ void taskAPRS(void *pvParameters)
 
                         if (config.rx_display && config.dispRF && (type & config.dispFilter))
                         {
-                            if(!dispBuffer.isFull()){
+                            if (!dispBuffer.isFull())
+                            {
                                 dispBuffer.push(rawP);
-                                //log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
+                                // log_d("RF_putQueueDisp:[pkgList_idx=%d,Type=%d RAW:%s] %s\n", idx, type, call, rawP);
                             }
                         }
                     }
@@ -9211,7 +9255,7 @@ void taskAPRS(void *pvParameters)
                     free(rawP);
                 }
             }
-            if(config.msg_enable && (type & FILTER_MESSAGE))
+            if (config.msg_enable && (type & FILTER_MESSAGE))
             {
                 handleIncomingAPRS(tnc2);
             }
@@ -9245,23 +9289,23 @@ void taskAPRS(void *pvParameters)
                         if (gps.location.isValid())
                         {
                             rawData = igate_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
-                            #ifdef LOG_FILE
+#ifdef LOG_FILE
                             if (config.log & LOG_IGATE)
                             {
                                 logIGate(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                             }
-                            #endif
+#endif
                         }
                     }
                     else
                     { // IGATE Send fix position
                         rawData = igate_position(config.igate_lat, config.igate_lon, config.igate_alt, "");
-                        #ifdef LOG_FILE
+#ifdef LOG_FILE
                         if (config.log & LOG_TRACKER)
                         {
                             logIGate(config.igate_lat, config.igate_lon, 0, 0);
                         }
-                        #endif
+#endif
                     }
                     if (rawData != "")
                     {
@@ -9437,7 +9481,7 @@ void taskAPRS(void *pvParameters)
                 }
             }
             // IGATE send to inet
-            if ((newIGatePkg && aprsClient.connected()==true))
+            if ((newIGatePkg && aprsClient.connected() == true))
             {
                 newIGatePkg = false;
                 // if (config.rf2inet && aprsClient.connected())
@@ -9451,16 +9495,15 @@ void taskAPRS(void *pvParameters)
                     if (ret == 0)
                     {
                         status.dropCount++;
-                        //igateTLM.DROP++;
+                        // igateTLM.DROP++;
                     }
                     else
                     {
                         status.rf2inet++;
-                        //igateTLM.RF2INET++;
+                        // igateTLM.RF2INET++;
                     }
                 }
             }
-            
         }
 
         // Digi Repeater Process
@@ -9486,26 +9529,26 @@ void taskAPRS(void *pvParameters)
                         if (gps.location.isValid())
                         {
                             rawData = digi_position(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
-                            #ifdef LOG_FILE
+#ifdef LOG_FILE
                             if (config.log & LOG_DIGI)
                             {
                                 logDigi(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                             }
-                            #endif
+#endif
                         }
                     }
                     else
                     { // DIGI Send fix position
                         rawData = digi_position(config.digi_lat, config.digi_lon, config.digi_alt, "");
-                        #ifdef LOG_FILE
+#ifdef LOG_FILE
                         if (config.log & LOG_DIGI)
                         {
                             logDigi(config.digi_lat, config.digi_lon, 0, 0);
                         }
-                        #endif
+#endif
                     }
                     if (rawData != "")
-                    {                        
+                    {
                         Sleep_Activate &= ~ACTIVATE_DIGI;
                         StandByTick = millis() + (5000);
                         if (config.digi_tlm_interval > 0)
@@ -9749,23 +9792,23 @@ void taskAPRS(void *pvParameters)
                     if (gps.location.isValid())
                     {
                         rawData = wx_report(gps.location.lat(), gps.location.lng(), gps.altitude.meters(), "");
-                        #ifdef LOG_FILE
+#ifdef LOG_FILE
                         if (config.log & LOG_WX)
                         {
                             logWeather(gps.location.lat(), gps.location.lng(), gps.speed.kmph(), gps.course.deg());
                         }
-                        #endif
+#endif
                     }
                 }
                 else
                 { // Wx Send fix position
                     rawData = wx_report(config.wx_lat, config.wx_lon, config.wx_alt, "");
-                    #ifdef LOG_FILE
+#ifdef LOG_FILE
                     if (config.log & LOG_WX)
                     {
                         logWeather(config.wx_lat, config.wx_lon, 0, 0);
                     }
-                    #endif
+#endif
                 }
                 if (!rawData.isEmpty())
                 {
@@ -9793,17 +9836,17 @@ void taskAPRS(void *pvParameters)
                 {
                     char payload[500];
                     char topic[100];
-                    if(strlen(config.wx_object)<3)
-                        sprintf(topic,"/%s/WEATHER/sample",config.wx_mycall);
+                    if (strlen(config.wx_object) < 3)
+                        sprintf(topic, "/%s/WEATHER/sample", config.wx_mycall);
                     else
-                        sprintf(topic,"/%s/WEATHER/sample",config.wx_object);
-                    getWxJson(&payload[0],false);
+                        sprintf(topic, "/%s/WEATHER/sample", config.wx_object);
+                    getWxJson(&payload[0], false);
                     log_d("Publish MQTT Topic: %s Payload: %s", config.mqtt_topic, payload);
                     clientMQTT.publish(config.mqtt_topic, payload);
                 }
 #endif
             }
-#ifdef MQTT            
+#ifdef MQTT
             if (millis() > WxIntervalAvg)
             {
                 WxIntervalAvg = millis() + (600 * 1000);
@@ -9811,16 +9854,16 @@ void taskAPRS(void *pvParameters)
                 {
                     char payload[500];
                     char topic[100];
-                    if(strlen(config.wx_object)<3)
-                        sprintf(topic,"/%s/WEATHER/average",config.wx_mycall);
+                    if (strlen(config.wx_object) < 3)
+                        sprintf(topic, "/%s/WEATHER/average", config.wx_mycall);
                     else
-                        sprintf(topic,"/%s/WEATHER/average",config.wx_object);
-                    getWxJson(&payload[0],true);
+                        sprintf(topic, "/%s/WEATHER/average", config.wx_object);
+                    getWxJson(&payload[0], true);
                     log_d("Publish MQTT Topic: %s Payload: %s", topic, payload);
                     clientMQTT.publish(topic, payload);
                 }
             }
-#endif            
+#endif
         }
 
         if (config.tlm0_en)
@@ -9937,7 +9980,7 @@ void taskAPRSPoll(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         if (AFSKInitAct == true)
         {
-            //esp_task_wdt_reset();
+            // esp_task_wdt_reset();
             if (APRS_poll())
             {
                 // StandByTick += millis() + 10000;
@@ -9969,82 +10012,84 @@ IPAddress ap_dns(8, 8, 8, 8);
 uint8_t wifiStatus = WL_DISCONNECTED;
 bool vpnConnected = false;
 bool wifiDisconnecting = false;
-uint16_t wifiDisCount=0;
-unsigned long vpnTimeout=0;
-unsigned long mitiWifiTimeout=0;
+uint16_t wifiDisCount = 0;
+unsigned long vpnTimeout = 0;
+unsigned long mitiWifiTimeout = 0;
 
 void wifiConnection()
 {
     WiFi.disconnect(true, true, 500);
-                        WiFi.persistent(false);
-                        WiFi.mode(WIFI_OFF); // Switch WiFi off
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_OFF); // Switch WiFi off
 
-                        wifiTTL = 0;
-                        delay(1000);
-                        if (config.wifi_mode == WIFI_STA_FIX)
-                        { /**< WiFi station mode */
-                            WiFi.mode(WIFI_MODE_STA);
-                            //WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                        }
-                        else if (config.wifi_mode == WIFI_AP_FIX)
-                        { /**< WiFi soft-AP mode */
-                            WiFi.mode(WIFI_MODE_AP);
-                            //WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                        }
-                        else if (config.wifi_mode == WIFI_AP_STA_FIX)
-                        { /**< WiFi station + soft-AP mode */
-                            WiFi.mode(WIFI_MODE_APSTA);
-                            //WiFi.setTxPower((wifi_power_t)config.wifi_power);
-                        }
-                        else
-                        {
-                            WiFi.mode(WIFI_MODE_NULL);
-                        }
-                        wifiMulti.APlistClean(); // Clean AP list        
-                        for (int i = 0; i < 5; i++)
-                        {
-                            if (config.wifi_sta[i].enable)
-                            {
-                                wifiMulti.addAP(config.wifi_sta[i].wifi_ssid, config.wifi_sta[i].wifi_pass);
-                            }
-                        }
-                        WiFi.setHostname(config.host_name);
-                        if (wifiMulti.run() == WL_CONNECTED)
-                        {
-                            wifiDisCount=0;
-                            pingTimeout = millis() + 60000;
-                            NTP_Timeout = millis() + 2000;
-                        }
+    wifiTTL = 0;
+    delay(1000);
+    if (config.wifi_mode == WIFI_STA_FIX)
+    { /**< WiFi station mode */
+        WiFi.mode(WIFI_MODE_STA);
+        // WiFi.setTxPower((wifi_power_t)config.wifi_power);
+    }
+    else if (config.wifi_mode == WIFI_AP_FIX)
+    { /**< WiFi soft-AP mode */
+        WiFi.mode(WIFI_MODE_AP);
+        // WiFi.setTxPower((wifi_power_t)config.wifi_power);
+    }
+    else if (config.wifi_mode == WIFI_AP_STA_FIX)
+    { /**< WiFi station + soft-AP mode */
+        WiFi.mode(WIFI_MODE_APSTA);
+        // WiFi.setTxPower((wifi_power_t)config.wifi_power);
+    }
+    else
+    {
+        WiFi.mode(WIFI_MODE_NULL);
+    }
+    wifiMulti.APlistClean(); // Clean AP list
+    for (int i = 0; i < 5; i++)
+    {
+        if (config.wifi_sta[i].enable)
+        {
+            wifiMulti.addAP(config.wifi_sta[i].wifi_ssid, config.wifi_sta[i].wifi_pass);
+        }
+    }
+    WiFi.setHostname(config.host_name);
+    if (wifiMulti.run() == WL_CONNECTED)
+    {
+        wifiDisCount = 0;
+        pingTimeout = millis() + 60000;
+        NTP_Timeout = millis() + 2000;
+    }
 }
 
 void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 {
     switch (event)
     {
-    #ifdef PPPOS
+#ifdef PPPOS
     case ARDUINO_EVENT_PPP_START:
         log_d("PPP Started");
         break;
     case ARDUINO_EVENT_PPP_CONNECTED:
         log_d("PPP Connected");
-        if(!WiFi.isConnected()){
-            if(config.vpn){
+        if (!WiFi.isConnected())
+        {
+            if (config.vpn)
+            {
                 log_d("Setup Wireguard VPN by PPP!");
                 vpnConnected = false;
-                vpnTimeout=millis()+3000;
+                vpnTimeout = millis() + 3000;
             }
-        
+
 #ifdef MQTT
-        if (config.en_mqtt)
-        {
-            if (!clientMQTT.connected())
+            if (config.en_mqtt)
             {
-                clientMQTT.disconnect();
-                clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
-                clientMQTT.setCallback(mqtt_callback);
+                if (!clientMQTT.connected())
+                {
+                    clientMQTT.disconnect();
+                    clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
+                    clientMQTT.setCallback(mqtt_callback);
+                }
+                mqtt_reconnect();
             }
-            mqtt_reconnect();
-        }
 #endif
         }
         break;
@@ -10071,7 +10116,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
     case ARDUINO_EVENT_PPP_STOP:
         log_d("PPP Stopped");
         break;
-    #endif
+#endif
 
     case ARDUINO_EVENT_WIFI_AP_START:
         log_d("AP Started");
@@ -10094,19 +10139,20 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         log_d("AP Stopped");
         break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-        wifiDisCount=0;
+        wifiDisCount = 0;
         wifiDisconnecting = false;
-// String info = "WiFi Infor:";
-// info += "\nSSID: " + WiFi.SSID();
-// info += "\nRSSI: " + String(WiFi.RSSI()) + "dBm";
-// info += "\nIP: " + WiFi.localIP().toString();
-// info += "\nGW IP: " + WiFi.gatewayIP().toString();
-// info += "\nMAC: " + WiFi.macAddress();
-// lv_label_set_text(ui_txtSystemInfo, info.c_str());
-        if(config.vpn){
+        // String info = "WiFi Infor:";
+        // info += "\nSSID: " + WiFi.SSID();
+        // info += "\nRSSI: " + String(WiFi.RSSI()) + "dBm";
+        // info += "\nIP: " + WiFi.localIP().toString();
+        // info += "\nGW IP: " + WiFi.gatewayIP().toString();
+        // info += "\nMAC: " + WiFi.macAddress();
+        // lv_label_set_text(ui_txtSystemInfo, info.c_str());
+        if (config.vpn)
+        {
             log_d("Setup Wireguard VPN by WiFi!");
             vpnConnected = false;
-            vpnTimeout=millis()+3000;
+            vpnTimeout = millis() + 3000;
         }
 #ifdef MQTT
         if (config.en_mqtt)
@@ -10119,36 +10165,38 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
             }
             mqtt_reconnect();
         }
-#endif        
+#endif
         log_d("WiFi Connected");
         break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
         log_d("WiFi Disconnected");
-        wifiDisCount++;        
-        if(wifiDisconnecting==false && wifiDisCount>30){
-            wifiDisCount=0;
-            wifiDisconnecting = true; 
-            pingTimeout = millis() + 10000;
-            #ifdef MQTT
-        if (config.en_mqtt)
+        wifiDisCount++;
+        if (wifiDisconnecting == false && wifiDisCount > 30)
         {
-            if (!clientMQTT.connected())
+            wifiDisCount = 0;
+            wifiDisconnecting = true;
+            pingTimeout = millis() + 10000;
+#ifdef MQTT
+            if (config.en_mqtt)
             {
-                clientMQTT.disconnect();
-                clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
-                clientMQTT.setCallback(mqtt_callback);
+                if (!clientMQTT.connected())
+                {
+                    clientMQTT.disconnect();
+                    clientMQTT.setServer(config.mqtt_host, config.mqtt_port);
+                    clientMQTT.setCallback(mqtt_callback);
+                }
+                mqtt_reconnect();
             }
-            mqtt_reconnect();
-        }
-#endif                           
-        #ifdef PPPOS
-        if(config.vpn ){            
-            //if(PPP.connected()){
-                vpnConnected = false;  
-                vpnTimeout=millis()+1000;              
-            //}
-        }
-        #endif
+#endif
+#ifdef PPPOS
+            if (config.vpn)
+            {
+                // if(PPP.connected()){
+                vpnConnected = false;
+                vpnTimeout = millis() + 1000;
+                //}
+            }
+#endif
         }
         break;
     default:
@@ -10161,7 +10209,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 void PPPOS_Start()
 {
     if (config.ppp_enable)
-    {        
+    {
         pppTimeout = millis() + (600 * 1000);
         log_d("Starting the modem. It might take a while!");
         PPP.end();
@@ -10172,13 +10220,14 @@ void PPPOS_Start()
         // pinMode(39, INPUT_PULLUP); // Set GPIO39 as input with pull-up resistor
         //  digitalWrite(39, HIGH); // Set GPIO39 to high to enable pull-up resistor
         delay(1000); // Wait for the modem to reset
-        
-        PPP.setApn(config.ppp_apn);     // Set the APN for the modem
+
+        PPP.setApn(config.ppp_apn); // Set the APN for the modem
         PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
         PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
         log_d("PPP Modem Init...");
         log_d("Using UART %d as PPP interface", config.ppp_serial);
-        if(config.ppp_serial>1) return;
+        if (config.ppp_serial > 1)
+            return;
         if (PPP.begin(PPP_MODEM_MODEL, config.ppp_serial, 115200))
         {
             log_d("PPP started successfully");
@@ -10202,7 +10251,7 @@ void PPPOS_Start()
             Serial.println(PPP.cmd("AT+QGPSCFG=\"apflash\",1", 10000));             // เปิดใช้งาน AP-Flash เพื่อการเริ่มต้นที่รวดเร็ว
             Serial.println(PPP.cmd("AT+QGPS=1", 10000));
         }
-        
+
         PPP.cmd("AT+CTZU=1", 1000); // Enable automatic time zone update
         // PPP.setUser(ppp_user);
         // PPP.setPass(ppp_pass);
@@ -10245,7 +10294,7 @@ void PPPOS_Start()
             pppStatus.rssi = PPP.RSSI();
             log_d("Operator: %s", pppStatus.oper);
             log_d("RSSI: %d dBm", pppStatus.rssi);
-            PPP.started(); // Start the PPP connection            
+            PPP.started(); // Start the PPP connection
             //   if(PPP.sms("0984958488","Test SMS from ESP32")){
             //       log_d("SMS sent successfully!");
             //   } else {
@@ -10315,22 +10364,22 @@ void taskNetwork(void *pvParameters)
 
     if (config.wifi_mode & WIFI_STA_FIX)
     {
-        manualWiFi = true; 
+        manualWiFi = true;
         wifiConnection();
-        wifiMulti.setStrictMode(false);  // Default is true.  Library will disconnect and forget currently connected AP if it's not in the AP list.
-        wifiMulti.setAllowOpenAP(true);  // Default is false.  True adds open APs to the AP list.
+        wifiMulti.setStrictMode(false); // Default is true.  Library will disconnect and forget currently connected AP if it's not in the AP list.
+        wifiMulti.setAllowOpenAP(true); // Default is false.  True adds open APs to the AP list.
     }
 
     if (config.wifi_mode & WIFI_AP_FIX)
     {
         manualWiFi = true;
-        // กำหนดค่าการทำงานไวไฟเป็นแอสเซสพ้อย
-        // WiFi.softAP(config.wifi_ap_ssid, config.wifi_ap_pass); // Start HOTspot removing password will disable security
-        // WiFi.softAPConfig(local_IP, gateway, subnet);
-        #if (CORE_DEBUG_LEVEL > 0)
+// กำหนดค่าการทำงานไวไฟเป็นแอสเซสพ้อย
+// WiFi.softAP(config.wifi_ap_ssid, config.wifi_ap_pass); // Start HOTspot removing password will disable security
+// WiFi.softAPConfig(local_IP, gateway, subnet);
+#if (CORE_DEBUG_LEVEL > 0)
         log_d("Access point running. IP address: ");
         log_d("%s", WiFi.softAPIP().toString().c_str());
-        #endif
+#endif
         // Start the Access Point
         WiFi.AP.begin();
         WiFi.AP.config(ap_ip, ap_ip, ap_mask, ap_leaseStart, ap_dns);
@@ -10352,35 +10401,35 @@ void taskNetwork(void *pvParameters)
     unsigned long timeNetworkOld = millis();
     timeNetwork = 0;
 
-    #ifdef PPPOS
+#ifdef PPPOS
     PPPOS_Start(); // Start PPP connection if enabled
     pppTimeout = millis() + (600 * 1000);
-    #endif
+#endif
 
-    #ifdef PPPOS
+#ifdef PPPOS
     if (config.ppp_enable || (config.wifi_mode & WIFI_AP_STA_FIX))
-    #else
+#else
     if (config.wifi_mode & WIFI_AP_STA_FIX)
-    #endif
+#endif
         webService();
-    #ifdef BLUETOOTH
+#ifdef BLUETOOTH
     bluetooth_init(); // Initialize Bluetooth if enabled
-    #endif
+#endif
 
-    char infoData[512];
-
+    ax25frame frame;
+    char raw[300];
     for (;;)
     {
         unsigned long now = millis();
         timeNetwork = now - timeNetworkOld;
         timeNetworkOld = now;
         // wdtNetworkTimer = millis();
-        //serviceHandle();
+        // serviceHandle();
         timerNetwork = micros() - timerNetwork_old;
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerNetwork_old = micros();
 
-        #ifdef PPPOS
+#ifdef PPPOS
         if (config.ppp_enable)
         {
             if (!PPP.connected())
@@ -10395,15 +10444,15 @@ void taskNetwork(void *pvParameters)
         }
 
         if (WiFi.isConnected() == true || WiFi.softAPgetStationNum() > 0 || PPP.connected())
-        #else
+#else
         if (WiFi.isConnected() == true || WiFi.softAPgetStationNum())
-        #endif
+#endif
         {
             if (lastHeard_Flag && (millis() > lastHeardTimeout))
             {
-                    lastHeard_Flag = false;
-                    lastHeardTimeout = millis() + 1000;
-                    event_lastHeard(false);                    
+                lastHeard_Flag = false;
+                lastHeardTimeout = millis() + 1000;
+                event_lastHeard(false);
             }
         }
 
@@ -10412,12 +10461,12 @@ void taskNetwork(void *pvParameters)
             APStationNum = WiFi.softAPgetStationNum();
             if (APStationNum > 0)
             {
-                // config.pwr_sleep_activate |= ACTIVATE_WIFI;
-                #ifdef PPPOS
+// config.pwr_sleep_activate |= ACTIVATE_WIFI;
+#ifdef PPPOS
                 if ((WiFi.isConnected() == false) && (PPP.connected() == false))
-                #else   
+#else
                 if (WiFi.isConnected() == false)
-                #endif
+#endif
                 {
                     vTaskDelay(9 / portTICK_PERIOD_MS);
                     continue;
@@ -10426,33 +10475,36 @@ void taskNetwork(void *pvParameters)
         }
         wifiStatus = WL_DISCONNECTED;
         if (config.wifi_mode & WIFI_STA_FIX)
-        {            
-                if(WiFi.isConnected() == false)
-                { 
-                    if(millis()>mitiWifiTimeout){
-                        mitiWifiTimeout=millis()+30000;                
-                        log_d("WiFi Check Connection!");               
-                        wifiStatus = wifiMulti.run();
-                        vTaskDelay(2000 / portTICK_PERIOD_MS);
-                    }
-                }else{
-                    wifiStatus = WL_CONNECTED;
+        {
+            if (WiFi.isConnected() == false)
+            {
+                if (millis() > mitiWifiTimeout)
+                {
+                    mitiWifiTimeout = millis() + 30000;
+                    log_d("WiFi Check Connection!");
+                    wifiStatus = wifiMulti.run();
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
                 }
+            }
+            else
+            {
+                wifiStatus = WL_CONNECTED;
+            }
         }
-        #ifdef PPPOS
+#ifdef PPPOS
         if ((wifiStatus == WL_CONNECTED) || (PPP.connected()))
-        #else
+#else
         if ((wifiStatus == WL_CONNECTED))
-        #endif
+#endif
         {
             // config.pwr_sleep_activate |= ACTIVATE_WIFI;
             if (millis() > NTP_Timeout)
             {
                 NTP_Timeout = millis() + 86400000;
-                // setSyncProvider(getNtpTime);
-                #if (CORE_DEBUG_LEVEL > 0)
+// setSyncProvider(getNtpTime);
+#if (CORE_DEBUG_LEVEL > 0)
                 log_d("Contacting Time Server\n");
-                #endif
+#endif
                 configTime(3600 * config.timeZone, 0, config.ntp_host);
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 struct tm tmstruct;
@@ -10468,43 +10520,42 @@ void taskNetwork(void *pvParameters)
                     pingTimeout = millis() + 2000;
                     if (config.vpn)
                     {
-                        // if (wireguard_up())
-                        //     log_d("Wireguard UP Link");
-                        // else
-                        //     log_d("Wireguard Connect Fail!");
                         log_d("Setup Wireguard Setup!");
-                        vpnTimeout=millis()+10000;
-                        //if (wireguard_active()) wireguard_remove();
+                        vpnTimeout = millis() + 10000;
                         if (!wireguard_active())
-                        {                            
-                         //if (wireguard_active()) wireguard_remove();
+                        {
                             log_d("Setup Wireguard VPN!");
-                            if(WiFi.isConnected()){
+                            if (WiFi.isConnected())
+                            {
                                 wireguard_setup(NULL);
-                                vpnConnected=true;
-                            }else{
-                                #ifdef PPPOS
-                                if(PPP.connected()){
-        
+                                vpnConnected = true;
+                            }
+                            else
+                            {
+#ifdef PPPOS
+                                if (PPP.connected())
+                                {
+
                                     wireguard_setup((netif *)PPP.netif());
-                                    vpnConnected=true;
+                                    vpnConnected = true;
                                 }
-                                #endif
+#endif
                             }
                         }
                     }
                 }
                 else
                 {
-                    NTP_Timeout = millis() + 5000;                    
+                    NTP_Timeout = millis() + 5000;
                 }
             }
 
-            if(millis()>vpnTimeout && !vpnConnected && config.vpn){
-                vpnTimeout=millis()+10000;                                
-                log_d("RENEW Device Wireguard VPN!"); 
+            if (millis() > vpnTimeout && !vpnConnected && config.vpn)
+            {
+                vpnTimeout = millis() + 10000;
+                log_d("RENEW Device Wireguard VPN!");
                 wireguard_change_device();
-                vpnConnected=true; 
+                vpnConnected = true;
             }
 
             if (config.igate_en)
@@ -10521,100 +10572,104 @@ void taskNetwork(void *pvParameters)
                 {
                     if (aprsClient.available())
                     {
-                        pingTimeout = millis() + 300000;                // Reset ping timout
-                        String line = aprsClient.readStringUntil('\n'); // อ่านค่าที่ Server ตอบหลับมาทีละบรรทัด
-                        status.isCount++;
-                        int start_val = line.indexOf(">", 0); // หาตำแหน่งแรกของ >
-                        if (start_val > 3)
+                        status.allCount++;
+                        pingTimeout = millis() + 300000; // Reset ping timout
+                        // String raw = aprsClient.readStringUntil('\n'); // อ่านค่าที่ Server ตอบหลับมาทีละบรรทัด
+                        memset(raw, 0, sizeof(raw));
+                        size_t rawSize = aprsClient.readBytesUntil('\n', raw, sizeof(raw) - 1); // อ่านค่าที่ Server ตอบหลับมาทีละบรรทัด
+                        raw[rawSize] = '\0';                                                    // Ensure null termination
+                        log_d("INET: %s\n", raw);
+
+                        // unsigned int p = strpos(raw, '>');
+                        // int ssidNum=-1;
+                        // char srcCall[15];
+                        // if(p>3 && p<15)
+                        // {
+
+                        //     char ssidChar[5];
+                        //     memset(srcCall, 0, sizeof(srcCall));
+                        //     strncpy(srcCall, raw, p);
+                        //     srcCall[p] = '\0'; // Null-terminate the string
+                        //     char *p1=strchr(srcCall,'-');
+                        //     if(p1!=NULL){
+                        //         strncpy(ssidChar, p1+1, 4);
+                        //         ssidChar[4] = '\0'; // Ensure null termination
+                        //         ssidNum = atoi(ssidChar);
+                        //     }else{
+                        //         *p1=strchr(srcCall,'-');
+                        //         ssidNum=-1;
+                        //     }
+                        // }
+                        // int start_val = raw.indexOf(">", 0); // หาตำแหน่งแรกของ >
+                        if (ax25_encode(frame, raw, rawSize) > 0)
                         {
-                            String src_call = line.substring(0, start_val);
-                            String msg_call = "::" + src_call;
-
-                            status.allCount++;
-
-                            log_d("INET: %s\n", line.c_str());
-                            start_val = line.indexOf(":", 10); // Search of info in ax25
-                            if (start_val > 5)
+                            if (frame.header[1].ssidChar == true)
                             {
-                                String info = line.substring(start_val + 1);
-                                size_t rawSize = line.length();
-                                char *raw = (char *)calloc(rawSize, sizeof(char));
-                                if (raw)
+                                log_d("INET_INFO: Invalid AX.25 frame, missing SSID bit in header[1]");
+                                continue;
+                            }
+                            status.isCount++;
+                            char srcCall[15];
+                            memset(srcCall, 0, sizeof(srcCall));
+                            uint8_t srcSSID = (uint8_t)frame.header[1].ssid & 0x1F; // Get SSID (lower 5 bits)
+                            srcSSID >>= 1;                                          // SSID is shifted right by 1 bit in AX.25 header
+                            if (srcSSID == 0)
+                                sprintf(srcCall, "%s", frame.header[1].addr);
+                            else
+                                sprintf(srcCall, "%s-%d", frame.header[1].addr, srcSSID);
+
+                            uint16_t type = pkgType(&frame.data[0]);
+                            if (type & FILTER_MESSAGE)
+                            {
+                                handleIncomingAPRS(String(raw));
+                            }
+                            int idx = pkgListUpdate(srcCall, raw, type, 1);
+#if defined OLED || defined ST7735_160x80
+                            if (idx > -1)
+                            {
+                                // Put queue affter filter for display popup
+                                if (config.rx_display && config.dispINET && (type & config.dispFilter))
                                 {
-                                    memset(raw, 0, rawSize);
-                                    memcpy(raw, info.c_str(), info.length());
-
-                                    uint16_t type = pkgType(&raw[0]);
-                                    if(type & FILTER_MESSAGE)
+                                    if (!dispBuffer.isFull())
                                     {
-                                        handleIncomingAPRS(line);
+                                        log_d("INET_dispBuffer is FULL");
                                     }
-                                    int start_dstssid = line.indexOf("-", 1); // get SSID -
-                                    if (start_dstssid < 0)
-                                        start_dstssid = line.indexOf(" ", 1); // get ssid space
-                                    char ssid = 0;
-                                    if (start_dstssid > 0)
-                                        ssid = line.charAt(start_dstssid + 1);
-
-                                    if (ssid > 47 && ssid < 58)
+                                    else
                                     {
-                                        size_t len = src_call.length();
-                                        char call[15];
-                                        memset(call, 0, sizeof(call));
-                                        if (len > 15)
-                                            len = 15;
-                                        memcpy(call, src_call.c_str(), len);
-                                        call[14] = 0;
-                                        memset(raw, 0, rawSize);
-                                        memcpy(raw, line.c_str(), line.length());
-                                        int idx = pkgListUpdate(call, raw, type, 1);
-                                        free(raw);
-#if defined OLED || defined ST7735_160x80
-                                        if (idx > -1)
-                                        {
-                                            // Put queue affter filter for display popup
-                                            if (config.rx_display && config.dispINET && (type & config.dispFilter))
-                                            {
-                                                if(!dispBuffer.isFull()){
-                                                    log_d("INET_dispBuffer is FULL");
-                                                } else {
-                                                    dispBuffer.push(line.c_str());
-                                                    log_d("INET_putQueueDisp:[pkgList_idx=%d/queue=%d,Type=%d] %s\n", idx, dispBuffer.getCount(), type, call);
-                                                }
-                                            }
-                                        }
+                                        dispBuffer.push(raw);
+                                        log_d("INET_putQueueDisp:[pkgList_idx=%d/queue=%d,Type=%d] %s\n", idx, dispBuffer.getCount(), type, srcCall);
+                                    }
+                                }
+                            }
 #endif
-                                        // INET2RF affter filter
-                                        if (config.inet2rf)
-                                        {
-                                            if (type & config.inet2rfFilter)
-                                            {
-                                                String tnc2Raw = "";
-                                                char *strtmp = (char *)calloc(350, sizeof(char));
-                                                if (strtmp)
-                                                {
-                                                    memset(strtmp, 0, 350);
-                                                    if (config.igate_ssid == 0)
-                                                        sprintf(strtmp, "%s>APE32L", config.igate_mycall);
-                                                    else
-                                                        sprintf(strtmp, "%s-%d>APE32L", config.igate_mycall, config.igate_ssid);
-                                                    tnc2Raw = String(strtmp);
-                                                    tnc2Raw += ",RFONLY"; // fix path to rf only not send loop to inet
-                                                    tnc2Raw += ":}";      // 3rd-party frame
-                                                    tnc2Raw += line;
-                                                    pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, RF_CHANNEL);
-                                                    char sts[50];
-                                                    sprintf(sts, "--SRC CALL--\n%s\n", src_call.c_str());
+                            // INET2RF affter filter
+                            if (config.inet2rf)
+                            {
+                                if (type & config.inet2rfFilter)
+                                {
+                                    String tnc2Raw = "";
+                                    char *strtmp = (char *)calloc(350, sizeof(char));
+                                    if (strtmp)
+                                    {
+                                        memset(strtmp, 0, 350);
+                                        if (config.igate_ssid == 0)
+                                            sprintf(strtmp, "%s>APE32L", config.igate_mycall);
+                                        else
+                                            sprintf(strtmp, "%s-%d>APE32L", config.igate_mycall, config.igate_ssid);
+                                        tnc2Raw = String(strtmp);
+                                        tnc2Raw += ",RFONLY"; // fix path to rf only not send loop to inet
+                                        tnc2Raw += ":}";      // 3rd-party frame
+                                        tnc2Raw += String(raw);
+                                        pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, RF_CHANNEL);
 #if defined OLED || defined ST7735_160x80
-                                                    pushTxDisp(TXCH_3PTY, "TX INET->RF", sts);
+                                        char sts[50];
+                                        sprintf(sts, "--SRC CALL--\n%s\n", srcCall);
+                                        pushTxDisp(TXCH_3PTY, "TX INET->RF", sts);
 #endif
-                                                    status.inet2rf++;
-                                                    //igateTLM.INET2RF++;
-                                                    log_d("INET2RF: %s\n", line);
-                                                    free(strtmp);
-                                                }
-                                            }
-                                        }
+                                        status.inet2rf++;
+                                        // igateTLM.INET2RF++;
+                                        log_d("INET2RF: %s\n", raw);
+                                        free(strtmp);
                                     }
                                 }
                             }
@@ -10640,7 +10695,7 @@ void taskNetwork(void *pvParameters)
             if (millis() > pingTimeout)
             {
                 pingTimeout = millis() + 600000;
-                if(config.wifi_mode & WIFI_STA_FIX)
+                if (config.wifi_mode & WIFI_STA_FIX)
                 {
                     log_d("Ping WiFi to %s\n", WiFi.gatewayIP().toString().c_str());
                     IPAddress wifiIP;
@@ -10655,45 +10710,45 @@ void taskNetwork(void *pvParameters)
                         wifiConnection();
                     }
                 }
-                // if (config.vpn)
-                // {
-                //     if (!wireguard_active())
-                //     {
-                //         log_d("Reconnection Wireguard VPN!");
-                //         wireguard_remove();
-                //         delay(1000);
-                //         if(WiFi.isConnected()){
-                //                 wireguard_setup(NULL);
-                //             }else{
-                //                 if(PPP.connected()){
-                //                     wireguard_setup((netif *)PPP.netif());
-                //                 }
-                //             }
-                //     }
-                //     IPAddress vpnIP;
-                //     vpnIP.fromString(String(config.wg_local_address));
-                //     log_d("Ping VPN to %s", vpnIP.toString().c_str());
-                //     if (ping_start(vpnIP, 2, 0, 0, 10) == true)
-                //     {
-                //         log_d("VPN Ping Success!");
-                //     }
-                //     else
-                //     {
-                //         log_d("VPN Ping Fail!");
-                //         wireguard_remove();
-                //         delay(1000);
-                //         wireguard_setup(NULL);
-                            
-                //     }
-                // }
-                #ifdef PPPOS
-                if(config.ppp_enable)
+// if (config.vpn)
+// {
+//     if (!wireguard_active())
+//     {
+//         log_d("Reconnection Wireguard VPN!");
+//         wireguard_remove();
+//         delay(1000);
+//         if(WiFi.isConnected()){
+//                 wireguard_setup(NULL);
+//             }else{
+//                 if(PPP.connected()){
+//                     wireguard_setup((netif *)PPP.netif());
+//                 }
+//             }
+//     }
+//     IPAddress vpnIP;
+//     vpnIP.fromString(String(config.wg_local_address));
+//     log_d("Ping VPN to %s", vpnIP.toString().c_str());
+//     if (ping_start(vpnIP, 2, 0, 0, 10) == true)
+//     {
+//         log_d("VPN Ping Success!");
+//     }
+//     else
+//     {
+//         log_d("VPN Ping Fail!");
+//         wireguard_remove();
+//         delay(1000);
+//         wireguard_setup(NULL);
+
+//     }
+// }
+#ifdef PPPOS
+                if (config.ppp_enable)
                 {
                     if (PPP.connected())
                     {
-                        //IPAddress pppIP(pppStatus.ip);
+                        // IPAddress pppIP(pppStatus.ip);
                         log_d("Ping PPP to %s", PPP.localIP().toString().c_str());
-                        if ((PPP.linkUp()==true)&&(ping_start(PPP.localIP(), 2, 0, 0, 30) == true))
+                        if ((PPP.linkUp() == true) && (ping_start(PPP.localIP(), 2, 0, 0, 30) == true))
                         {
                             log_d("PPP Ping Success!!");
                         }
@@ -10705,7 +10760,7 @@ void taskNetwork(void *pvParameters)
                         }
                     }
                 }
-                #endif
+#endif
             }
         }
     } // for loop

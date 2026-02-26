@@ -41,7 +41,8 @@ typedef struct AX25Ctx {
 
 typedef struct ax25header_struct{   
     char addr[7];
-    char ssid;   
+    uint8_t ssid; 
+    bool ssidChar;  
 }ax25header;
 
 typedef struct ax25frame_struct{   
@@ -92,7 +93,7 @@ int rx_getchar(void);
 void ax25_poll(AX25Ctx *ctx);
 void ax25_sendRaw(AX25Ctx *ctx, void *_buf, size_t len);
 void ax25_init(AX25Ctx *ctx, ax25_callback_t hook);
-char ax25_encode(ax25frame &frame, char *txt,int size);
+char ax25_encode(ax25frame &frame,char *raw,int size);
 void ax25_decode(AX25Ctx *ctx);
 //void ax25sendFrame(AX25Ctx *ctx,ax25frame *pkg);
 int hdlcFrame(uint8_t *outbuf, size_t outbuf_len, AX25Ctx *ctx, ax25frame *pkg);
@@ -103,5 +104,5 @@ int hdlcDecode(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t len);
 int hdlcDecodeAX25(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t len);
 int unbit_stuffing(uint8_t *outbuf, size_t outbuf_size, uint8_t *inbuf, size_t inbuf_size);
 bool isValidToken(const char *s, bool allowEmpty = true);
-
+unsigned int strpos(char *txt, char chk);
 #endif

@@ -773,6 +773,10 @@ unsigned int strpos(char *txt, char chk)
     char *pch;
     unsigned int idx = 0;
     pch = strchr(txt, chk);
+    if(pch == NULL)
+        return 0;
+    if(pch && txt>pch)
+        return 0;
     idx = pch - txt;
     return idx;
 }
@@ -807,7 +811,10 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
         }
         if (j > 0)
         {
-            hdr->ssid = atoi(num);
+            hdr->ssid = (uint8_t)atoi(num);
+            hdr->ssidChar = false;
+        }else{
+            hdr->ssidChar = true;
         }
         hdr->ssid <<= 1;
     }
@@ -815,6 +822,11 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
     {
         if(size > 6)
             size = 6;
+        p = strpos(txt, ' ');
+        if(p > 0 && p < size)
+            hdr->ssidChar = true;
+        else
+            hdr->ssidChar = false;
         for (i = 0; i < size; i++)
         { // Get CallSign/Path
             if (txt[i] == '*')
@@ -834,16 +846,19 @@ void convPath(ax25header *hdr, char *txt, unsigned int size)
     hdr->ssid |= 0x60;
 }
 
-char ax25_encode(ax25frame &frame, char *txt, int size)
+char ax25_encode(ax25frame &frame,char *raw, int size)
 {
     char *token, *ptr;
     int i;
-    unsigned int p, p2, p3;
+    unsigned int p, p2, p3,p1;
     char j;
+    char txt[size];
     ptr = (char *)&frame;
+    strncpy(txt, raw, size);
     memset(ptr, 0, sizeof(ax25frame)); // Clear frame
+    p2 = strpos(txt, '>');
     p = strpos(txt, ':');
-    if (p > 7 && p < size)
+    if ((p > 7 && p < size) && (p2 > 3 && p2 < size) && (p2 < p))
     {
         // printf("p{:}=%d\r\n",p);
         // Get String APRS
@@ -852,9 +867,9 @@ char ax25_encode(ax25frame &frame, char *txt, int size)
         {
             frame.data[i] = txt[p + i + 1];
         }
-        p2 = strpos(txt, '>');
-        if (p2 > 2 && p2 < size)
-        {
+        
+        // if (p2 > 2 && p2 < size)
+        // {
             // printf("p2{>}=%d\r\n",p2);
             convPath(&frame.header[1], &txt[0], p2); // Get callsign src
             j = strpos(txt, ',');
@@ -901,7 +916,7 @@ char ax25_encode(ax25frame &frame, char *txt, int size)
             }
             // }
             return 1;
-        }
+        //}
     }
     return 0;
 }

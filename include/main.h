@@ -51,7 +51,7 @@
 
 #ifdef BOARD_HAS_PSRAM
 #define TLMLISTSIZE 100
-#define PKGLISTSIZE 50
+#define PKGLISTSIZE 30
 #define PKGTXSIZE 10
 #else
 #define TLMLISTSIZE 5
