@@ -11117,6 +11117,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		}
 		saveConfig(request);
 	}
+	#ifdef BLUETOOTH
 	else if (request->hasArg("commitBluetooth"))
 	{
 		bool btMaster = false;
@@ -11140,6 +11141,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 					strcpy(config.bt_name, request->arg(i).c_str());
 				}
 			}
+			#if !defined(CONFIG_IDF_TARGET_ESP32)
 			if (request->argName(i) == "bt_uuid")
 			{
 				if (request->arg(i) != "")
@@ -11161,6 +11163,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 					strcpy(config.bt_uuid_tx, request->arg(i).c_str());
 				}
 			}
+			#endif
 			if (request->argName(i) == "bt_mode")
 			{
 				if (request->arg(i) != "")
@@ -11181,6 +11184,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		config.bt_master = btMaster;
 		saveConfig(request);
 	}
+	#endif
 	else
 	{
 		// Allocate initial memory for HTML content
@@ -11364,7 +11368,8 @@ void handle_wireless(AsyncWebServerRequest *request)
 		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input min=\"0\" max=\"999999\" id=\"bt_pin\" name=\"bt_pin\" type=\"number\" value=\"%d\" /></td> <i>*Value 0 is no auth.</i>\n", config.bt_pin);
 		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
-		strcat(html, "<tr>\n");
+		#if !defined(CONFIG_IDF_TARGET_ESP32)
+		strcat(html, "<tr>\n");		
 		strcat(html, "<td align=\"right\"><b>UUID:</b></td>\n");
 		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid\" name=\"bt_uuid\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid);
 		strcat(html, tempHtml);
@@ -11379,7 +11384,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_tx\" name=\"bt_uuid_tx\" type=\"text\" value=\"%s\" /></td>\n", config.bt_uuid_tx);
 		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
-
+		#endif
 		strcat(html, "<td align=\"right\"><b>MODE:</b></td>\n");
 		strcat(html, "<td style=\"text-align: left;\">\n");
 		strcat(html, "<select name=\"bt_mode\" id=\"bt_mode\">\n");

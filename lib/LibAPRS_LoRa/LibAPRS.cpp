@@ -1407,7 +1407,7 @@ bool APRS_poll(void)
                         if (numBytes > 10)
                         {
                             // Check AX.25 protocol with HDLC 7E Flage
-                            if (byteArr[0] == 0x7E)
+                            if (byteArr[0] == 0x7E) //AX.25 with HDLC 0x7E flag
                             {
                                 // parseBit(byteArr, numBytes);
                                 uint8_t *outputBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
@@ -1426,7 +1426,7 @@ bool APRS_poll(void)
                                     free(outputBuff);
                                 }
                             }
-                            else if (byteArr[0] == '<' && byteArr[1] == 0xFF && byteArr[2] == 0x01)
+                            else if (byteArr[0] == '<' && byteArr[1] == 0xFF && byteArr[2] == 0x01) //LoRa_APRS projects by richonguzman/CA2RXU
                             {
                                 // Get TNC2 Raw text
                                 String str = "";

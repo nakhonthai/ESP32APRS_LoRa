@@ -279,6 +279,8 @@ bool getBAT(uint8_t port)
 #elif defined(APRS_LORA_HT)
             VBat = (double)analogReadMilliVolts(3) / 595.24F;
             sensorUpdate(i, VBat);
+#elif defined(T_BEAM_S3_1W)
+            VBat = (double)analogReadMilliVolts(4) / 333.289F;            
 #elif defined(BUOY)
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);

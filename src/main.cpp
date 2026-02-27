@@ -5230,7 +5230,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        12000,              /* Stack size in words */
+        8192,              /* Stack size in words */
         NULL,               /* Task input parameter */
         0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -5248,7 +5248,7 @@ void setup()
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        12000,              /* Stack size in words */
+        8192,              /* Stack size in words */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -10402,6 +10402,16 @@ void taskNetwork(void *pvParameters)
     timeNetwork = 0;
 
 #ifdef PPPOS
+    //Initialize pppStatus
+    memset(&pppStatus, 0, sizeof(pppType));
+    strcpy(pppStatus.manufacturer, "N/A");
+    strcpy(pppStatus.model, "N/A");
+    strcpy(pppStatus.imei, "N/A");
+    strcpy(pppStatus.imsi, "N/A");
+    strcpy(pppStatus.oper, "N/A");
+    pppStatus.rssi= -127;
+    pppStatus.ip = 0;
+    pppStatus.gateway = 0;
     PPPOS_Start(); // Start PPP connection if enabled
     pppTimeout = millis() + (600 * 1000);
 #endif
@@ -10571,8 +10581,7 @@ void taskNetwork(void *pvParameters)
                 else
                 {
                     if (aprsClient.available())
-                    {
-                        status.allCount++;
+                    {                        
                         pingTimeout = millis() + 300000; // Reset ping timout
                         // String raw = aprsClient.readStringUntil('\n'); // อ่านค่าที่ Server ตอบหลับมาทีละบรรทัด
                         memset(raw, 0, sizeof(raw));
@@ -10608,6 +10617,7 @@ void taskNetwork(void *pvParameters)
                                 log_d("INET_INFO: Invalid AX.25 frame, missing SSID bit in header[1]");
                                 continue;
                             }
+                            status.allCount++;
                             status.isCount++;
                             char srcCall[15];
                             memset(srcCall, 0, sizeof(srcCall));
