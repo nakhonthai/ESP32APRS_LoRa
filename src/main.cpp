@@ -6612,7 +6612,7 @@ void loop()
 {
     if (millis() > timeTask)
     {
-        timeTask = millis() + 30000;
+        timeTask = millis() + 10000; // ⏱️ เช็คทุกๆ 10 วินาที
 #if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
         if (VbatRead)
         {
@@ -6802,9 +6802,13 @@ void loop()
         }
 
         // Automatic Restart when heap memory not enough
+        #ifdef __XTENSA__
         if (ESP.getFreeHeap() < 60000)
+        #else
+        if (ESP.getFreeHeap() < 80000)
+        #endif
         {
-            if (++heapCount > 60)
+            if (++heapCount >= 3)
             {
                 heapCount = 0;
                 vTaskSuspendAll();
@@ -8900,7 +8904,7 @@ void taskAPRS(void *pvParameters)
                 if (config.trk_tlm_interval > 0)
                 {
                     trkTlmInvCount++;
-                    if ((trkTlmInvCount >= config.trk_tlm_interval) || (TLM_SEQ == 0))
+                    if ((trkTlmInvCount >= config.trk_tlm_interval) || (TLM_SEQ == 0) || (config.trk_smartbeacon && (tx_interval == config.trk_slowinterval)))
                     {
                         trkTlmInvCount = 0;
                         if (config.trk_tlm_sensor[0] | config.trk_tlm_sensor[1] | config.trk_tlm_sensor[2] | config.trk_tlm_sensor[3] | config.trk_tlm_sensor[4])

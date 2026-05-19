@@ -484,42 +484,67 @@ bool getBME_I2C(Adafruit_BME280 &node, uint8_t port)
 
 bool getBMP_I2C(Adafruit_BMP280 &node, uint8_t port)
 {
-    bool result;
-    /* Default settings from datasheet. */
-    node.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
-                     Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-                     Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-                     Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                     Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
-    result = node.takeForcedMeasurement();             // has no effect in normal mode
-    if (result)
-    {
-        // Read data from BMP280
-        float pressure = node.readPressure(); // Convert to hPa
-        //float altitude = node.readAltitude(1013.25); // Sea level pressure in hPa
-        float temperature = node.readTemperature(); // Temperature in Celsius
-        for (int i = 0; i < SENSOR_NUMBER; i++)
-        {
-            if(!config.sensor[i].enable) continue;
-            if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
-            {
-                sensorUpdate(i, temperature); // Temperature
-                return true;
-            }
-            // else if (config.sensor[i].type == SENSOR_ALTITUDE && config.sensor[i].port == port)
-            // {
-            //     sensorUpdate(i, node.readAltitude(1013.25)); // Altutude
-            // }
-            else if (config.sensor[i].type == SENSOR_PRESSURE && config.sensor[i].port == port)
-            {
-                if(pressure>0){
-                    sensorUpdate(i, pressure/100.0F); // Convert to hPa                    
-                }
-            }
-        } 
-        return true;       
+    bool dataUpdated = false;
+
+    // ✅ Check sensor ID to verify BMP280 is connected
+    uint8_t sensorID = node.sensorID();
+    if (sensorID == 0 || sensorID == 0xFF) {
+        log_e("BMP280: Invalid sensor ID 0x%02X - sensor not connected!", sensorID);
+        return false;
     }
-    return false;
+
+    /* Default settings from datasheet. */
+    node.setSampling(Adafruit_BMP280::MODE_FORCED,
+                     Adafruit_BMP280::SAMPLING_X16,
+                     Adafruit_BMP280::SAMPLING_X16,
+                     Adafruit_BMP280::FILTER_OFF,
+                     Adafruit_BMP280::STANDBY_MS_1);
+
+    if (!node.takeForcedMeasurement()) {
+        log_e("BMP280: Failed to take forced measurement");
+        return false;
+    }
+
+    float pressure = node.readPressure();
+    float temperature = node.readTemperature();
+
+    // ✅ Validate readings
+    if (isnan(pressure) || isnan(temperature)) {
+        log_e("BMP280: Invalid readings - Pressure: %.2f, Temperature: %.2f", pressure, temperature);
+        return false;
+    }
+
+    // ✅ Check for reasonable value ranges
+    if (temperature < -40 || temperature > 85) {
+        log_e("BMP280: Temperature out of range: %.2f°C (valid: -40 to +85°C)", temperature);
+        return false;
+    }
+
+    if (pressure < 30000 || pressure > 110000) {
+        log_e("BMP280: Pressure out of range: %.2f Pa (valid: 30000 to 110000 Pa)", pressure);
+        return false;
+    }
+
+    // ✅ Update all enabled sensors for this port
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+    {
+        if(!config.sensor[i].enable) continue;
+
+        if (config.sensor[i].type == SENSOR_TEMPERATURE && config.sensor[i].port == port)
+        {
+            sensorUpdate(i, temperature);
+            dataUpdated = true;
+            log_d("BMP280: Temperature = %.2f°C", temperature);
+        }
+        else if (config.sensor[i].type == SENSOR_PRESSURE && config.sensor[i].port == port)
+        {
+            sensorUpdate(i, pressure / 100.0F);
+            dataUpdated = true;
+            log_d("BMP280: Pressure = %.2f hPa", pressure / 100.0F);
+        }
+    }
+
+    return dataUpdated;
 }
 
 bool getSI7021_I2C(Adafruit_Si7021 &node, uint8_t port)
@@ -1132,15 +1157,19 @@ bool getSensor(int cfgIdx)
     case PORT_BMP280_I2C0:
         if (config.i2c_enable)
         {
-            if (getBMP_I2C(*bmp280, port))
+            if (bmp280 != NULL) {
+                if (getBMP_I2C(*bmp280, port))
                 return true;
+            }
         }
         break;
     case PORT_BMP280_I2C1:
         if (config.i2c1_enable)
         {
-            if (getBMP_I2C(*bmp280, port))
-                return true;
+            if (bmp280 != NULL) {
+                if (getBMP_I2C(*bmp280, port))
+                    return true;
+            }
         }
         break;
     case PORT_SI7021_I2C0:
@@ -1479,8 +1508,7 @@ void sensorInit(bool resetAll)
                 //if (bmp280 != NULL)
                 //    break;
                 bmp280 = new Adafruit_BMP280(&Wire1);
-                //if (!bmp280->begin(config.sensor[i].address,88)) // 0x76=118,0x77=119
-                if(!bmp280->begin())
+                if (!bmp280->begin(config.sensor[i].address)) // 0x76=118,0x77=119
                 {
                     log_d("Could not find a valid BMP280 sensor, check wiring, address, sensor ID!");
                     log_d("SensorID was: 0x%0X", bmp280->sensorID()); // log_d(bme.sensorID(),16);

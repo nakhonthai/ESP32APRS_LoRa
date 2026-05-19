@@ -344,6 +344,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "<td>${row.dx !== null ? row.dx : \"-\"}</td>\n");
 	strcat(webString, "<td>${row.packet}</td>\n");
 	strcat(webString, "<td style=\"color:green;\">${row.rssi !== '-' ? row.rssi + \"dBm\" : \"-\"}</td>\n");
+	strcat(webString, "<td style=\"color:green;\">${row.freqErr !== '-' ? row.freqErr : \"-\"}</td>\n");
 	strcat(webString, "`;\n");
 	strcat(webString, "tableBody.appendChild(tr);\n");
 	strcat(webString, "});\n");
@@ -721,7 +722,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	strcat(webString, "<div class=\"content\">\n");
 	strcat(webString, "<div id=\"lastHeard\">\n");
 	strcat(webString, "<table id=\"aprsTable\">\n<thread>\n");
-	strcat(webString, "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n");
+	strcat(webString, "<th colspan=\"8\" style=\"background-color: #070ac2;\">LAST HEARD <a href=\"/tnc2\" target=\"_tnc2\" style=\"color: yellow;font-size:8pt\">[RAW]</a></th>\n");
 	strcat(webString, "<tr>\n");
 	strcat(webString, "<th data-sort=\"time\" style=\"min-width:10ch\"><span><b>Time (");
 	if (config.timeZone >= 0)
@@ -747,6 +748,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 	strcat(webString, "<th data-sort=\"dx\" style=\"min-width:5ch\">DX<span class=\"arrow\"></span></th>\n");
 	strcat(webString, "<th data-sort=\"packet\" style=\"min-width:5ch\">PACKET<span class=\"arrow\"></span></th>\n");
 	strcat(webString, "<th data-sort=\"rssi\" style=\"min-width:5ch\">RSSI<span class=\"arrow\"></span></th>\n");
+	strcat(webString, "<th data-sort=\"freq\" style=\"min-width:5ch\">FreqErr<span class=\"arrow\"></span></th>\n");
 	strcat(webString, "</tr></thread>\n<tbody id=\"aprsTableBody\"></tbody>\n");
 	strcat(webString, "</table>\n");
 	strcat(webString, "</div>\n");
@@ -827,7 +829,7 @@ void handle_sidebar(AsyncWebServerRequest *request)
 	if (clientMQTT.connected())
 		strcat(html, "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">MQTT</th>\n");
 	else
-		strcat(html, "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">MQTT</th>\n";);
+		strcat(html, "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">MQTT</th>\n");
 #endif
 	// if (config.fx25_mode > 0)
 	// 	strcat(html, "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">FX.25</th>\n");
@@ -1308,7 +1310,7 @@ void event_lastHeard(bool gethtml)
 					strcat(html, temp_html);
 					if (pkgINET)
 					{
-						strcat(html, "\"rssi\":\"-\"},");
+						strcat(html, "\"rssi\":\"-\",");
 					}
 					else
 					{
@@ -1325,9 +1327,22 @@ void event_lastHeard(bool gethtml)
 						// {
 						// 	strcat(html, "<td style=\"color: #008000;\">");
 						// }
-						snprintf(temp_html, sizeof(temp_html), "\"rssi\":\"%.1f\"},", rssi);
+						snprintf(temp_html, sizeof(temp_html), "\"rssi\":\"%.1f\",", rssi);
 						strcat(html, temp_html);
 						// strcat(html, "dBV</td></tr>\n");
+					}
+
+					if (config.rf_mode != RF_MODE_AIS)
+					{
+						if (pkg.freqErr == 0)
+						{
+							strcat(html, "\"freqErr\":\"-\"},");
+						}
+						else
+						{
+							snprintf(temp_html, sizeof(temp_html), "\"freqErr\":\"%dHz\"},", (int)pkg.freqErr);
+							strcat(html, temp_html);
+						}
 					}
 					// log_d("%s",html_ptr);
 				}
