@@ -9168,7 +9168,7 @@ void handle_wx(AsyncWebServerRequest *request)
 			else
 				sampleFlag = "checked=\"checked\"";
 
-			snprintf(tempHtml, sizeof(tempHtml), "<input type=\"radio\" name=\"avgSel%d\" value=\"0\" %s/>Sample <input type=\"radio\" name=\"avgSel%d\" value=\"1\" %s/>Average", ax, sampleFlag, ax, avgFlag);
+			snprintf(tempHtml, sizeof(tempHtml), "<input type=\"radio\" name=\"avgSel%d\" value=\"0\" %s/>Sample <input type=\"radio\" name=\"avgSel%d\" value=\"1\" %s/>Average", ax, sampleFlag.c_str(), ax, avgFlag.c_str());
 			strcat(html, tempHtml);
 			strcat(html, "</td></tr>");
 		}
@@ -10044,7 +10044,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 				char *temp_checkbox = allocateStringMemory(256);
 				if (temp_checkbox)
 				{
-					snprintf(temp_checkbox, 256, "<label class=\"switch\"><input type=\"checkbox\" name=\"En%d\" value=\"OK\" %s><span class=\"slider round\"></span></label>", ax, EnFlag);
+					snprintf(temp_checkbox, 256, "<label class=\"switch\"><input type=\"checkbox\" name=\"En%d\" value=\"OK\" %s><span class=\"slider round\"></span></label>", ax, EnFlag.c_str());
 					strcat(html, temp_checkbox);
 					free(temp_checkbox);
 				}
@@ -11294,7 +11294,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		String wifiClientEnFlag = "";
 		if (config.wifi_mode & WIFI_STA_FIX)
 			wifiClientEnFlag = "checked";
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wificlient\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", wifiClientEnFlag);
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wificlient\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", wifiClientEnFlag.c_str());
 		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");

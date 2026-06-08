@@ -493,11 +493,11 @@ bool getBMP_I2C(Adafruit_BMP280 &node, uint8_t port)
     bool dataUpdated = false;
 
     // ✅ Check sensor ID to verify BMP280 is connected
-    uint8_t sensorID = node.sensorID();
-    if (sensorID == 0 || sensorID == 0xFF) {
-        log_e("BMP280: Invalid sensor ID 0x%02X - sensor not connected!", sensorID);
-        return false;
-    }
+    // uint8_t sensorID = node.sensorID();
+    // if (sensorID == 0 || sensorID == 0xFF) {
+    //     log_e("BMP280: Invalid sensor ID 0x%02X - sensor not connected!", sensorID);
+    //     return false;
+    // }
 
     /* Default settings from datasheet. */
     node.setSampling(Adafruit_BMP280::MODE_FORCED,

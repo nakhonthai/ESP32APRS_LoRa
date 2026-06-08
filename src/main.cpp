@@ -5860,7 +5860,7 @@ String trk_gps_postion(String comment)
                 if (config.trk_timestamp)
                 {
                     String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, ";%s*%s%s", object, timeStamp, compPosition.c_str());
+                    sprintf(rawTNC, ";%s*%s%s", object, timeStamp.c_str(), compPosition.c_str());
                 }
                 else
                 {
@@ -5922,7 +5922,7 @@ String trk_gps_postion(String comment)
                 if (config.trk_timestamp)
                 {
                     String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", object, timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
+                    sprintf(rawTNC, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
                 }
                 else
                 {
@@ -5934,7 +5934,7 @@ String trk_gps_postion(String comment)
                 if (config.trk_timestamp)
                 {
                     String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
+                    sprintf(rawTNC, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
                 }
                 else
                 {
@@ -6006,7 +6006,7 @@ String trk_fix_position(String comment)
             if (config.trk_timestamp)
             {
                 String timeStamp = getTimeStamp();
-                sprintf(loc, ";%s*%s%s", object, timeStamp, compPosition.c_str());
+                sprintf(loc, ";%s*%s%s", object, timeStamp.c_str(), compPosition.c_str());
             }
             else
             {
@@ -6018,7 +6018,7 @@ String trk_fix_position(String comment)
             if (config.trk_timestamp)
             {
                 String timeStamp = getTimeStamp();
-                sprintf(loc, "/%s%s", timeStamp, compPosition.c_str());
+                sprintf(loc, "/%s%s", timeStamp.c_str(), compPosition.c_str());
             }
             else
             {
@@ -6049,7 +6049,7 @@ String trk_fix_position(String comment)
             if (config.trk_timestamp)
             {
                 String timeStamp = getTimeStamp();
-                sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
+                sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
             }
             else
             {
@@ -6061,7 +6061,7 @@ String trk_fix_position(String comment)
             if (config.trk_timestamp)
             {
                 String timeStamp = getTimeStamp();
-                sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
+                sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
             }
             else
             {
@@ -6134,7 +6134,7 @@ String igate_position(double lat, double lon, double alt, String comment)
         if (config.igate_timestamp)
         {
             String timeStamp = getTimeStamp();
-            sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
+            sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.igate_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.igate_symbol[1]);
         }
         else
         {
@@ -6203,7 +6203,7 @@ String digi_position(double lat, double lon, double alt, String comment)
     if (config.digi_timestamp)
     {
         String timeStamp = getTimeStamp();
-        sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
+        sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
     }
     else
     {
