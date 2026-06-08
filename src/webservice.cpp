@@ -9798,6 +9798,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 			}
 		}
 
+		sensorInit(true);
 		log_d("Sensor Config Updated.");
 		String html_msg;
 		if (saveConfiguration("/default.cfg", config))

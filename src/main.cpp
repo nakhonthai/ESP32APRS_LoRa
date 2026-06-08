@@ -277,7 +277,8 @@ void LED_Status(uint8_t r, uint8_t g, uint8_t b)
 }
 #endif
 
-bool i2c_busy = false;
+SemaphoreHandle_t i2c0_mutex = NULL;
+SemaphoreHandle_t i2c1_mutex = NULL;
 #include <Wire.h>
 
 #include <Fonts/FreeSansBold9pt7b.h>
@@ -4599,6 +4600,8 @@ bool AFSKInitAct = false;
 unsigned long timeTask;
 void setup()
 {
+    i2c0_mutex = xSemaphoreCreateMutex();
+    i2c1_mutex = xSemaphoreCreateMutex();
     // pinMode(19,INPUT);
     // pinMode(20,INPUT);
     //  byte *ptr;
@@ -4814,14 +4817,6 @@ void setup()
         // delay(300);
         Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
 
-        // int i2c_timeout = 0;
-        // while (i2c_busy)
-        // {
-        //     delay(10);
-        //     if (++i2c_timeout > 20)
-        //         break;
-        // }
-        i2c_busy = true;
 // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
 #ifdef SH1106
         display.begin(SH1106_SWITCHCAPVCC, SCREEN_ADDRESS, OLED_RESET > -1);
@@ -4944,13 +4939,11 @@ void setup()
         }
         display.setFont();
         display.setTextColor(WHITE);
-        i2c_busy = false;
 #else
 #ifdef ST7735_160x80
         if (config.i2c_enable)
         {
             Wire.begin(config.i2c_sda_pin, config.i2c_sck_pin, config.i2c_freq);
-            i2c_busy = false;
         }
         TFT_SPI.begin(ST7735_SCLK_Pin, -1, ST7735_MOSI_Pin, ST7735_CS_Pin);
         TFT_SPI.setFrequency(40000000);
@@ -5150,18 +5143,13 @@ void setup()
     if (config.oled_enable)
     {
 #ifdef OLED
-        int i2c_timeout = 0;
-        while (i2c_busy)
+        if (xSemaphoreTake(i2c0_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
-            delay(10);
-            if (++i2c_timeout > 20)
-                break;
+            display.clearDisplay();
+            display.setTextSize(1);
+            display.display();
+            xSemaphoreGive(i2c0_mutex);
         }
-        i2c_busy = true;
-        display.clearDisplay();
-        display.setTextSize(1);
-        display.display();
-        i2c_busy = false;
 #elif defined(ST7735_160x80)
         display.fillScreen(ST77XX_BLACK);
         display.setTextSize(1);
@@ -7022,19 +7010,14 @@ void loop()
         {
             if (millis() > timeHalfSec)
             {
-                int i2c_timeout = 0;
-                while (i2c_busy)
+                if (xSemaphoreTake(i2c0_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
                 {
-                    delay(10);
-                    if (++i2c_timeout > 20)
-                        break;
+                    char tnc2[300];
+                    dispBuffer.pop(&tnc2);
+                    // log_d("dispWindow info=%s",tnc2);
+                    dispWindow(String(tnc2), 0, false);
+                    xSemaphoreGive(i2c0_mutex);
                 }
-                i2c_busy = true;
-                char tnc2[300];
-                dispBuffer.pop(&tnc2);
-                // log_d("dispWindow info=%s",tnc2);
-                dispWindow(String(tnc2), 0, false);
-                i2c_busy = false;
                 timeHalfSec = millis() + (config.dispDelay * 1000);
                 oledSleepTimeout = millis() + (config.oled_timeout * 1000);
             }
@@ -7079,21 +7062,16 @@ void loop()
                             showDisp = false;
                             timeHalfSec = 0;
                             oledSleepTimeout = 0;
-                            int i2c_timeout = 0;
-                            while (i2c_busy)
+                            if (xSemaphoreTake(i2c0_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
                             {
-                                delay(10);
-                                if (++i2c_timeout > 20)
-                                    break;
-                            }
-                            i2c_busy = true;
 #ifdef OLED
-                            display.clearDisplay();
-                            display.display();
+                                display.clearDisplay();
+                                display.display();
 #elif defined(ST7735_160x80)
-                            ledcWrite(ST7735_LED_K_Pin, 5);
+                                ledcWrite(ST7735_LED_K_Pin, 5);
 #endif
-                            i2c_busy = false;
+                                xSemaphoreGive(i2c0_mutex);
+                            }
                         }
                     }
                     else
