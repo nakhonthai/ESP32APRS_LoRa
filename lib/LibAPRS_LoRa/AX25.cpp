@@ -591,10 +591,16 @@ void ax25_decode(AX25Ctx *ctx)
 
     memset(msg.info, 0, sizeof(msg.info));
     msg.len = ctx->frame_len - 2 - (buf - ctx->buf);
-    if(msg.len>0)
+    if (msg.len > 0)
+    {
+        if (msg.len > AX25_MAX_INFO_LEN)
+            msg.len = AX25_MAX_INFO_LEN;
         memcpy(msg.info, buf, msg.len);
+    }
     else
-        msg.len=0;
+    {
+        msg.len = 0;
+    }
     // msg.info[msg.len]=0;
     // msg.info = buf;
 
@@ -852,20 +858,25 @@ char ax25_encode(ax25frame &frame,char *raw, int size)
     int i;
     unsigned int p, p2, p3,p1;
     char j;
-    char txt[size];
+    // +1 to guarantee null-termination even when raw fills all 'size' bytes
+    char txt[size + 1];
     ptr = (char *)&frame;
     strncpy(txt, raw, size);
+    txt[size] = '\0';
     memset(ptr, 0, sizeof(ax25frame)); // Clear frame
     p2 = strpos(txt, '>');
     p = strpos(txt, ':');
-    if ((p > 7 && p < size) && (p2 > 3 && p2 < size) && (p2 < p))
+    if ((p > 7 && p < (unsigned int)size) && (p2 > 3 && p2 < (unsigned int)size) && (p2 < p))
     {
         // printf("p{:}=%d\r\n",p);
         // Get String APRS
         memset(&frame.data, 0, sizeof(frame.data));
-        for (i = 0; i < (size - p); i++)
+        int data_len = size - (int)p - 1;
+        if (data_len > AX25_MAX_INFO_LEN)
+            data_len = AX25_MAX_INFO_LEN;
+        for (i = 0; i < data_len; i++)
         {
-            frame.data[i] = txt[p + i + 1];
+            frame.data[i] = txt[p + 1 + i];
         }
         
         // if (p2 > 2 && p2 < size)
@@ -992,13 +1003,13 @@ uint8_t *ax25_putRaw(uint8_t *raw, AX25Ctx *ctx, uint8_t c)
 
 int hdlcFrame(uint8_t *outbuf, size_t outbuf_len, AX25Ctx *ctx, ax25frame *pkg)
 {
-    int i, j, c = 0;
-    int idx = 0;
+    int i, j;
     uint8_t data = 0;
     ctx->crc_out = CRC_CCIT_INIT_VAL;
-    int raw_count = 0;
-    uint8_t info[300];
-    info[idx++] = HDLC_FLAG;
+    // Buffer sized for worst-case: each byte could expand to 2 (ESC + byte) plus 2 flags
+    uint8_t info[AX25_MAX_FRAME_LEN * 2];
+    info[0] = HDLC_FLAG;
+    uint8_t *wp = &info[1]; // write pointer tracks actual bytes written (including ESC bytes)
 
     for (i = 0; i < 10; i++)
         pkg->header[i].ssid &= 0xFE; // Clear All END Path
@@ -1021,32 +1032,33 @@ int hdlcFrame(uint8_t *outbuf, size_t outbuf_len, AX25Ctx *ctx, ax25frame *pkg)
             data = (uint8_t)pkg->header[i].addr[j];
             if (data == 0)
                 data = 0x20;
-            // putchar(data);
             data <<= 1;
-            ax25_putRaw(&info[idx++], ctx, data);
-            c++;
+            wp = ax25_putRaw(wp, ctx, data);
         }
-        ax25_putRaw(&info[idx++], ctx, (uint8_t)pkg->header[i].ssid);
+        wp = ax25_putRaw(wp, ctx, (uint8_t)pkg->header[i].ssid);
         if (pkg->header[i].ssid & 0x01)
             break;
     }
 
-    ax25_putRaw(&info[idx++], ctx, AX25_CTRL_UI);      // Control field - 0x03 is APRS UI-frame
-    ax25_putRaw(&info[idx++], ctx, AX25_PID_NOLAYER3); // Protocol ID - 0xF0 is no layer 3
+    wp = ax25_putRaw(wp, ctx, AX25_CTRL_UI);      // Control field
+    wp = ax25_putRaw(wp, ctx, AX25_PID_NOLAYER3); // Protocol ID
 
     for (i = 0; i < strlen(pkg->data); i++)
     {
-        ax25_putRaw(&info[idx++], ctx, (uint8_t)pkg->data[i]);
+        wp = ax25_putRaw(wp, ctx, (uint8_t)pkg->data[i]);
     }
 
     uint8_t crcl = (ctx->crc_out & 0xff) ^ 0xff;
     uint8_t crch = (ctx->crc_out >> 8) ^ 0xff;
-    ax25_putRaw(&info[idx++], ctx, crcl);
-    ax25_putRaw(&info[idx++], ctx, crch);
+    wp = ax25_putRaw(wp, ctx, crcl);
+    wp = ax25_putRaw(wp, ctx, crch);
+
+    int idx = (int)(wp - info);
     memcpy(ctx->buf, &info[1], idx - 1);
     ctx->frame_len = idx - 1;
 
-    info[idx++] = HDLC_FLAG;
+    *wp++ = HDLC_FLAG;
+    idx++;
     int len = bit_stuffing(outbuf, outbuf_len, &info[0], idx);
     return len;
 }
@@ -1426,12 +1438,12 @@ int hdlcDecode(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t len)
                     crc_in = update_crc_ccit(frame_buf[idx - 1], crc_in);
                     if (crc_in == 0xF0B8)
                     {
-                        uint16_t actual_fcs = frame_buf[idx - 2] | (frame_buf[idx - 1] << 8);
-                        uint16_t expected_fcs = fcs_calc(frame_buf, idx - 2);
-                        if(expected_fcs == actual_fcs){
+                        // uint16_t actual_fcs = frame_buf[idx - 2] | (frame_buf[idx - 1] << 8);
+                        // uint16_t expected_fcs = fcs_calc(frame_buf, idx - 2);
+                        // if(expected_fcs == actual_fcs){
                             frame_len = idx;
                             return i;
-                        }
+                        //}
                     }
                 }
             }
@@ -1464,18 +1476,11 @@ int hdlcDecodeAX25(uint8_t *frame_buf, size_t &frame_len, uint8_t *raw, size_t l
             {
                 if (idx > 0)
                 {
-                    // uint16_t actual_fcs = frame_buf[idx - 2] | (frame_buf[idx - 1] << 8);
-                    // uint16_t expected_fcs = fcs_calc(frame_buf, idx - 2);
-                    //  log_d("RAW[%d]:%0X FCS=%02X = %02X",idx-1,frame_buf[idx-1],actual_fcs,expected_fcs);
                     crc_in = update_crc_ccit(frame_buf[idx - 1], crc_in);
                     if (crc_in == 0xF0B8)
                     {
-                        uint16_t actual_fcs = frame_buf[idx - 2] | (frame_buf[idx - 1] << 8);
-                        uint16_t expected_fcs = fcs_calc(frame_buf, idx - 2);
-                        if(expected_fcs == actual_fcs){
-                            frame_len = idx;
-                            return i;
-                        }
+                        frame_len = idx;
+                        return i;
                     }
                 }
             }

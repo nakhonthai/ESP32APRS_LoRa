@@ -1292,13 +1292,14 @@ bool APRS_poll(void)
                 {
                     rxTimeout = millis() + 300000;
                     numBytes = radioHal->getPacketLength();
+                    if (numBytes > MAX_RFBUFF)
+                        numBytes = MAX_RFBUFF;
                     if (numBytes > 0)
                     {
                         uint8_t *rawBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
                         if (rawBuff)
                         {
                             radioRecvStatus();
-                            memset(rawBuff, 0, numBytes);
                             state = radioHal->readData(rawBuff, numBytes);
                             if (state == RADIOLIB_ERR_NONE)
                             {
@@ -1307,16 +1308,17 @@ bool APRS_poll(void)
                                 NRZIDecode(byteArr, rawBuff, numBytes);
                                 // printHex(rawBuff, numBytes);
                                 size_t frame_len = 0;
-                                int idx = 0;
+                                int offset = 0;
+                                int remaining = numBytes;
                                 do
                                 {
                                     frame_len = 0;
-                                    idx = hdlcDecode(byteArr, frame_len, &rawBuff[idx], numBytes);
+                                    int consumed = hdlcDecode(byteArr, frame_len, &rawBuff[offset], remaining);
                                     if (frame_len > 2)
                                     {
                                         status.rxCount++;
-                                        // rssi = fskRSSI;
-                                        // fskRSSI = -130;
+                                        rssi = fskRSSI;
+                                        fskRSSI = -130;
                                         frame_len -= 2; // remove FCS 2byte
                                         char nmea[256];
                                         ais_to_nmea((unsigned char *)byteArr, frame_len, nmea, sizeof(nmea));
@@ -1325,11 +1327,12 @@ bool APRS_poll(void)
                                         if (aisRaw.length() > 0)
                                         {
                                             // log_d("%s",aisRaw.c_str());
-                                            int size = APRS_getTNC2(aisRaw);
+                                            APRS_getTNC2(aisRaw);
                                         }
                                     }
-                                    numBytes -= idx;
-                                } while (numBytes >= 10);
+                                    remaining -= consumed;
+                                    offset += consumed;
+                                } while (remaining >= 10);
                             }
                             free(rawBuff);
                         }
@@ -1406,6 +1409,7 @@ bool APRS_poll(void)
                         // log_d("[LoRa] Received packet! %d Byte\n", numBytes);
                         if (numBytes > 10)
                         {
+                            
                             // Check AX.25 protocol with HDLC 7E Flage
                             if (byteArr[0] == 0x7E) //AX.25 with HDLC 0x7E flag
                             {
@@ -1422,6 +1426,8 @@ bool APRS_poll(void)
                                         memcpy(AX25.buf, outputBuff, frame_len);
                                         ax25_decode(&AX25);
                                         log_d("[LoRa AX.25] Packet size %d Byte", frame_len);
+                                    }else{
+                                        log_d("[LoRa] HDLC decode failed! %d/ %d Byte", frame_len, numBytes);
                                     }
                                     free(outputBuff);
                                 }
@@ -1730,13 +1736,14 @@ bool APRS_poll(void)
                 {
                     rxTimeout1 = millis() + 300000;
                     numBytes = radioHal1->getPacketLength();
+                    if (numBytes > MAX_RFBUFF)
+                        numBytes = MAX_RFBUFF;
                     if (numBytes > 0)
                     {
                         uint8_t *rawBuff = (uint8_t *)calloc(numBytes, sizeof(uint8_t));
                         if (rawBuff)
                         {
                             radioRecvStatus1();
-                            memset(rawBuff, 0, numBytes);
                             state = radioHal1->readData(rawBuff, numBytes);
                             if (state == RADIOLIB_ERR_NONE)
                             {
@@ -1745,16 +1752,17 @@ bool APRS_poll(void)
                                 NRZIDecode(byteArr, rawBuff, numBytes);
                                 // printHex(rawBuff, numBytes);
                                 size_t frame_len = 0;
-                                int idx = 0;
+                                int offset = 0;
+                                int remaining = numBytes;
                                 do
                                 {
                                     frame_len = 0;
-                                    idx = hdlcDecode(byteArr, frame_len, &rawBuff[idx], numBytes);
+                                    int consumed = hdlcDecode(byteArr, frame_len, &rawBuff[offset], remaining);
                                     if (frame_len > 2)
                                     {
                                         status.rxCount++;
-                                        // rssi = fskRSSI;
-                                        // fskRSSI = -130;
+                                        rssi = fskRSSI;
+                                        fskRSSI = -130;
                                         frame_len -= 2; // remove FCS 2byte
                                         char nmea[256];
                                         ais_to_nmea((unsigned char *)byteArr, frame_len, nmea, sizeof(nmea));
@@ -1763,11 +1771,12 @@ bool APRS_poll(void)
                                         if (aisRaw.length() > 0)
                                         {
                                             // log_d("%s",aisRaw.c_str());
-                                            int size = APRS_getTNC2(aisRaw);
+                                            APRS_getTNC2(aisRaw);
                                         }
                                     }
-                                    numBytes -= idx;
-                                } while (numBytes >= 10);
+                                    remaining -= consumed;
+                                    offset += consumed;
+                                } while (remaining >= 10);
                             }
                             free(rawBuff);
                         }

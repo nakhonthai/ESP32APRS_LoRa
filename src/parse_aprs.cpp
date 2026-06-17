@@ -106,6 +106,8 @@ String ParseAPRS::deg2lon(double deg)
 	uint id = (uint)floor(deg);
 	uint im = (uint)((deg - (double)id) * 60);
 	uint imm = (uint)round((((deg - (double)id) * 60) - (double)im) * 100);
+	if (imm >= 100) { imm = 0; im++; }
+	if (im >= 60)   { im = 0;  id++; }
 	char dmm[10];
 	sprintf(dmm, "%03d%02d.%02d%c", id, im, imm, sign);
 	return String(dmm);
@@ -127,6 +129,8 @@ String ParseAPRS::deg2lat(double deg)
 	uint id = (uint)floor(deg);
 	uint im = (uint)((deg - (double)id) * 60);
 	uint imm = (uint)round((((deg - (double)id) * 60) - (double)im) * 100);
+	if (imm >= 100) { imm = 0; im++; }
+	if (im >= 60)   { im = 0;  id++; }
 	char dmm[10];
 	sprintf(dmm, "%02d%02d.%02d%c", id, im, imm, sign);
 	return String(dmm);
@@ -928,14 +932,17 @@ int ParseAPRS::parse_aprs_mice(struct pbuf_t *pb, const unsigned char *body, con
 	 * symbol table and code are checked). Not bullet proof..
 	 *
 	 *   0          1          23            4          5          6              7
-	 * /^[\x26-\x7f][\x26-\x61][\x1c-\x7f]{2}[\x1c-\x7d][\x1c-\x7f][\x21-\x7b\x7d][\/\\A-Z0-9]/
+	 * /^[\x26-\xcf][\x26-\x93][\x1c-\x7f]{2}[\x1c-\x7d][\x1c-\x7f][\x21-\x7b\x7d][\/\\A-Z0-9]/
+	 *
+	 * body[0] upper bound extended to 0xcf: longitude degrees 100-179 encode as d+28=128-207 (0x80-0xcf)
+	 * body[1] upper bound extended to 0x93: minutes with +60 bias encode up to 59+28+60=147 (0x93)
 	 */
-	if (body[0] < 0x26 || body[0] > 0x7f)
+	if (body[0] < 0x26 || body[0] > 0xcf)
 	{
 		log_d("..bad infofield column 1");
 		return 0;
 	}
-	if (body[1] < 0x26 || body[1] > 0x61)
+	if (body[1] < 0x26 || body[1] > 0x93)
 	{
 		log_d("..bad infofield column 2");
 		return 0;
