@@ -211,6 +211,7 @@ int getRawWx(char *strData)
     unsigned int i;
     char strtmp[300], obj[30];
 
+    strData[0] = '\0';
     memset(&obj[0], 0, sizeof(obj));
 
     weather.visable = 0;
@@ -231,9 +232,10 @@ int getRawWx(char *strData)
         case WX_WIND_GUST:
             float windspeed;
             getSensor(senType, &windspeed, i, config.wx_sensor_avg[i]);
-            if(wgIdx>=(sizeof(wgArray)/4)) wgIdx=0;
+            if(wgIdx>=(sizeof(wgArray)/sizeof(wgArray[0]))) wgIdx=0;
             wgArray[wgIdx++]=windspeed;
-            for(int i;i<(sizeof(wgArray)/4);i++)
+            weather.windgust = 0;
+            for(int i = 0; i < (int)(sizeof(wgArray)/sizeof(wgArray[0])); i++)
             {
                 if(wgArray[i]>weather.windgust) weather.windgust=wgArray[i];
             }
@@ -307,7 +309,7 @@ int getRawWx(char *strData)
 
     if (config.wx_flage & WX_WIND_DIR)
     {
-        if (weather.visable & WX_WIND_DIR & (weather.winddirection<361))
+        if ((weather.visable & WX_WIND_DIR) && (weather.winddirection < 361))
             sprintf(strtmp, "%03u/", weather.winddirection);
         else
             sprintf(strtmp, ".../");
@@ -585,11 +587,11 @@ int getRawWx(char *strData)
         {
             double tmp=(weather.temperature * 9.0F / 5.0F) + 32.0F;
             tmp *= 50.0F;
-            unsigned int tempF = (unsigned int)round(tmp);
+            int tempF = (int)round(tmp);
             if(tempF < 0){
-                sprintf(strtmp, "T-%03u", tempF);
+                sprintf(strtmp, "T-%03d", -tempF);
             }else{
-                sprintf(strtmp, "T%04u", tempF);
+                sprintf(strtmp, "T%04d", tempF);
             }
             strcat(strData, strtmp);
         }
@@ -773,7 +775,7 @@ int getWxJson(char *strData, bool avg)
     if (config.wx_flage & WX_RAIN)
     {
         if (weather.visable & WX_RAIN){
-            sprintf(strtmp, ",\"Rain\":\"%d\"", weather.rain);
+            sprintf(strtmp, ",\"Rain\":\"%.1f\"", weather.rain);
             strcat(strData, strtmp);
         }
     }
