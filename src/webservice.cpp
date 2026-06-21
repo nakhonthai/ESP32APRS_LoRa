@@ -7895,6 +7895,10 @@ void handle_igate(AsyncWebServerRequest *request)
 				 (config.rf2inetFilter & FILTER_POSITION) ? "checked" : "");
 		strcat(html, tempHtml);
 
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"rf2inetFilterPosition\" type=\"checkbox\" value=\"OK\" %s/>ALL</td>\n",
+				 (config.rf2inetFilter & FILTER_ENABLE_ALL) ? "checked" : "");
+		strcat(html, tempHtml);
+
 		strcat(html, "<td style=\"border:unset;\"></td>");
 		strcat(html, "</tr></table></fieldset>\n");
 		strcat(html, "</td></tr>\n");
@@ -11636,6 +11640,7 @@ void handle_about(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
+	char FirmwareOTA[50];
 	char strCID[50];
 	uint64_t chipid = ESP.getEfuseMac();
 	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
@@ -11655,10 +11660,13 @@ void handle_about(AsyncWebServerRequest *request)
 	strcat(webString, "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\">");
 #ifdef HT_CT62
 	strcat(webString, "HT-CT62,ESP32-C3 DIY");
+	sprintf(FirmwareOTA, "HTCT62_%s%s", VERSION, VERSION_BUILD);
 #elif LORA_TRACKER
 	strcat(webString, "APRS LoRa Tracker Rev.1");
+	sprintf(FirmwareOTA, "LoRaTracker_%s%s", VERSION, VERSION_BUILD);
 #elif ESP32C3_MINI
 	strcat(webString, "ESP32-C3-Mini,ESP32-C3 DIY");
+	sprintf(FirmwareOTA, "ESP32C3_MINI_%s%s", VERSION, VERSION_BUILD);
 #elif defined(TTGO_LORA32_V1)
 	strcat(webString, "TTGO LORA32 V1,ESP32 DIY");
 #elif defined(TTGO_LORA32_V1_6)
@@ -11695,7 +11703,7 @@ void handle_about(AsyncWebServerRequest *request)
 	char *temp_str = allocateStringMemory(512);
 	if (temp_str)
 	{
-		snprintf(temp_str, 512, "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V%s%c</td></tr>\n", VERSION, VERSION_BUILD);
+		snprintf(temp_str, 512, "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V%s%s</td></tr>\n", VERSION, VERSION_BUILD);
 		strcat(webString, temp_str);
 
 		snprintf(temp_str, 512, "<tr><td align=\"right\"><b>RF Module: </b></td><td align=\"left\"> %s</td></tr>\n", RF_TYPE[config.rf_type]);

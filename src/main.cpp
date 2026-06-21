@@ -4887,7 +4887,7 @@ void setup()
             display.setTextColor(WHITE);
 
             display.setCursor(60, 5);
-            display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+            display.printf("FW Ver %s%s", VERSION, VERSION_BUILD);
             display.setCursor(52, 42);
             display.print("BOOT Wait");
             display.display();
@@ -4992,7 +4992,7 @@ void setup()
             display.setTextColor(ST77XX_GREEN);
 
             display.setCursor(80, 50);
-            display.printf("FW Ver %s%c", VERSION, VERSION_BUILD);
+            display.printf("FW Ver %s%s", VERSION, VERSION_BUILD);
             display.setCursor(85, 5);
             display.print("Copy@2024");
             display.display();
@@ -8989,6 +8989,7 @@ void taskAPRS(void *pvParameters)
                             memset(tlm_data, 0, 200);
                             memset(tlm_result, 0, 100);
                             int n = 0;
+                            bool visable = true;
                             sprintf(tlm_data, "%i", TLM_SEQ);
                             for (int s = 0; s < 5; s++)
                             {
@@ -9002,8 +9003,12 @@ void taskAPRS(void *pvParameters)
                                     strcat(tlm_data, ",");
                                     int sen_idx = config.trk_tlm_sensor[s] - 1;
                                     double data = 0;
-                                    if (sen[sen_idx].visable)
+                                    if (sen[sen_idx].visable){
                                         data = sen[sen_idx].sample;
+                                    }else{
+                                        visable=false;
+                                        break;
+                                    }
                                     double precision = pow(10.0f, (double)config.trk_tlm_precision[s]);
                                     int val = (int)((data + config.trk_tlm_offset[s]) * precision);
                                     // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
@@ -9011,15 +9016,17 @@ void taskAPRS(void *pvParameters)
                                         val = 8280;
                                     if (val < 0)
                                         val = 0;
-                                    char strVal[10];
+                                    char strVal[10]; 
                                     sprintf(strVal, "%i", val);
                                     strcat(tlm_data, strVal);
                                 }
                             }
                             // log_d("TLM_DATA:%s",tlm_data);
                             //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
-                            telemetry_base91(tlm_data, tlm_result, tlm_sz);
-                            cmn = String(tlm_result);
+                            if(visable){
+                                telemetry_base91(tlm_data, tlm_result, tlm_sz);
+                                cmn = String(tlm_result);
+                            }
                         }
                     }
                 }
@@ -9403,6 +9410,7 @@ void taskAPRS(void *pvParameters)
                                     memset(tlm_data, 0, 200);
                                     memset(tlm_result, 0, 100);
                                     int n = 0;
+                                    bool visable=true;
                                     sprintf(tlm_data, "%i", IGATE_TLM_SEQ);
                                     for (int s = 0; s < 5; s++)
                                     {
@@ -9416,8 +9424,12 @@ void taskAPRS(void *pvParameters)
                                             strcat(tlm_data, ",");
                                             int sen_idx = config.igate_tlm_sensor[s] - 1;
                                             double data = 0;
-                                            if (sen[sen_idx].visable)
+                                            if (sen[sen_idx].visable){
                                                 data = sen[sen_idx].sample;
+                                            }else{
+                                                visable=false;
+                                                break;
+                                            }
                                             double precision = pow(10.0f, (double)config.igate_tlm_precision[s]);
                                             int val = (int)((data + config.igate_tlm_offset[s]) * precision);
                                             // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
@@ -9432,8 +9444,10 @@ void taskAPRS(void *pvParameters)
                                     }
                                     // log_d("TLM_DATA:%s",tlm_data);
                                     //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
-                                    telemetry_base91(tlm_data, tlm_result, tlm_sz);
-                                    rawData += String(tlm_result);
+                                    if(visable){
+                                        telemetry_base91(tlm_data, tlm_result, tlm_sz);
+                                        rawData += String(tlm_result);
+                                    }
                                 }
                             }
                         }
@@ -9471,7 +9485,7 @@ void taskAPRS(void *pvParameters)
                     int ret = 0;
                     uint16_t type = pkgType((const char *)&incomingPacket.info[0]);
                     // IGate Filter RF->INET
-                    if ((type & config.rf2inetFilter))
+                    if ((config.rf2inetFilter & FILTER_ENABLE_ALL) || (type & config.rf2inetFilter))
                         ret = igateProcess(incomingPacket);
                     if (ret == 0)
                     {
@@ -9642,6 +9656,7 @@ void taskAPRS(void *pvParameters)
                                     memset(tlm_data, 0, 200);
                                     memset(tlm_result, 0, 100);
                                     int n = 0;
+                                    bool visable=true;
                                     sprintf(tlm_data, "%i", DIGI_TLM_SEQ);
                                     for (int s = 0; s < 5; s++)
                                     {
@@ -9655,8 +9670,12 @@ void taskAPRS(void *pvParameters)
                                             strcat(tlm_data, ",");
                                             int sen_idx = config.digi_tlm_sensor[s] - 1;
                                             double data = 0;
-                                            if (sen[sen_idx].visable)
+                                            if (sen[sen_idx].visable){
                                                 data = sen[sen_idx].sample;
+                                            }else{
+                                                visable=false;
+                                                break;
+                                            }
                                             double precision = pow(10.0f, (double)config.digi_tlm_precision[s]);
                                             int val = (int)((data + config.digi_tlm_offset[s]) * precision);
                                             // log_d("s:%d Data:%.2f /tPresion:%.5f /tOffset:%.5f/t Val:%d",s,sen[sen_idx].sample,precision,config.trk_tlm_offset[s],val);
@@ -9671,8 +9690,10 @@ void taskAPRS(void *pvParameters)
                                     }
                                     // log_d("TLM_DATA:%s",tlm_data);
                                     //  sprintf(tlm_data, "%i,%i,%i,%i", TLM_SEQ, (int)(VBat * 100), int(TempNTC * 100), gps.satellites.value());
-                                    telemetry_base91(tlm_data, tlm_result, tlm_sz);
-                                    rawData += String(tlm_result);
+                                    if(visable){
+                                        telemetry_base91(tlm_data, tlm_result, tlm_sz);
+                                        rawData += String(tlm_result);
+                                    }
                                 }
                             }
                         }
@@ -10546,10 +10567,10 @@ void taskNetwork(void *pvParameters)
 #if (CORE_DEBUG_LEVEL > 0)
                 log_d("Contacting Time Server\n");
 #endif
-                configTime(3600 * config.timeZone, 0, config.ntp_host);
+                configTime(3600 * config.timeZone, 0, config.ntp_host,"44.63.31.199");
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 struct tm tmstruct;
-                if (getLocalTime(&tmstruct, 1000))
+                if (getLocalTime(&tmstruct, 3000))
                 {
                     time_t systemTime;
                     time(&systemTime);
