@@ -1,5 +1,5 @@
 Import("env")
-import os, shutil
+import os, re, shutil
 
 FIRMWARE_NAMES = {
     "ht-ct62":            "HTCT62",
@@ -25,8 +25,8 @@ def copy_firmware(source, target, env):
         if isinstance(item, (list, tuple)) and len(item) == 2:
             defines[str(item[0])] = str(item[1])
 
-    version = defines.get("VERSION", "0.0").strip("\"'").replace(".", "")
-    version_build = defines.get("VERSION_BUILD", "a").strip("\"'")
+    version = re.sub(r'[\\"\']', '', defines.get("VERSION", "0.0")).replace(".", "")
+    version_build = re.sub(r'[\\"\']', '', defines.get("VERSION_BUILD", "a"))
 
     env_name = env["PIOENV"]
     prefix = FIRMWARE_NAMES.get(env_name, env_name)
