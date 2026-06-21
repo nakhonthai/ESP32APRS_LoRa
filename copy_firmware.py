@@ -14,6 +14,8 @@ FIRMWARE_NAMES = {
     "aprs-lora-dongle":   "LoRaDongle",
     "t_beam_s3_bpf":      "TBEAM-S3-BPF",
     "t_beam_s3_1w":       "TBEAM-S3-1W",
+    "aprs-lora-ht":       "LoRaHT",
+    "NAWS4-ESP32S3":       "NAWS4",
 }
 
 def copy_firmware(source, target, env):
@@ -23,8 +25,8 @@ def copy_firmware(source, target, env):
         if isinstance(item, (list, tuple)) and len(item) == 2:
             defines[str(item[0])] = str(item[1])
 
-    version = defines.get("VERSION", '"0.0"').strip('"').replace(".", "")
-    version_build = defines.get("VERSION_BUILD", "'a'").strip("'")
+    version = defines.get("VERSION", "0.0").strip("\"'").replace(".", "")
+    version_build = defines.get("VERSION_BUILD", "a").strip("\"'")
 
     env_name = env["PIOENV"]
     prefix = FIRMWARE_NAMES.get(env_name, env_name)
