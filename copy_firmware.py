@@ -4,18 +4,20 @@ import os, re, shutil
 FIRMWARE_NAMES = {
     "ht-ct62":            "HTCT62",
     "esp32c3-mini":       "ESP32C3mini",
-    "esp32-sh1106_8MB":   "ESP32SH1106-8B",
+    "esp32-sh1106_8MB":   "ESP32SH1106_8B",
     "ttgo-lora32-v1":     "TTGO_LoRa32V1",
-    "ttgo-lora32-v1_6":   "TTGO_LoRa32-V16",
-    "ttgo-t-beam-v1_2":   "TTGO_TBeam-V2",
+    "ttgo-lora32-v1_6":   "TTGO_LoRa32_V16",
+    "ttgo-lora32-v21":    "TTGO_LORA32_V21",
+    "ttgo-t-beam-v1_2":   "TTGO_TBeam_V12",
     "heltec_htit_tracker":"HTITTracker",
-    "t_beam_s3_supreme":  "TBEAM-S3-SUPREME",
-    "heltec_V3_GPS":      "HELTEC-LoRa32-V3",
+    "t_beam_s3_supreme":  "TBEAM_S3_SUPREME",
+    "heltec_V3_GPS":      "HELTEC_LoRa32_V3",
     "aprs-lora-dongle":   "LoRaDongle",
-    "t_beam_s3_bpf":      "TBEAM-S3-BPF",
-    "t_beam_s3_1w":       "TBEAM-S3-1W",
+    "t_beam_s3_bpf":      "TBEAM_S3_BPF",
+    "t_beam_s3_1w":       "TBEAM_S3_1W",
     "aprs-lora-ht":       "LoRaHT",
-    "NAWS4-ESP32S3":       "NAWS4",
+    "NAWS4-ESP32S3":      "NAWS4",
+    "lora-tracker":       "LoRaTracker",
 }
 
 def copy_firmware(source, target, env):

@@ -181,8 +181,8 @@ void notFound(AsyncWebServerRequest *request)
 
 void handle_logout(AsyncWebServerRequest *request)
 {
-	webString = "Log out";
-	request->send(200, "text/html", webString);
+	String webString = "Log out";
+	request->send(200, "text/html",;
 }
 
 void setMainPage(AsyncWebServerRequest *request)
@@ -11634,6 +11634,62 @@ void handle_test(AsyncWebServerRequest *request)
 	webString.clear();
 }
 
+static void ota_url_task(void *pvParameters)
+{
+	char *url = (char *)pvParameters;
+	HTTPClient http;
+	http.begin(url);
+	http.setTimeout(30000);
+	int httpCode = http.GET();
+	if (httpCode == HTTP_CODE_OK) {
+		int contentLength = http.getSize();
+		WiFiClient *stream = http.getStreamPtr();
+		if (contentLength > 0 && Update.begin(contentLength)) {
+			disableLoopWDT();
+			disableCore0WDT();
+			Update.writeStream(*stream);
+			if (Update.end(true)) {
+				log_i("OTA URL update success, rebooting");
+				delay(500);
+				esp_restart();
+			} else {
+				Update.printError(Serial);
+			}
+		} else {
+			log_e("OTA URL: bad content length or Update.begin failed");
+		}
+	} else {
+		log_e("OTA URL: HTTP GET failed, code=%d", httpCode);
+	}
+	http.end();
+	free(url);
+	vTaskDelete(NULL);
+}
+
+void handle_ota_url(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password)) {
+		return request->requestAuthentication();
+	}
+	if (!request->hasParam("url", true)) {
+		request->send(400, "text/plain", "Missing url parameter");
+		return;
+	}
+	String urlStr = request->getParam("url", true)->value();
+	if (urlStr.length() == 0) {
+		request->send(400, "text/plain", "Empty url");
+		return;
+	}
+	char *urlBuf = (char *)malloc(urlStr.length() + 1);
+	if (!urlBuf) {
+		request->send(500, "text/plain", "Out of memory");
+		return;
+	}
+	strcpy(urlBuf, urlStr.c_str());
+	request->send(200, "text/plain", "OTA update started");
+	xTaskCreate(ota_url_task, "ota_url_task", 8192, urlBuf, 5, NULL);
+}
+
 void handle_about(AsyncWebServerRequest *request)
 {
 	if (!request->authenticate(config.http_username, config.http_password))
@@ -11658,39 +11714,62 @@ void handle_about(AsyncWebServerRequest *request)
 	strcat(webString, "<th colspan=\"2\"><span><b>System Information</b></span></th>\n");
 	// strcat(webString, "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
 	strcat(webString, "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\">");
+
+	// Build a dot-free version string for use in firmware filenames
+	char verNoDot[20];
+	{
+		const char *src = VERSION;
+		char *dst = verNoDot;
+		while (*src) { if (*src != '.') *dst++ = *src; src++; }
+		*dst = '\0';
+	}
+	char ver[20];
+	sprintf(ver, "V%s%s.bin", verNoDot, VERSION_BUILD);
 #ifdef HT_CT62
 	strcat(webString, "HT-CT62,ESP32-C3 DIY");
-	sprintf(FirmwareOTA, "HTCT62_%s%s", VERSION, VERSION_BUILD);
+	sprintf(FirmwareOTA, "HTCT62_%s", ver);
 #elif LORA_TRACKER
 	strcat(webString, "APRS LoRa Tracker Rev.1");
-	sprintf(FirmwareOTA, "LoRaTracker_%s%s", VERSION, VERSION_BUILD);
+	sprintf(FirmwareOTA, "LoRaTracker_%s", ver);
 #elif ESP32C3_MINI
 	strcat(webString, "ESP32-C3-Mini,ESP32-C3 DIY");
-	sprintf(FirmwareOTA, "ESP32C3_MINI_%s%s", VERSION, VERSION_BUILD);
+	sprintf(FirmwareOTA, "ESP32C3mini_%s", ver);
 #elif defined(TTGO_LORA32_V1)
 	strcat(webString, "TTGO LORA32 V1,ESP32 DIY");
+	sprintf(FirmwareOTA, "TTGO_LoRa32V1_%s", ver);
 #elif defined(TTGO_LORA32_V1_6)
 	strcat(webString, "TTGO LORA32(T3) V1.6,ESP32 DIY");
+	sprintf(FirmwareOTA, "TTGO_LoRa32_V16_%s", ver);
 #elif defined(TTGO_T_Beam_V1_2)
 	strcat(webString, "TTGO_T_Beam_V1.2,ESP32 DIY");
-#elif defined(TTGO_T_Beam_V1_0)
-	strcat(webString, "TTGO_T_Beam_V1.0,ESP32 DIY");
-#elif defined(TTGO_T_LORA32_V2_1_GPS)
+	sprintf(FirmwareOTA, "TTGO_TBeam_V12_%s", ver);
+#elif defined(TTGO_LORA32_V21)
 	strcat(webString, "TTGO_T_LORA32_V2.1-GPS,ESP32 DIY");
+	sprintf(FirmwareOTA, "TTGO_LoRa32_V21_%s", ver);
 #elif defined(T_BEAM_S3_SUPREME)
 	strcat(webString, "T_BEAM_S3_SUPREME");
+	sprintf(FirmwareOTA, "TBEAM_S3_SUPREME_%s", ver);
 #elif defined(T_BEAM_S3_BPF)
 	strcat(webString, "LilyGo T-Beam-BPF");
+	sprintf(FirmwareOTA, "TBEAM_S3_BPF_%s", ver);
 #elif defined(T_BEAM_S3_1W)
 	strcat(webString, "LilyGo T-Beam-1W");
-#elif defined(HELTEC_V3_GPS)
-	strcat(webString, "HELTEC_V3_GPS,ESP32 DIY");
+	sprintf(FirmwareOTA, "TBEAM_S3_1W_%s", ver);
 #elif defined(HELTEC_HTIT_TRACKER)
 	strcat(webString, "HELTEC HTIT-TRACKER,ESP32-S3 DIY");
+	sprintf(FirmwareOTA, "HTITTracker_%s", ver);
 #elif defined(HELTEC_V3_GPS)
 	strcat(webString, "HELTEC WiFi LoRa32 V3,ESP32-S3 DIY");
+	sprintf(FirmwareOTA, "HELTEC_LoRa32_V3_%s", ver);
+#elif defined(APRS_LORA_HT)
+	strcat(webString, "HELTEC WiFi LoRa32 V3,ESP32-S3 DIY");
+	sprintf(FirmwareOTA, "LoRaHT_%s", ver);
+#elif defined(NAWS4)
+	strcat(webString, "HELTEC WiFi LoRa32 V3,ESP32-S3 DIY");
+	sprintf(FirmwareOTA, "NAWS4_%s", ver);
 #elif defined(APRS_LORA_DONGLE)
 	strcat(webString, "APRS LoRa Dongle,ESP32-S3 DIY");
+	sprintf(FirmwareOTA, "LoRaDongle_V%s%s.bin", verNoDot, VERSION_BUILD);
 #elif defined(TTGO_T_Beam_V1_2_SX1262) || defined(TTGO_T_Beam_V1_2_SX1268)
 	strcat(webString, "TTGO_T_Beam_V1_2_SX1262,TTGO_T_Beam_V1_2_SX1268");
 #elif defined(BV5DJ_BOARD)
@@ -11914,9 +11993,9 @@ void handle_about(AsyncWebServerRequest *request)
 	strcat(webString, "<tr><td align=\"right\"><b>File:</b></td><td align=\"left\"><input id=\"file\" name=\"update\" type=\"file\" onchange='sub(this)' /></td></tr>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>Progress:</b></td><td><div id='prgbar'><div id='bar' style=\"width: 0px;\"><label id='prg'></label></div></div></td></tr>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>Support Firmware:</b></td><td align=\"left\"><a target=\"_download\" href=\"https://github.com/nakhonthai/ESP32APRS_LoRa/releases\">https://github.com/nakhonthai/ESP32APRS_LoRa/releases</a></td></tr>\n");
+	
+	strcat(webString, "<tr><td colspan=\"2\" align=\"right\"><div class=\"col-sm-3 col-xs-4\"><input type='submit' class=\"btn btn-danger\" id=\"update_sumbit\" value='Firmware UpLoad'></div></td></tr>\n");
 	strcat(webString, "</table><br />\n");
-	strcat(webString, "<div class=\"col-sm-3 col-xs-4\"><input type='submit' class=\"btn btn-danger\" id=\"update_sumbit\" value='Firmware Update'></div>\n");
-
 	strcat(webString, "</form>\n");
 	// strcat(webString, "</td></tr></table><br />");
 
@@ -11951,6 +12030,53 @@ void handle_about(AsyncWebServerRequest *request)
 					  "alert('Wait for system reboot 10sec');"
 					  "},"
 					  "error: function (a, b, c) {"
+					  "}"
+					  "});"
+					  "});"
+					  "</script>");
+
+	{
+		char ota_url_buf[200];
+		snprintf(ota_url_buf, sizeof(ota_url_buf), "http://fw.nakhonthai.net/%s", FirmwareOTA);
+		strcat(webString, "<table>");
+		strcat(webString, "<th colspan=\"2\"><span><b>OTA Update from URL</b></span></th>\n");
+		char ota_row[512];
+		snprintf(ota_row, sizeof(ota_row),
+			"<tr><td align=\"right\"><b>Firmware File:</b></td><td align=\"left\"><a href=\"%s\" target=\"_blank\">%s</a></td></tr>\n",
+			ota_url_buf, FirmwareOTA);
+		strcat(webString, ota_row);
+		snprintf(ota_row, sizeof(ota_row),
+			"<tr><td align=\"right\"><b>Current Version:</b></td><td align=\"left\">V%s%s</td></tr>\n",
+			VERSION, VERSION_BUILD);
+		strcat(webString, ota_row);
+		strcat(webString, "<tr><td align=\"right\"><b>Status:</b></td><td><span id='ota_prg'>Ready</span></td></tr>\n");
+		snprintf(ota_row, sizeof(ota_row),
+			"<tr><td colspan=\"2\" align=\"right\"><div class=\"col-sm-3 col-xs-4\">"
+			"<input type='hidden' id='ota_url' value='%s'>"
+			"<input type='button' class=\"btn btn-danger\" id=\"ota_sumbit\" value='Firmware Update from URL'>"
+			"</div></td></tr>\n",
+			ota_url_buf);
+		strcat(webString, ota_row);
+		strcat(webString, "</table><br />\n");
+	}
+
+	strcat(webString, "<script>"
+					  "document.getElementById('ota_sumbit').addEventListener('click', function(){"
+					  "if (!confirm('Download and install firmware from URL?\\n' + document.getElementById('ota_url').value)) return;"
+					  "document.getElementById('ota_sumbit').disabled = true;"
+					  "document.getElementById('ota_prg').innerHTML = 'Downloading... Please wait ~30 sec';"
+					  "$.ajax({"
+					  "url: '/ota_url',"
+					  "type: 'POST',"
+					  "data: { url: document.getElementById('ota_url').value },"
+					  "success: function(d, s) {"
+					  "document.getElementById('ota_prg').innerHTML = 'Update started. Rebooting...';"
+					  "alert('OTA update started. Wait for system reboot (~30sec).');"
+					  "},"
+					  "error: function(a, b, c) {"
+					  "document.getElementById('ota_prg').innerHTML = 'Error: ' + c;"
+					  "document.getElementById('ota_sumbit').disabled = false;"
+					  "alert('OTA update failed: ' + c);"
 					  "}"
 					  "});"
 					  "});"
@@ -12299,6 +12425,9 @@ void webService()
 				}
 			}
 		});
+
+	async_server.on("/ota_url", HTTP_POST, [](AsyncWebServerRequest *request)
+					{ handle_ota_url(request); });
 
 	lastheard_events.onConnect([](AsyncEventSourceClient *client)
 							   {

@@ -11,8 +11,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define VERSION "0.8"
-#define VERSION_BUILD 'd'
+// #define VERSION "0.8"
+// #define VERSION_BUILD 'f'
 
 #include <Arduino.h>
 // #include "ModbusMaster.h"
@@ -78,6 +78,7 @@
 #define FILTER_BUOY (1 << 8)		// packet is buoy
 #define FILTER_MICE (1 << 9)		// packet is MIC-E
 #define FILTER_THIRDPARTY (1 << 10) // packet is 3rd-party packet from INET2RF
+#define FILTER_ENABLE_ALL (1 << 15)			// Packet is enable all packet
 
 #define RF_NONE 0
 
