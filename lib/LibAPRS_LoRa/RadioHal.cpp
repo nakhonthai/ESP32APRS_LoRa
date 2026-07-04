@@ -88,29 +88,29 @@ int16_t RadioHal<SX1262>::begin()
     return radio->begin();
 }
 
-template<>
-int16_t RadioHal<SX1231>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
-{
-    return radio->begin(freq, br, freqDev, rxBw, power, preambleLength);
-}
+// template<>
+// int16_t RadioHal<SX1231>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
+// {
+//     return radio->begin(freq, br, freqDev, rxBw, power, preambleLength);
+// }
 
-template<>
-int16_t RadioHal<SX1233>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
-{
-    return radio->begin(freq, br, freqDev, rxBw, power, preambleLength);
-}
+// template<>
+// int16_t RadioHal<SX1233>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
+// {
+//     return radio->begin(freq, br, freqDev, rxBw, power, preambleLength);
+// }
 
-template<>
-int16_t RadioHal<SX1261>::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint16_t preambleLength, uint8_t gain, float tcxoVoltage)
-{
-    if (power>=17) radio->setCurrentLimit(150);
-    return radio->begin(freq, bw, sf, cr, syncWord, power, preambleLength, tcxoVoltage);
-}
-template<>
-int16_t RadioHal<SX1261>::begin()
-{
-    return radio->begin();
-}
+// template<>
+// int16_t RadioHal<SX1261>::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint16_t preambleLength, uint8_t gain, float tcxoVoltage)
+// {
+//     if (power>=17) radio->setCurrentLimit(150);
+//     return radio->begin(freq, bw, sf, cr, syncWord, power, preambleLength, tcxoVoltage);
+// }
+// template<>
+// int16_t RadioHal<SX1261>::begin()
+// {
+//     return radio->begin();
+// }
 
 
 template<>
@@ -195,12 +195,12 @@ int16_t RadioHal<SX1262>::beginFSK(float freq, float br, float freqDev, float rx
     return radio->beginFSK(freq, br, freqDev, rxBw, power, preambleLength, tcxoVoltage, useRegulatorLDO);
 }
 
-template<>
-int16_t RadioHal<SX1261>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
-{
-    if (power>=17) radio->setCurrentLimit(150);
-    return radio->beginFSK(freq, br, freqDev, rxBw, power, preambleLength, tcxoVoltage, useRegulatorLDO);
-}
+// template<>
+// int16_t RadioHal<SX1261>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
+// {
+//     if (power>=17) radio->setCurrentLimit(150);
+//     return radio->beginFSK(freq, br, freqDev, rxBw, power, preambleLength, tcxoVoltage, useRegulatorLDO);
+// }
 
 template<>
 int16_t RadioHal<SX1280>::beginFSK(float freq, float br, float freqDev, float rxBw, int8_t power, uint16_t preambleLength, bool enableOOK, float tcxoVoltage, bool useRegulatorLDO)
@@ -250,23 +250,23 @@ float RadioHal<SX1262>::getRSSI(bool packet,bool skipReceive)
     return radio->getRSSI(packet);
 }
 
-template<>
-float RadioHal<SX1261>::getRSSI(bool packet,bool skipReceive)
-{
-    return radio->getRSSI(packet);
-}
+// template<>
+// float RadioHal<SX1261>::getRSSI(bool packet,bool skipReceive)
+// {
+//     return radio->getRSSI(packet);
+// }
 
-template<>
-float RadioHal<SX1231>::getRSSI(bool packet,bool skipReceive)
-{
-    return radio->getRSSI();
-}
+// template<>
+// float RadioHal<SX1231>::getRSSI(bool packet,bool skipReceive)
+// {
+//     return radio->getRSSI();
+// }
 
-template<>
-float RadioHal<SX1233>::getRSSI(bool packet,bool skipReceive)
-{
-    return radio->getRSSI();
-}
+// template<>
+// float RadioHal<SX1233>::getRSSI(bool packet,bool skipReceive)
+// {
+//     return radio->getRSSI();
+// }
 
 template<>
 float RadioHal<SX1279>::getRSSI(bool packet,bool skipReceive)
@@ -312,11 +312,11 @@ float RadioHal<SX1262>::getFrequencyError(bool autoCorrect)
     return radio->getFrequencyError();
 }
 
-template<>
-float RadioHal<SX1261>::getFrequencyError(bool autoCorrect)
-{
-    return radio->getFrequencyError();
-}
+// template<>
+// float RadioHal<SX1261>::getFrequencyError(bool autoCorrect)
+// {
+//     return radio->getFrequencyError();
+// }
 
 
 template<>
@@ -379,23 +379,23 @@ void RadioHal<SX1262>::setDio0Action(void (*func)(void))
     radio->setPacketReceivedAction(func);
 }
 
-template<>
-void RadioHal<SX1261>::setDio0Action(void (*func)(void))
-{
-    radio->setPacketReceivedAction(func);
-}
+// template<>
+// void RadioHal<SX1261>::setDio0Action(void (*func)(void))
+// {
+//     radio->setPacketReceivedAction(func);
+// }
 
-template<>
-void RadioHal<SX1231>::setDio0Action(void (*func)(void))
-{
-    radio->setPacketReceivedAction(func);
-}
+// template<>
+// void RadioHal<SX1231>::setDio0Action(void (*func)(void))
+// {
+//     radio->setPacketReceivedAction(func);
+// }
 
-template<>
-void RadioHal<SX1233>::setDio0Action(void (*func)(void))
-{
-    radio->setPacketReceivedAction(func);
-}
+// template<>
+// void RadioHal<SX1233>::setDio0Action(void (*func)(void))
+// {
+//     radio->setPacketReceivedAction(func);
+// }
 
 template<>
 void RadioHal<SX1279>::setDio0Action(void (*func)(void))
@@ -494,23 +494,23 @@ int16_t RadioHal<SX1262>::startReceive(uint8_t len, uint8_t mode)
     return radio->startReceive(len);
 }
 
-template<>
-int16_t RadioHal<SX1261>::startReceive(uint8_t len, uint8_t mode)
-{
-    return radio->startReceive(len);
-}
+// template<>
+// int16_t RadioHal<SX1261>::startReceive(uint8_t len, uint8_t mode)
+// {
+//     return radio->startReceive(len);
+// }
 
-template<>
-int16_t RadioHal<SX1231>::startReceive(uint8_t len, uint8_t mode)
-{
-    return radio->startReceive();
-}
+// template<>
+// int16_t RadioHal<SX1231>::startReceive(uint8_t len, uint8_t mode)
+// {
+//     return radio->startReceive();
+// }
 
-template<>
-int16_t RadioHal<SX1233>::startReceive(uint8_t len, uint8_t mode)
-{
-    return radio->startReceive();
-}
+// template<>
+// int16_t RadioHal<SX1233>::startReceive(uint8_t len, uint8_t mode)
+// {
+//     return radio->startReceive();
+// }
 
 template<>
 int16_t RadioHal<SX1280>::startReceive(uint8_t len, uint8_t mode)
@@ -590,11 +590,11 @@ int16_t RadioHal<SX1262>::autoLDRO()
     return radio->autoLDRO();
 }
 
-template<>
-int16_t RadioHal<SX1261>::autoLDRO()
-{
-    return radio->autoLDRO();
-}
+// template<>
+// int16_t RadioHal<SX1261>::autoLDRO()
+// {
+//     return radio->autoLDRO();
+// }
 
 template<>
 int16_t RadioHal<SX1279>::forceLDRO(bool enable)
@@ -638,11 +638,11 @@ int16_t RadioHal<SX1262>::forceLDRO(bool enable)
     return radio->forceLDRO(enable);
 }
 
-template<>
-int16_t RadioHal<SX1261>::forceLDRO(bool enable)
-{
-    return radio->forceLDRO(enable);
-}
+// template<>
+// int16_t RadioHal<SX1261>::forceLDRO(bool enable)
+// {
+//     return radio->forceLDRO(enable);
+// }
 
 template<>
 int16_t RadioHal<SX1280>::forceLDRO(bool enable)
@@ -704,23 +704,23 @@ int16_t RadioHal<SX1262>::fixedPacketLengthMode(uint8_t len)
     return radio->fixedPacketLengthMode(len);
 }
 
-template<>
-int16_t RadioHal<SX1261>::fixedPacketLengthMode(uint8_t len)
-{
-    return radio->fixedPacketLengthMode(len);
-}
+// template<>
+// int16_t RadioHal<SX1261>::fixedPacketLengthMode(uint8_t len)
+// {
+//     return radio->fixedPacketLengthMode(len);
+// }
 
-template<>
-int16_t RadioHal<SX1231>::fixedPacketLengthMode(uint8_t len)
-{
-    return radio->fixedPacketLengthMode(len);
-}
+// template<>
+// int16_t RadioHal<SX1231>::fixedPacketLengthMode(uint8_t len)
+// {
+//     return radio->fixedPacketLengthMode(len);
+// }
 
-template<>
-int16_t RadioHal<SX1233>::fixedPacketLengthMode(uint8_t len)
-{
-    return radio->fixedPacketLengthMode(len);
-}
+// template<>
+// int16_t RadioHal<SX1233>::fixedPacketLengthMode(uint8_t len)
+// {
+//     return radio->fixedPacketLengthMode(len);
+// }
 
 template<>
 int16_t RadioHal<SX1280>::fixedPacketLengthMode(uint8_t len)
@@ -782,11 +782,11 @@ int16_t RadioHal<SX1262>::setCRC(uint8_t len,	uint16_t initial , uint16_t polyno
     return radio->setCRC(len,initial,polynomial,inverted);
 }
 
-template<>
-int16_t RadioHal<SX1261>::setCRC(uint8_t len,	uint16_t initial , uint16_t polynomial , bool inverted )
-{
-    return radio->setCRC(len,initial,polynomial,inverted);
-}
+// template<>
+// int16_t RadioHal<SX1261>::setCRC(uint8_t len,	uint16_t initial , uint16_t polynomial , bool inverted )
+// {
+//     return radio->setCRC(len,initial,polynomial,inverted);
+// }
 
 template<>
 int16_t RadioHal<SX1280>::setCRC(uint8_t len,	uint16_t initial , uint16_t polynomial , bool inverted )
@@ -859,32 +859,32 @@ int16_t RadioHal<SX1262>::setEncoding(uint8_t encoding)
     return radio->setEncoding(encoding);
 }
 
-template<>
-int16_t RadioHal<SX1261>::setEncoding(uint8_t encoding) 
-{
-    if (encoding == 10)
-        encoding = 1;
+// template<>
+// int16_t RadioHal<SX1261>::setEncoding(uint8_t encoding) 
+// {
+//     if (encoding == 10)
+//         encoding = 1;
 
-    return radio->setEncoding(encoding);
-}
+//     return radio->setEncoding(encoding);
+// }
 
-template<>
-int16_t RadioHal<SX1231>::setEncoding(uint8_t encoding) 
-{
-    if (encoding == 10)
-        encoding = 1;
+// template<>
+// int16_t RadioHal<SX1231>::setEncoding(uint8_t encoding) 
+// {
+//     if (encoding == 10)
+//         encoding = 1;
 
-    return radio->setEncoding(encoding);
-}
+//     return radio->setEncoding(encoding);
+// }
 
-template<>
-int16_t RadioHal<SX1233>::setEncoding(uint8_t encoding) 
-{
-    if (encoding == 10)
-        encoding = 1;
+// template<>
+// int16_t RadioHal<SX1233>::setEncoding(uint8_t encoding) 
+// {
+//     if (encoding == 10)
+//         encoding = 1;
 
-    return radio->setEncoding(encoding);
-}
+//     return radio->setEncoding(encoding);
+// }
 
 template<>
 int16_t RadioHal<SX1268>::setEncoding(uint8_t encoding) 
@@ -964,11 +964,11 @@ bool RadioHal<SX1262>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
     return false;
 }
 
-template<>
-bool RadioHal<SX1261>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
-{
-    return false;
-}
+// template<>
+// bool RadioHal<SX1261>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
+// {
+//     return false;
+// }
 
 template<>
 bool RadioHal<SX1280>::fifoAdd(uint8_t* data, int totalLen, int* remLen)
@@ -1018,11 +1018,11 @@ void RadioHal<SX1279>::setFifoEmptyAction(void (*func)(void))
     radio->setFifoEmptyAction(func);
 }
 
-template<>
-void RadioHal<SX1261>::setFifoEmptyAction(void (*func)(void))
-{
+// template<>
+// void RadioHal<SX1261>::setFifoEmptyAction(void (*func)(void))
+// {
 
-}
+// }
 
 template<>
 void RadioHal<SX1262>::setFifoEmptyAction(void (*func)(void))
@@ -1085,11 +1085,11 @@ void RadioHal<SX1279>::setFifoFullAction(void (*func)(void))
     radio->setFifoFullAction(func);
 }
 
-template<>
-void RadioHal<SX1261>::setFifoFullAction(void (*func)(void))
-{
+// template<>
+// void RadioHal<SX1261>::setFifoFullAction(void (*func)(void))
+// {
 
-}
+// }
 
 template<>
 void RadioHal<SX1262>::setFifoFullAction(void (*func)(void))
@@ -1163,11 +1163,11 @@ bool RadioHal<SX1262>::fifoGet(volatile uint8_t* data, int totalLen, volatile in
     return false;
 }
 
-template<>
-bool RadioHal<SX1261>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
-{
-    return false;
-}
+// template<>
+// bool RadioHal<SX1261>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
+// {
+//     return false;
+// }
 
 template<>
 bool RadioHal<SX1280>::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen)
@@ -1229,11 +1229,11 @@ int16_t RadioHal<SX1262>::setCurrentLimit(float currentLimit)
     return radio->setCurrentLimit(currentLimit);
 }
 
-template<>
-int16_t RadioHal<SX1261>::setCurrentLimit(float currentLimit)
-{
-    return radio->setCurrentLimit(currentLimit);
-}
+// template<>
+// int16_t RadioHal<SX1261>::setCurrentLimit(float currentLimit)
+// {
+//     return radio->setCurrentLimit(currentLimit);
+// }
 
 template<>
 int16_t RadioHal<SX1280>::setCurrentLimit(float currentLimit)
@@ -1300,11 +1300,11 @@ int16_t RadioHal<SX1262>::setOutputPower(int8_t power)
     return false;
 }
 
-template<>
-int16_t RadioHal<SX1261>::setOutputPower(int8_t power)
-{
-    return false;
-}
+// template<>
+// int16_t RadioHal<SX1261>::setOutputPower(int8_t power)
+// {
+//     return false;
+// }
 
 template<>
 int16_t RadioHal<SX1280>::setOutputPower(int8_t power)
@@ -1366,11 +1366,11 @@ int16_t RadioHal<SX1262>::setRxBoostedGainMode(bool rxbgm)
     return radio->setRxBoostedGainMode(rxbgm);
 }
 
-template<>
-int16_t RadioHal<SX1261>::setRxBoostedGainMode(bool rxbgm)
-{
-    return radio->setRxBoostedGainMode(rxbgm);
-}
+// template<>
+// int16_t RadioHal<SX1261>::setRxBoostedGainMode(bool rxbgm)
+// {
+//     return radio->setRxBoostedGainMode(rxbgm);
+// }
 
 template<>
 int16_t RadioHal<SX1280>::setRxBoostedGainMode(bool rxbgm)

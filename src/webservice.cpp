@@ -182,7 +182,7 @@ void notFound(AsyncWebServerRequest *request)
 void handle_logout(AsyncWebServerRequest *request)
 {
 	String webString = "Log out";
-	request->send(200, "text/html",;
+	request->send(200, "text/html",webString);
 }
 
 void setMainPage(AsyncWebServerRequest *request)
@@ -6681,6 +6681,7 @@ void handle_system(AsyncWebServerRequest *request)
 
 		strcat(html, "</form><br /><br />\n");
 
+		#ifdef LOG_FILE
 		/**************Log File******************/
 		strcat(html, "<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"formLOG\" method=\"post\">\n");
 		strcat(html, "<table>\n");
@@ -6735,6 +6736,7 @@ void handle_system(AsyncWebServerRequest *request)
 		strcat(html, "</td></tr></table>\n");
 
 		strcat(html, "</form><br /><br />\n");
+		#endif
 
 		/************************ PATH USER define **************************/
 		strcat(html, "<form id='formPath' method=\"POST\" action='#' enctype='multipart/form-data'>\n");
@@ -7384,6 +7386,14 @@ void handle_igate(AsyncWebServerRequest *request)
 						config.rf2inetFilter |= FILTER_POSITION;
 				}
 			}
+			if (request->argName(i) == "rf2inetFilterAll")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						config.rf2inetFilter |= FILTER_ENABLE_ALL;
+				}
+			}
 			// config inet2rf filter
 
 			if (request->argName(i) == "inet2rfFilterMessage")
@@ -7895,7 +7905,7 @@ void handle_igate(AsyncWebServerRequest *request)
 				 (config.rf2inetFilter & FILTER_POSITION) ? "checked" : "");
 		strcat(html, tempHtml);
 
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"rf2inetFilterPosition\" type=\"checkbox\" value=\"OK\" %s/>ALL</td>\n",
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"rf2inetFilterAll\" type=\"checkbox\" value=\"OK\" %s/>ALL</td>\n",
 				 (config.rf2inetFilter & FILTER_ENABLE_ALL) ? "checked" : "");
 		strcat(html, tempHtml);
 
@@ -11989,7 +11999,7 @@ void handle_about(AsyncWebServerRequest *request)
 #ifndef NO_OTA
 	strcat(webString, "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form' class=\"form-horizontal\">\n");
 	strcat(webString, "<table>");
-	strcat(webString, "<th colspan=\"2\"><span><b>Firmware Update</b></span></th>\n");
+	strcat(webString, "<th colspan=\"2\"><span><b>Manual Firmware Update</b></span></th>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>File:</b></td><td align=\"left\"><input id=\"file\" name=\"update\" type=\"file\" onchange='sub(this)' /></td></tr>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>Progress:</b></td><td><div id='prgbar'><div id='bar' style=\"width: 0px;\"><label id='prg'></label></div></div></td></tr>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>Support Firmware:</b></td><td align=\"left\"><a target=\"_download\" href=\"https://github.com/nakhonthai/ESP32APRS_LoRa/releases\">https://github.com/nakhonthai/ESP32APRS_LoRa/releases</a></td></tr>\n");
@@ -12037,9 +12047,9 @@ void handle_about(AsyncWebServerRequest *request)
 
 	{
 		char ota_url_buf[200];
-		snprintf(ota_url_buf, sizeof(ota_url_buf), "http://fw.nakhonthai.net/%s", FirmwareOTA);
+		snprintf(ota_url_buf, sizeof(ota_url_buf), "http://fw.nakhonthai.net/LoRa/%s", FirmwareOTA);
 		strcat(webString, "<table>");
-		strcat(webString, "<th colspan=\"2\"><span><b>OTA Update from URL</b></span></th>\n");
+		strcat(webString, "<th colspan=\"2\"><span><b>OTA Online Firmware Update</b></span></th>\n");
 		char ota_row[512];
 		snprintf(ota_row, sizeof(ota_row),
 			"<tr><td align=\"right\"><b>Firmware File:</b></td><td align=\"left\"><a href=\"%s\" target=\"_blank\">%s</a></td></tr>\n",
@@ -12053,7 +12063,7 @@ void handle_about(AsyncWebServerRequest *request)
 		snprintf(ota_row, sizeof(ota_row),
 			"<tr><td colspan=\"2\" align=\"right\"><div class=\"col-sm-3 col-xs-4\">"
 			"<input type='hidden' id='ota_url' value='%s'>"
-			"<input type='button' class=\"btn btn-danger\" id=\"ota_sumbit\" value='Firmware Update from URL'>"
+			"<input type='button' class=\"btn btn-danger\" id=\"ota_sumbit\" value='Firmware Update'>"
 			"</div></td></tr>\n",
 			ota_url_buf);
 		strcat(webString, ota_row);

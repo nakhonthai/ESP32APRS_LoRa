@@ -388,11 +388,13 @@ ModbusMaster modbus;
 #define PPP_USER ""
 #define PPP_PASS ""
 
-// #ifdef __XTENSA__
-// #define BOOT_PIN 0
-// #else
-// #define BOOT_PIN 9
-// #endif
+#ifndef BOOT_PIN
+#ifdef __XTENSA__
+#define BOOT_PIN 0
+#else
+#define BOOT_PIN 9
+#endif
+#endif
 
 #ifdef BV5DJ_BOARD
 #define BUTTON_LEFT 27
@@ -4457,7 +4459,23 @@ void aprs_msg_callback(struct AX25Msg *msg)
         if (idx > 0)
         {
             info.remove(idx, 5);
-            info += "[RSSI:" + String((int)rssi) + "dBm] ";
+            info += "[RSSI:" + String(rssi, 1) + "dBm] ";
+            info.toCharArray((char *)msg->info, info.length(), 0);
+            msg->len = info.length() - 1;
+        }
+        idx = info.lastIndexOf("?SNR");
+        if (idx > 0)
+        {
+            info.remove(idx, 5);
+            info += "[SNR:" + String(snr, 1) + "dBm] ";
+            info.toCharArray((char *)msg->info, info.length(), 0);
+            msg->len = info.length() - 1;
+        }
+        idx = info.lastIndexOf("?FREQ");
+        if (idx > 0)
+        {
+            info.remove(idx, 5);
+            info += "[FREQERR:" + String((int)freqErr) + "Hz] ";
             info.toCharArray((char *)msg->info, info.length(), 0);
             msg->len = info.length() - 1;
         }
@@ -5576,31 +5594,7 @@ String compressMicE(char *destCallsign, float lat, float lon, uint16_t heading, 
 
     // prepare buffers
     // char destCallsign[7];
-#if !RADIOLIB_STATIC_ONLY
-    size_t infoLen = 10;
-    if (telemLen > 0)
-    {
-        infoLen += 1 + telemLen;
-    }
-    else
-    {
-        if (grid != NULL)
-        {
-            infoLen += strlen(grid) + 2;
-        }
-        if (status != NULL)
-        {
-            infoLen += strlen(status);
-        }
-        if (alt > RADIOLIB_APRS_MIC_E_ALTITUDE_UNUSED)
-        {
-            infoLen += 4;
-        }
-    }
-    char *info = new char[infoLen];
-#else
-    char info[RADIOLIB_STATIC_ARRAY_SIZE];
-#endif
+    char info[200];
     size_t infoPos = 0;
 
     // the following is based on APRS Mic-E implementation by https://github.com/omegat
@@ -5759,9 +5753,6 @@ String compressMicE(char *destCallsign, float lat, float lon, uint16_t heading, 
     info[infoPos++] = '\0';
 
     strRet = String(info);
-#if !RADIOLIB_STATIC_ONLY
-    delete[] info;
-#endif
     return strRet;
 }
 
