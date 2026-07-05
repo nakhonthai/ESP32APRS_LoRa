@@ -4466,7 +4466,7 @@ void aprs_msg_callback(struct AX25Msg *msg)
         idx = info.lastIndexOf("?SNR");
         if (idx > 0)
         {
-            info.remove(idx, 5);
+            info.remove(idx, 4);
             info += "[SNR:" + String(snr, 1) + "dBm] ";
             info.toCharArray((char *)msg->info, info.length(), 0);
             msg->len = info.length() - 1;
@@ -9022,9 +9022,20 @@ void taskAPRS(void *pvParameters)
                     }
                 }
 
-                if (config.trk_rssi)
+                if (config.trk_loc2rf)
                 {
-                    cmn += " ?RSSI";
+                    if (config.trk_rssi)
+                    {
+                        cmn += " ?RSSI";
+                    }
+                    if (config.trk_snr)
+                    {
+                        cmn += " ?SNR";
+                    }
+                    if (config.trk_freqerr)
+                    {
+                        cmn += " ?FREQ";
+                    }
                 }
 
                 if (config.trk_gps) // TRACKER by GPS

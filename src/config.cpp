@@ -217,6 +217,8 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["trkOptAlt"] = config.trk_altitude;
         doc["trkLog"] = config.trk_log;
         doc["trkOptRSSI"] = config.trk_rssi;
+        doc["trkOptSNR"] = config.trk_snr;
+        doc["trkOptFreq"] = config.trk_freqerr;
         doc["trkHSpeed"] = config.trk_hspeed;
         doc["trkMaxInv"] = config.trk_maxinterval;
         doc["trkMinInv"] = config.trk_mininterval;
@@ -751,6 +753,8 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.trk_altitude = doc["trkOptAlt"];
         config.trk_log = doc["trkLog"];
         config.trk_rssi = doc["trkOptRSSI"];
+        config.trk_snr = doc["trkOptSNR"];
+        config.trk_freqerr = doc["trkOptFreq"];
         config.trk_hspeed = doc["trkHSpeed"];
         config.trk_maxinterval = doc["trkMaxInv"];
         config.trk_mininterval = doc["trkMinInv"];

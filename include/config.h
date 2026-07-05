@@ -227,6 +227,8 @@ typedef struct Config_Struct
 	bool trk_altitude = false;
 	bool trk_log = false;
 	bool trk_rssi = false;
+	bool trk_snr = false;
+	bool trk_freqerr = false;
 	bool trk_sat = false;
 	bool trk_dx = false;
 	uint16_t trk_hspeed = 120;

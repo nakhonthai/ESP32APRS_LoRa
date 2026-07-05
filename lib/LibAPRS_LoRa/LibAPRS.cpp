@@ -786,11 +786,11 @@ bool APRS_init2(Configuration *cfg)
             log_d("Init chip1 SX1268");
             radioHal1 = new RadioHal<SX1268>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
         }
-        else if (cfg->rf1_type == RF_SX1261)
-        {
-            log_d("Init chip1 SX1262");
-            radioHal1 = new RadioHal<SX1261>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
-        }
+        // else if (cfg->rf1_type == RF_SX1261)
+        // {
+        //     log_d("Init chip1 SX1262");
+        //     radioHal1 = new RadioHal<SX1261>(new Module(config.rf1_nss_gpio, config.rf1_dio1_gpio, config.rf1_reset_gpio, config.rf1_dio0_gpio, spi, SPISettings(2000000, MSBFIRST, SPI_MODE0)));
+        // }
         else if (cfg->rf1_type == RF_SX1262)
         {
             log_d("Init chip SX1262");

@@ -4,8 +4,8 @@
  Author:	HS5TQA/Atten
  Github:	https://github.com/nakhonthai
  Facebook:	https://www.facebook.com/atten
- Support IS: host:aprs.dprns.com port:14580 or aprs.hs5tqa.ampr.org:14580
- Support IS monitor: http://aprs.dprns.com:14501 or http://aprs.hs5tqa.ampr.org:14501
+ Support IS: host:aprs.nakhonthai.net port:14580 or aprs.hs5tqa.ampr.org:14580
+ Support IS monitor: http://aprs.nakhonthai.net:14501 or http://aprs.hs5tqa.ampr.org:14501
 */
 #include <Arduino.h>
 #include <esp_task_wdt.h>
@@ -24,6 +24,7 @@ extern bool psramBusy;
 // Helper function to allocate memory with PSRAM support
 char *allocateStringMemory(size_t size)
 {
+	char *ptr = NULL;
 #ifdef BOARD_HAS_PSRAM
     while (psramBusy)
         delay(1);
@@ -33,7 +34,7 @@ char *allocateStringMemory(size_t size)
 	// char *ptr = (char *)ps_calloc(size, sizeof(char));
 
 	// Retry loop for PSRAM allocation with backoff
-	char *ptr = NULL;
+	
 	int retry_count = 3;
 	int delay_ms = 10;
 
@@ -54,12 +55,15 @@ char *allocateStringMemory(size_t size)
 
 	if (ptr != NULL)
 	{
+		memset(ptr, 0, size); // Initialize memory to zero
 		return ptr;
 	}
 	// If PSRAM allocation fails, fall back to regular heap
 #endif
 	// Regular heap allocation
-	return (char *)calloc(size, sizeof(char));
+	ptr = (char *)calloc(size, sizeof(char));
+	memset(ptr, 0, size); // Initialize memory to zero
+	return ptr;
 }
 
 // Helper function to format integers to string using allocateStringMemory
@@ -959,7 +963,6 @@ void handle_symbol(AsyncWebServerRequest *request)
 	char *web = allocateStringMemory(22000); // Initial buffer size, adjust as needed
 	if (web)
 	{
-		memset(web, 0, 22000);
 		strcat(web, "<table border=\"1\" align=\"center\">\n");
 		strcat(web, "<tr><th colspan=\"16\">Table '/'</th></tr>\n");
 		strcat(web, "<tr>\n");
@@ -967,11 +970,11 @@ void handle_symbol(AsyncWebServerRequest *request)
 		for (i = 33; i < 129; i++)
 		{
 			memset(lnk, 0, sizeof(lnk));
-			//<td><img onclick="window.opener.setValue(113,2);" src="http://aprs.dprns.com/symbols/icons/113-2.png"></td>
+			//<td><img onclick="window.opener.setValue(113,2);" src="http://aprs.nakhonthai.net/symbols/icons/113-2.png"></td>
 			if (sel == -1)
-				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-1.png\"></td>", i, i);
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,1);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-1.png\"></td>", i, i);
 			else
-				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,%d,1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-1.png\"></td>", sel, i, i);
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,%d,1);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-1.png\"></td>", sel, i, i);
 			strcat(web, lnk);
 
 			if (((i % 16) == 0) && (i < 126))
@@ -986,9 +989,9 @@ void handle_symbol(AsyncWebServerRequest *request)
 		{
 			memset(lnk, 0, sizeof(lnk));
 			if (sel == -1)
-				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-2.png\"></td>", i, i);
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,2);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-2.png\"></td>", i, i);
 			else
-				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,%d,2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-2.png\"></td>", sel, i, i);
+				sprintf(lnk, "<td><img onclick=\"window.opener.setValue(%d,%d,2);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-2.png\"></td>", sel, i, i);
 			strcat(web, lnk);
 			if (((i % 16) == 0) && (i < 126))
 				strcat(web, "</tr>\n<tr>\n");
@@ -1217,14 +1220,14 @@ void event_lastHeard(bool gethtml)
 							{
 								strcpy(fileImg, "dot.png");
 							}
-							// snprintf(temp_html, sizeof(temp_html), "<td><img src=\"http://aprs.dprns.com/symbols/icons/%s\"></td>", fileImg);
+							// snprintf(temp_html, sizeof(temp_html), "<td><img src=\"http://aprs.nakhonthai.net/symbols/icons/%s\"></td>", fileImg);
 							snprintf(temp_html, sizeof(temp_html), "\"icon\":\"%s\",", fileImg);
 							strcat(html, temp_html);
 						}
 					}
 					else
 					{
-						// strcat(html, "<td><img src=\"http://aprs.dprns.com/symbols/icons/dot.png\"></td>");
+						// strcat(html, "<td><img src=\"http://aprs.nakhonthai.net/symbols/icons/dot.png\"></td>");
 						strcat(html, "\"icon\":\"dot.png\",");
 					}
 
@@ -2052,7 +2055,7 @@ void handle_radio(AsyncWebServerRequest *request)
 						config.rf_mode = request->arg(i).toInt();
 						if (config.rf_mode == RF_MODE_AIS)
 						{
-							sprintf(config.igate_host, "aprs.dprns.com");
+							sprintf(config.igate_host, "aprs.nakhonthai.net");
 							config.aprs_port = 24580;
 						}
 					}
@@ -2238,7 +2241,7 @@ void handle_radio(AsyncWebServerRequest *request)
 						config.rf1_mode = request->arg(i).toInt();
 						if (config.rf1_mode == RF_MODE_AIS)
 						{
-							sprintf(config.igate_host, "aprs.dprns.com");
+							sprintf(config.igate_host, "aprs.nakhonthai.net");
 							config.aprs_port = 24580;
 						}
 					}
@@ -7535,7 +7538,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		strcat(html, "document.getElementById('igateSymbol').value = String.fromCharCode(symbol);\n");
 		strcat(html, "if(table==1){\n document.getElementById('igateTable').value='/';\n");
 		strcat(html, "}else if(table==2){\n document.getElementById('igateTable').value='\\\\';\n}\n");
-		strcat(html, "document.getElementById('igateImgSymbol').src = \"http://aprs.dprns.com/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n");
+		strcat(html, "document.getElementById('igateImgSymbol').src = \"http://aprs.nakhonthai.net/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n");
 		strcat(html, "\n}\n");
 		strcat(html, "function calculatePHGR(){document.forms.formIgate.texttouse.value=\"PHG\"+calcPower(document.forms.formIgate.power.value)+calcHeight(document.forms.formIgate.haat.value)+calcGain(document.forms.formIgate.gain.value)+calcDirection(document.forms.formIgate.direction.selectedIndex)}function Log2(e){return Math.log(e)/Math.log(2)}function calcPerHour(e){return e<10?e:String.fromCharCode(65+(e-10))}function calcHeight(e){return String.fromCharCode(48+Math.round(Log2(e/10),0))}function calcPower(e){if(e<1)return 0;if(e>=1&&e<4)return 1;if(e>=4&&e<9)return 2;if(e>=9&&e<16)return 3;if(e>=16&&e<25)return 4;if(e>=25&&e<36)return 5;if(e>=36&&e<49)return 6;if(e>=49&&e<64)return 7;if(e>=64&&e<81)return 8;if(e>=81)return 9}function calcDirection(e){if(e==\"0\")return\"0\";if(e==\"1\")return\"1\";if(e==\"2\")return\"2\";if(e==\"3\")return\"3\";if(e==\"4\")return\"4\";if(e==\"5\")return\"5\";if(e==\"6\")return\"6\";if(e==\"7\")return\"7\";if(e==\"8\")return\"8\"}function calcGain(e){return e>9?\"9\":e<0?\"0\":Math.round(e,0)}\n");
 		strcat(html, "function onRF2INETCheck() {\n");
@@ -7616,7 +7619,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			table = "1";
 		if (config.igate_symbol[0] == 92)
 			table = "2";
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"igateTable\" name=\"igateTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"igateSymbol\" name=\"igateSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"igateImgSymbol\" onclick=\"openWindowSymbol();\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"igateTable\" name=\"igateTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"igateSymbol\" name=\"igateSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"igateImgSymbol\" onclick=\"openWindowSymbol();\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
 				 config.igate_symbol[0], config.igate_symbol[1], (int)config.igate_symbol[1], table);
 		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
@@ -7646,7 +7649,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Server Host:</b></td>\n");
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"20\" size=\"20\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"%s\" /> *APRS-IS by T2THAI at <a href=\"http://aprs.dprns.com:14501\" target=\"_t2thai\">aprs.dprns.com:14580</a>,CBAPRS at <a href=\"http://aprs.dprns.com:24501\" target=\"_t2thai\">aprs.dprns.com:24580</a></td>\n", config.igate_host);
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\"><input maxlength=\"20\" size=\"20\" id=\"aprsHost\" name=\"aprsHost\" type=\"text\" value=\"%s\" /> *APRS-IS by T2THAI at <a href=\"http://aprs.nakhonthai.net:14501\" target=\"_t2thai\">aprs.nakhonthai.net:14580</a>,CBAPRS at <a href=\"http://aprs.nakhonthai.net:24501\" target=\"_t2thai\">aprs.nakhonthai.net:24580</a></td>\n", config.igate_host);
 		strcat(html, tempHtml);
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
@@ -8369,7 +8372,6 @@ void handle_digi(AsyncWebServerRequest *request)
 			request->send(500, "text/html", "Memory allocation failed");
 			return;
 		}
-		memset(html, 0, 20000);
 		char tempHtml[512];
 		strcpy(html, "<script type=\"text/javascript\">\n");
 		strcat(html, "$('form').submit(function (e) {\n");
@@ -8406,7 +8408,7 @@ void handle_digi(AsyncWebServerRequest *request)
 		strcat(html, "document.getElementById('digiSymbol').value = String.fromCharCode(symbol);\n");
 		strcat(html, "if(table==1){\n document.getElementById('digiTable').value='/';\n");
 		strcat(html, "}else if(table==2){\n document.getElementById('digiTable').value='\\\\';\n}\n");
-		strcat(html, "document.getElementById('digiImgSymbol').src = \"http://aprs.dprns.com/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n");
+		strcat(html, "document.getElementById('digiImgSymbol').src = \"http://aprs.nakhonthai.net/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n");
 		strcat(html, "\n}\n");
 		strcat(html, "function calculatePHGR(){document.forms.formDIGI.texttouse.value=\"PHG\"+calcPower(document.forms.formDIGI.power.value)+calcHeight(document.forms.formDIGI.haat.value)+calcGain(document.forms.formDIGI.gain.value)+calcDirection(document.forms.formDIGI.direction.selectedIndex)}function Log2(e){return Math.log(e)/Math.log(2)}function calcPerHour(e){return e<10?e:String.fromCharCode(65+(e-10))}function calcHeight(e){return String.fromCharCode(48+Math.round(Log2(e/10),0))}function calcPower(e){if(e<1)return 0;if(e>=1&&e<4)return 1;if(e>=4&&e<9)return 2;if(e>=9&&e<16)return 3;if(e>=16&&e<25)return 4;if(e>=25&&e<36)return 5;if(e>=36&&e<49)return 6;if(e>=49&&e<64)return 7;if(e>=64&&e<81)return 8;if(e>=81)return 9}function calcDirection(e){if(e==\"0\")return\"0\";if(e==\"1\")return\"1\";if(e==\"2\")return\"2\";if(e==\"3\")return\"3\";if(e==\"4\")return\"4\";if(e==\"5\")return\"5\";if(e==\"6\")return\"6\";if(e==\"7\")return\"7\";if(e==\"8\")return\"8\"}function calcGain(e){return e>9?\"9\":e<0?\"0\":Math.round(e,0)}\n");
 		strcat(html, "function selPrecision(idx) {\n");
@@ -8482,7 +8484,7 @@ void handle_digi(AsyncWebServerRequest *request)
 			strcpy(table, "1");
 		if (config.digi_symbol[0] == 92)
 			strcpy(table, "2");
-		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"digiTable\" name=\"digiTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"digiSymbol\" name=\"digiSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"digiImgSymbol\" onclick=\"openWindowSymbol();\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
+		snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"digiTable\" name=\"digiTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"digiSymbol\" name=\"digiSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"digiImgSymbol\" onclick=\"openWindowSymbol();\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
 				 config.digi_symbol[0], config.digi_symbol[1], (int)config.digi_symbol[1], table);
 		strcat(html, tempHtml);
 
@@ -10267,7 +10269,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 	bool pos2INET = false;
 	bool optCST = false;
 	bool optAlt = false;
-	bool optBat = false;
+	bool optRSSI = false;
+	bool optSNR = false;
+	bool optFreqErr = false;
 	bool optSat = false;
 	bool timeStamp = false;
 
@@ -10315,12 +10319,28 @@ void handle_tracker(AsyncWebServerRequest *request)
 						optAlt = true;
 				}
 			}
-			if (request->argName(i) == "trackerOptBat")
+			if (request->argName(i) == "trackeroptRSSI")
 			{
 				if (request->arg(i) != "")
 				{
 					if (String(request->arg(i)) == "OK")
-						optBat = true;
+						optRSSI = true;
+				}
+			}
+			if (request->argName(i) == "trackerOptSNR")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						optSNR = true;
+				}
+			}
+			if (request->argName(i) == "trackerOptFreqErr")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						optFreqErr = true;
 				}
 			}
 			if (request->argName(i) == "trackerOptSat")
@@ -10634,7 +10654,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 
 		config.trk_log = optCST;
 		config.trk_altitude = optAlt;
-		config.trk_rssi = optBat;
+		config.trk_rssi = optRSSI;
+		config.trk_snr = optSNR;
+		config.trk_freqerr = optFreqErr;
 		config.trk_sat = optSat;
 		config.trk_timestamp = timeStamp;
 
@@ -10697,7 +10719,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 	strcat(html, "txtsymbol.value = String.fromCharCode(symbol);\n");
 	strcat(html, "if(table==1){\n txttable.value='/';\n");
 	strcat(html, "}else if(table==2){\n txttable.value='\\\\';\n}\n");
-	strcat(html, "imgicon.src = \"http://aprs.dprns.com/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n");
+	strcat(html, "imgicon.src = \"http://aprs.nakhonthai.net/symbols/icons/\"+symbol.toString()+'-'+table.toString()+'.png';\n");
 	strcat(html, "\n}\n");
 	strcat(html, "function onSmartCheck() {\n");
 	strcat(html, "if (document.querySelector('#smartBcnEnable').checked) {\n");
@@ -10857,12 +10879,18 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(trackerPos2INETFlag, "checked");
 	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", trackerPos2RFFlag, trackerPos2INETFlag);
 	strcat(html, tempHtml);
-	char trackerOptBatFlag[10] = "";
+	char trackeroptRSSIFlag[10] = "";
+	char trackerOptSNRFlag[10] = "";
+	char trackerOptFreqErrFlag[10] = "";
 	char trackerOptSatFlag[10] = "";
 	char trackerOptAltFlag[10] = "";
 	char trackerOptCSTFlag[10] = "";
 	if (config.trk_rssi)
-		strcpy(trackerOptBatFlag, "checked");
+		strcpy(trackeroptRSSIFlag, "checked");
+	if (config.trk_snr)
+		strcpy(trackerOptSNRFlag, "checked");
+	if (config.trk_freqerr)
+		strcpy(trackerOptFreqErrFlag, "checked");
 	if (config.trk_sat)
 		strcpy(trackerOptSatFlag, "checked");
 	if (config.trk_altitude)
@@ -10870,8 +10898,8 @@ void handle_tracker(AsyncWebServerRequest *request)
 	if (config.trk_log)
 		strcpy(trackerOptCSTFlag, "checked");
 
-	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" %s/>Telemetry <input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" %s/>Altutude <input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" %s/>RSSI Request </td></tr>\n",
-			 trackerOptCSTFlag, trackerOptAltFlag, trackerOptBatFlag);
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" %s/>Telemetry <input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" %s/>Altutude <input type=\"checkbox\" name=\"trackeroptRSSI\" value=\"OK\" %s/>RSSI Request  <input type=\"checkbox\" name=\"trackerOptSNR\" value=\"OK\" %s/>SNR Request <input type=\"checkbox\" name=\"trackerOptFreqErr\" value=\"OK\" %s/>Frequency Error Request</td></tr>\n",
+			 trackerOptCSTFlag, trackerOptAltFlag, trackeroptRSSIFlag, trackerOptSNRFlag, trackerOptFreqErrFlag);
 	strcat(html, tempHtml);
 
 	strcat(html, "<tr>");
@@ -10898,7 +10926,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(table, "1");
 	if (config.trk_symbol[0] == 92)
 		strcpy(table, "2");
-	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"trackerTable\" name=\"trackerTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"trackerSymbol\" name=\"trackerSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"trackerImgSymbol\" onclick=\"openWindowSymbol(0);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"trackerTable\" name=\"trackerTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"trackerSymbol\" name=\"trackerSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"trackerImgSymbol\" onclick=\"openWindowSymbol(0);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-%s.png\"> <i>*Click icon for select symbol</i></td>\n",
 			 config.trk_symbol[0], config.trk_symbol[1], (int)config.trk_symbol[1], table);
 	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
@@ -10926,7 +10954,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(table, "1");
 	if (config.trk_symmove[0] == 92)
 		strcpy(table, "2");
-	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"moveTable\" name=\"moveTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"moveSymbol\" name=\"moveSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"moveImgSymbol\" onclick=\"openWindowSymbol(1);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select MOVE symbol</i></td>\n",
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"moveTable\" name=\"moveTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"moveSymbol\" name=\"moveSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"moveImgSymbol\" onclick=\"openWindowSymbol(1);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-%s.png\"> <i>*Click icon for select MOVE symbol</i></td>\n",
 			 config.trk_symmove[0], config.trk_symmove[1], (int)config.trk_symmove[1], table);
 	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
@@ -10937,7 +10965,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(table, "1");
 	if (config.trk_symstop[0] == 92)
 		strcpy(table, "2");
-	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"stopTable\" name=\"stopTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"stopSymbol\" name=\"stopSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"stopImgSymbol\" onclick=\"openWindowSymbol(2);\" src=\"http://aprs.dprns.com/symbols/icons/%d-%s.png\"> <i>*Click icon for select STOP symbol</i></td>\n",
+	snprintf(tempHtml, sizeof(tempHtml), "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"stopTable\" name=\"stopTable\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"stopSymbol\" name=\"stopSymbol\" type=\"text\" value=\"%c\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"stopImgSymbol\" onclick=\"openWindowSymbol(2);\" src=\"http://aprs.nakhonthai.net/symbols/icons/%d-%s.png\"> <i>*Click icon for select STOP symbol</i></td>\n",
 			 config.trk_symstop[0], config.trk_symstop[1], (int)config.trk_symstop[1], table);
 	strcat(html, tempHtml);
 	strcat(html, "</tr>\n");
@@ -11775,7 +11803,7 @@ void handle_about(AsyncWebServerRequest *request)
 	strcat(webString, "HELTEC WiFi LoRa32 V3,ESP32-S3 DIY");
 	sprintf(FirmwareOTA, "LoRaHT_%s", ver);
 #elif defined(NAWS4)
-	strcat(webString, "HELTEC WiFi LoRa32 V3,ESP32-S3 DIY");
+	strcat(webString, "NAWS4,ESP32-S3 DIY");
 	sprintf(FirmwareOTA, "NAWS4_%s", ver);
 #elif defined(APRS_LORA_DONGLE)
 	strcat(webString, "APRS LoRa Dongle,ESP32-S3 DIY");

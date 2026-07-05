@@ -78,7 +78,7 @@ const timeZoneName tzList[40] PROGMEM= {
 #define SYSTEM_BIT_LEN 9
 #define PATH_LEN 17
 const char SYSTEM_NAME[SYSTEM_LEN][20] = {"NONE", "All Count", "RF2INET", "INET2RF","DIGI","All Drop"};
-const char SYSTEM_BITS_NAME[9][20] = {"NONE", "IGATE Mode", "DIGI Mode", "WEATHER Mode","SAT Status","INET Status","VPN Status","GSM Status","MQTT Status"};
+const char SYSTEM_BITS_NAME[9][20] = {"NONE", "IGATE Mode", "DIGI Mode", "WX Mode","SAT Status","INET Status","VPN Status","GSM Status","MQTT Status"};
 const char PATH_NAME[PATH_LEN][15] = {"OFF", "DST-TRACE 1", "DST-TRACE 2", "DST-TRACE 3", "DST-TRACE 4", "TRACE1-1", "TRACE2-2", "TRACE3-3", "WIDE1-1","RFONLY","RELAY","GATE","ECHO","UserDefine 1","UserDefine 2","UserDefine 3","UserDefine 4"};
 
 
