@@ -2882,6 +2882,7 @@ String handleATCommand(String cmd)
         return "OK";
     }
 
+    #ifdef LOG_FILE
     if (cmd == "AT+LOG?")
         return String(config.log);
     else if (cmd.startsWith("AT+LOG="))
@@ -2889,6 +2890,7 @@ String handleATCommand(String cmd)
         config.log = cmd.substring(7).toInt();
         return "OK";
     }
+    #endif
 
     //   if (cmd == "AT+TRK_TLM_AVG?") return String(config.trk_tlm_avg ? "1" : "0");
     //   else if (cmd == "AT+TRK_TLM_AVG=1") { config.trk_tlm_avg = true; return "OK"; }

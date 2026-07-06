@@ -49,12 +49,13 @@
 #include "esp_wireguard_log.h"
 #include "esp_wireguard_err.h"
 
-#define ESP_LOG_ERROR 1
-#define ESP_LOG_WARN 1
-#define ESP_LOG_INFO 1
-#define ESP_LOG_DEBUG 1
-#define ESP_LOG_VERBOSE 1
-#include "esp_log.h"
+#define ESP_LOG_NONE 1
+#define ESP_LOG_ERROR 0
+#define ESP_LOG_WARN 0
+#define ESP_LOG_INFO 0
+#define ESP_LOG_DEBUG 0
+#define ESP_LOG_VERBOSE 0
+#include "ESP_LOG.h"
 
 #if (!defined(ESP8266) || defined(IDF_VER)) && !defined(LIBRETINY)
 #include <sys/socket.h>
@@ -214,7 +215,7 @@ static err_t wireguardif_output(struct netif *netif, struct pbuf *q, const ip4_a
 	ip_addr_t ipaddr;
 
 	if (!device) {
-		ESP_LOGE(TAG, "wireguardif_output NULL device");
+		//ESP_LOGE(TAG, "wireguardif_output NULL device");
 		return ERR_RTE;
 	}
 
@@ -402,7 +403,7 @@ static struct pbuf *wireguardif_initiate_handshake(struct wireguard_device *devi
 	struct pbuf *pbuf = NULL;
 	err_t err = ERR_OK;
 	if (wireguard_create_handshake_initiation(device, peer, msg)) {
-		ESP_LOGD(TAG, "sending initiation packet");
+		//ESP_LOGD(TAG, "sending initiation packet");
 		pbuf = pbuf_alloc(PBUF_TRANSPORT, sizeof(struct message_handshake_initiation), PBUF_RAM);
 		if (pbuf) {
 			err = pbuf_take(pbuf, msg, sizeof(struct message_handshake_initiation));
@@ -433,7 +434,7 @@ static void wireguardif_send_handshake_response(struct wireguard_device *device,
 
 		wireguard_start_session(peer, false);
 
-		ESP_LOGD(TAG, "sending handshake response packet");
+		//ESP_LOGD(TAG, "sending handshake response packet");
 		pbuf = pbuf_alloc(PBUF_TRANSPORT, sizeof(struct message_handshake_response), PBUF_RAM);
 		if (pbuf) {
 			err = pbuf_take(pbuf, &packet, sizeof(struct message_handshake_response));
@@ -644,15 +645,15 @@ static err_t wireguard_start_handshake(struct netif *netif, struct wireguard_pee
 	struct pbuf *pbuf;
 	struct message_handshake_initiation msg;
 
-	ESP_LOGD(TAG, "starting handshake");
+	//ESP_LOGD(TAG, "starting handshake");
 	pbuf = wireguardif_initiate_handshake(device, peer, &msg, &result);
 	if (pbuf) {
 		result = wireguardif_peer_output(netif, pbuf, peer);
 		if (result != ERR_OK) {
 #ifdef CONFIG_LWIP_DEBUG
-			ESP_LOGE(TAG, "wireguardif_peer_output: %s", lwip_strerr(result));
+			//ESP_LOGE(TAG, "wireguardif_peer_output: %s", lwip_strerr(result));
 #else
-			ESP_LOGE(TAG, "wireguardif_peer_output: %i", result);
+			//ESP_LOGE(TAG, "wireguardif_peer_output: %i", result);
 #endif
 		}
 		pbuf_free(pbuf);
@@ -676,11 +677,11 @@ static err_t wireguardif_lookup_peer(struct netif *netif, u8_t peer_index, struc
 		if (peer) {
 			result = ERR_OK;
 		} else {
-			ESP_LOGD(TAG, "peer_lookup_by_peer_index: peer not found");
+			//ESP_LOGD(TAG, "peer_lookup_by_peer_index: peer not found");
 			result = ERR_ARG;
 		}
 	} else {
-		ESP_LOGD(TAG, "wireguardif_lookup_peer: invalid device");
+		//ESP_LOGD(TAG, "wireguardif_lookup_peer: invalid device");
 		result = ERR_ARG;
 	}
 	*out = peer;
@@ -727,7 +728,7 @@ err_t wireguardif_peer_is_up(struct netif *netif, u8_t peer_index, ip_addr_t *cu
 		if ((peer->curr_keypair.valid) || (peer->prev_keypair.valid)) {
 			result = ERR_OK;
 		} else {
-			ESP_LOGD(TAG, "wireguardif_peer_is_up: invalid keypairs");
+			//ESP_LOGD(TAG, "wireguardif_peer_is_up: invalid keypairs");
 			result = ERR_CONN;
 		}
 		if (current_ip) {
@@ -756,7 +757,7 @@ time_t wireguardif_latest_handshake(struct netif *netif, u8_t peer_index) {
 			 */
 			result = (peer->latest_handshake_millis / 1000) + (time(NULL) - (wireguard_sys_now() / 1000));
 		} else {
-			ESP_LOGD(TAG, "wireguardif_latest_handshake: valid=%ld, lhs=%ld", (long) peer->valid, (long) peer->latest_handshake_millis);
+			//ESP_LOGD(TAG, "wireguardif_latest_handshake: valid=%ld, lhs=%ld", (long) peer->valid, (long) peer->latest_handshake_millis);
 		}
 	}
 	return result;
@@ -845,7 +846,7 @@ err_t wireguardif_add_peer(struct netif *netif, struct wireguardif_peer *p, u8_t
 	}
 
 	uint32_t t2 = wireguard_sys_now();
-	ESP_LOGV(TAG, "peer adding took %" PRIu32 "ms", (t2-t1));
+	//ESP_LOGV(TAG, "peer adding took %" PRIu32 "ms", (t2-t1));
 
 	if (peer_index) {
 		if (peer) {
@@ -972,16 +973,16 @@ err_t wireguardif_init(struct netif *netif) {
 	// ifkey will contain the selected interface key
 	const char* ifkey = NULL;
 
-	ESP_LOGD(TAG, "looking for available network interface");
+	//ESP_LOGD(TAG, "looking for available network interface");
 	for (int i = 0; i < sizeof(ifkeys) / sizeof(char *) && err != ESP_OK; i++) {
 		ifkey = ifkeys[i];
 		err = esp_netif_get_netif_impl_name(esp_netif_get_handle_from_ifkey(ifkey), lwip_netif_name);
-		ESP_LOGV(TAG, "esp_netif_get_netif_impl_name(%s): %s", ifkey, esp_err_to_name(err));
+		//ESP_LOGV(TAG, "esp_netif_get_netif_impl_name(%s): %s", ifkey, esp_err_to_name(err));
 		underlying_netif = netif_find(lwip_netif_name);
 		if (underlying_netif != NULL) {
 			if(underlying_netif->name[0]=='s' && underlying_netif->name[1]=='t') {
 				if(&underlying_netif->ip_addr == NULL || ip_addr_isany(&underlying_netif->ip_addr)) {
-					ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
+					//ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
 					err = ESP_FAIL;
 					continue;
 				}
@@ -990,7 +991,7 @@ err_t wireguardif_init(struct netif *netif) {
 			if(underlying_netif->name[0]=='p' && underlying_netif->name[1]=='p') {
 				// PPP interface - assume it's up
 				if(&underlying_netif->ip_addr == NULL || ip_addr_isany(&underlying_netif->ip_addr)) {
-					ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
+					//ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
 					err = ESP_FAIL;
 					continue;
 				}
@@ -1000,7 +1001,7 @@ err_t wireguardif_init(struct netif *netif) {
 		}
 	}
 	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "could not find an available network interface");
+		//ESP_LOGE(TAG, "could not find an available network interface");
 		result = ERR_IF;
 		goto fail;
 	}
@@ -1008,7 +1009,7 @@ err_t wireguardif_init(struct netif *netif) {
 	underlying_netif = netif_find(lwip_netif_name);
 
 	if (underlying_netif == NULL) {
-		ESP_LOGE(TAG, "netif_find: cannot find %s (%s)", ifkey, lwip_netif_name);
+		//ESP_LOGE(TAG, "netif_find: cannot find %s (%s)", ifkey, lwip_netif_name);
 		result = ERR_IF;
 		goto fail;
 	}
@@ -1016,21 +1017,21 @@ err_t wireguardif_init(struct netif *netif) {
 	underlying_netif = netif_default;
 
 	if (underlying_netif == NULL) {
-		ESP_LOGE(TAG, "netif_find: cannot find default netif");
+		//ESP_LOGE(TAG, "netif_find: cannot find default netif");
 		result = ERR_IF;
 		goto fail;
 	}
 #endif  // (!defined(ESP8266) || defined(IDF_VER)) && !defined(LIBRETINY)
 
-	ESP_LOGV(TAG, "underlying_netif = %p", underlying_netif);
-	ESP_LOGV(TAG, "underlying_netif->name = %c%c", underlying_netif->name[0], underlying_netif->name[1]);
-	ESP_LOGV(TAG, "underlying_netif->num = %d", underlying_netif->num);
-	ESP_LOGV(TAG, "underlying_netif->hwaddr_len = %d", underlying_netif->hwaddr_len);
-	ESP_LOGV(TAG, "underlying_netif->mtu = %d", underlying_netif->mtu);
-	ESP_LOGV(TAG, "underlying_netif->flags = 0x%04x", underlying_netif->flags);	
-	ESP_LOGV(TAG, "underlying_netif->ip_addr = %d.%d.%d.%d", IP2STR(&underlying_netif->ip_addr.u_addr.ip4));
-	ESP_LOGV(TAG, "underlying_netif->gw = %d.%d.%d.%d", IP2STR(&underlying_netif->gw.u_addr.ip4));
-	ESP_LOGV(TAG, "underlying_netif->netmask = %d.%d.%d.%d", IP2STR(&underlying_netif->netmask.u_addr.ip4));
+	//ESP_LOGV(TAG, "underlying_netif = %p", underlying_netif);
+	//ESP_LOGV(TAG, "underlying_netif->name = %c%c", underlying_netif->name[0], underlying_netif->name[1]);
+	//ESP_LOGV(TAG, "underlying_netif->num = %d", underlying_netif->num);
+	//ESP_LOGV(TAG, "underlying_netif->hwaddr_len = %d", underlying_netif->hwaddr_len);
+	//ESP_LOGV(TAG, "underlying_netif->mtu = %d", underlying_netif->mtu);
+	//ESP_LOGV(TAG, "underlying_netif->flags = 0x%04x", underlying_netif->flags);	
+	//ESP_LOGV(TAG, "underlying_netif->ip_addr = %d.%d.%d.%d", IP2STR(&underlying_netif->ip_addr.u_addr.ip4));
+	//ESP_LOGV(TAG, "underlying_netif->gw = %d.%d.%d.%d", IP2STR(&underlying_netif->gw.u_addr.ip4));
+	//ESP_LOGV(TAG, "underlying_netif->netmask = %d.%d.%d.%d", IP2STR(&underlying_netif->netmask.u_addr.ip4));
 
 	LWIP_ASSERT("netif != NULL", (netif != NULL));
 	LWIP_ASSERT("state != NULL", (netif->state != NULL));
@@ -1065,7 +1066,7 @@ err_t wireguardif_init(struct netif *netif) {
 						uint32_t t1 = wireguard_sys_now();
 						if (wireguard_device_init(device, private_key)) {
 							uint32_t t2 = wireguard_sys_now();
-							ESP_LOGV(TAG, "device init took %" PRIi32 "ms", (t2-t1));
+							//ESP_LOGV(TAG, "device init took %" PRIi32 "ms", (t2-t1));
 
 #if LWIP_CHECKSUM_CTRL_PER_NETIF
 							NETIF_SET_CHECKSUM_CTRL(netif, NETIF_CHECKSUM_ENABLE_ALL);
@@ -1171,16 +1172,16 @@ err_t wireguardif_changedevice(struct netif *netif) {
 	// ifkey will contain the selected interface key
 	const char* ifkey = NULL;
 
-	ESP_LOGD(TAG, "looking for available network interface");
+	//ESP_LOGD(TAG, "looking for available network interface");
 	for (int i = 0; i < sizeof(ifkeys) / sizeof(char *) && err != ESP_OK; i++) {
 		ifkey = ifkeys[i];
 		err = esp_netif_get_netif_impl_name(esp_netif_get_handle_from_ifkey(ifkey), lwip_netif_name);
-		ESP_LOGV(TAG, "esp_netif_get_netif_impl_name(%s): %s", ifkey, esp_err_to_name(err));
+		//ESP_LOGV(TAG, "esp_netif_get_netif_impl_name(%s): %s", ifkey, esp_err_to_name(err));
 		underlying_netif = netif_find(lwip_netif_name);
 		if (underlying_netif != NULL) {
 			if(underlying_netif->name[0]=='s' && underlying_netif->name[1]=='t') {
 				if(&underlying_netif->ip_addr == NULL || ip_addr_isany(&underlying_netif->ip_addr)) {
-					ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
+					//ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
 					err = ESP_FAIL;
 					continue;
 				}
@@ -1189,7 +1190,7 @@ err_t wireguardif_changedevice(struct netif *netif) {
 			if(underlying_netif->name[0]=='p' && underlying_netif->name[1]=='p') {
 				// PPP interface - assume it's up
 				if(&underlying_netif->ip_addr == NULL || ip_addr_isany(&underlying_netif->ip_addr)) {
-					ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
+					//ESP_LOGD(TAG, "skipping network interface: %s (%s) - no IP address", ifkey, lwip_netif_name);
 					err = ESP_FAIL;
 					continue;
 				}
@@ -1199,7 +1200,7 @@ err_t wireguardif_changedevice(struct netif *netif) {
 		}
 	}
 	if (err != ESP_OK) {
-		ESP_LOGE(TAG, "could not find an available network interface");
+		//ESP_LOGE(TAG, "could not find an available network interface");
 		result = ERR_IF;
 		return result;
 	}
@@ -1207,7 +1208,7 @@ err_t wireguardif_changedevice(struct netif *netif) {
 	underlying_netif = netif_find(lwip_netif_name);
 
 	if (underlying_netif == NULL) {
-		ESP_LOGE(TAG, "netif_find: cannot find %s (%s)", ifkey, lwip_netif_name);
+		//ESP_LOGE(TAG, "netif_find: cannot find %s (%s)", ifkey, lwip_netif_name);
 		result = ERR_IF;
 		return result;
 	}
@@ -1215,21 +1216,21 @@ err_t wireguardif_changedevice(struct netif *netif) {
 	underlying_netif = netif_default;
 
 	if (underlying_netif == NULL) {
-		ESP_LOGE(TAG, "netif_find: cannot find default netif");
+		//ESP_LOGE(TAG, "netif_find: cannot find default netif");
 		result = ERR_IF;
 		goto fail;
 	}
 #endif  // (!defined(ESP8266) || defined(IDF_VER)) && !defined(LIBRETINY)
 
-	ESP_LOGV(TAG, "underlying_netif = %p", underlying_netif);
-	ESP_LOGV(TAG, "underlying_netif->name = %c%c", underlying_netif->name[0], underlying_netif->name[1]);
-	ESP_LOGV(TAG, "underlying_netif->num = %d", underlying_netif->num);
-	ESP_LOGV(TAG, "underlying_netif->hwaddr_len = %d", underlying_netif->hwaddr_len);
-	ESP_LOGV(TAG, "underlying_netif->mtu = %d", underlying_netif->mtu);
-	ESP_LOGV(TAG, "underlying_netif->flags = 0x%04x", underlying_netif->flags);	
-	ESP_LOGV(TAG, "underlying_netif->ip_addr = %d.%d.%d.%d", IP2STR(&underlying_netif->ip_addr.u_addr.ip4));
-	ESP_LOGV(TAG, "underlying_netif->gw = %d.%d.%d.%d", IP2STR(&underlying_netif->gw.u_addr.ip4));
-	ESP_LOGV(TAG, "underlying_netif->netmask = %d.%d.%d.%d", IP2STR(&underlying_netif->netmask.u_addr.ip4));
+	//ESP_LOGV(TAG, "underlying_netif = %p", underlying_netif);
+	//ESP_LOGV(TAG, "underlying_netif->name = %c%c", underlying_netif->name[0], underlying_netif->name[1]);
+	//ESP_LOGV(TAG, "underlying_netif->num = %d", underlying_netif->num);
+	//ESP_LOGV(TAG, "underlying_netif->hwaddr_len = %d", underlying_netif->hwaddr_len);
+	//ESP_LOGV(TAG, "underlying_netif->mtu = %d", underlying_netif->mtu);
+	//ESP_LOGV(TAG, "underlying_netif->flags = 0x%04x", underlying_netif->flags);	
+	//ESP_LOGV(TAG, "underlying_netif->ip_addr = %d.%d.%d.%d", IP2STR(&underlying_netif->ip_addr.u_addr.ip4));
+	//ESP_LOGV(TAG, "underlying_netif->gw = %d.%d.%d.%d", IP2STR(&underlying_netif->gw.u_addr.ip4));
+	//ESP_LOGV(TAG, "underlying_netif->netmask = %d.%d.%d.%d", IP2STR(&underlying_netif->netmask.u_addr.ip4));
 
 	struct wireguard_device *device = (struct wireguard_device *)netif->state;
 

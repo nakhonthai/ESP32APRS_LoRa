@@ -18,6 +18,7 @@
 #include <ESPCPUTemp.h>
 #include "esp_wifi.h"
 #include "esp_heap_caps.h"
+#include <ArduinoJson.h>
 
 extern bool psramBusy;
 
@@ -9377,6 +9378,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 	}
 	else
 	{
+		char temp_buf[512];
 		// Allocate initial memory for HTML content
 		char *html = allocateStringMemory(18000); // Start with 8KB buffer
 		if (!html)
@@ -9414,26 +9416,14 @@ void handle_tlm(AsyncWebServerRequest *request)
 		char EnFlag[10] = "";
 		if (config.tlm0_en)
 			strcpy(EnFlag, "checked");
-		{
-			char *temp_flag = allocateStringMemory(512);
-			if (temp_flag)
-			{
-				snprintf(temp_flag, 512, "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"Enable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", EnFlag);
-				strcat(html, temp_flag);
-				free(temp_flag);
-			}
-		}
+		snprintf(temp_buf, sizeof(temp_buf), "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"Enable\" value=\"OK\" %s><span class=\"slider round\"></span></label></td>\n", EnFlag);
+		strcat(html, temp_buf);
+
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
-		{
-			char *temp_callsign = allocateStringMemory(512);
-			if (temp_callsign)
-			{
-				snprintf(temp_callsign, 512, "<td align=\"right\"><b>Station Callsign:</b></td>\n<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"%s\" /></td>\n", config.tlm0_mycall);
-				strcat(html, temp_callsign);
-				free(temp_callsign);
-			}
-		}
+		snprintf(temp_buf, sizeof(temp_buf), "<td align=\"right\"><b>Station Callsign:</b></td>\n<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"%s\" /></td>\n", config.tlm0_mycall);
+		strcat(html, temp_buf);
+
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Station SSID:</b></td>\n");
@@ -9441,20 +9431,15 @@ void handle_tlm(AsyncWebServerRequest *request)
 		strcat(html, "<select name=\"mySSID\" id=\"mySSID\">\n");
 		for (uint8_t ssid = 0; ssid <= 15; ssid++)
 		{
-			char *temp_option = allocateStringMemory(256);
-			if (temp_option)
-			{
 				if (config.tlm0_ssid == ssid)
 				{
-					snprintf(temp_option, 256, "<option value=\"%d\" selected>%d</option>\n", ssid, ssid);
+					snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\" selected>%d</option>\n", ssid, ssid);
 				}
 				else
 				{
-					snprintf(temp_option, 256, "<option value=\"%d\">%d</option>\n", ssid, ssid);
+					snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\">%d</option>\n", ssid, ssid);
 				}
-				strcat(html, temp_option);
-				free(temp_option);
-			}
+				strcat(html, temp_buf);
 		}
 		strcat(html, "</select></td>\n");
 		strcat(html, "</tr>\n");
@@ -9465,49 +9450,30 @@ void handle_tlm(AsyncWebServerRequest *request)
 		strcat(html, "<select name=\"Path\" id=\"Path\">\n");
 		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
 		{
-			{
-				char *temp_path = allocateStringMemory(256);
-				if (temp_path)
-				{
 					if (config.tlm0_path == pthIdx)
 					{
-						snprintf(temp_path, 256, "<option value=\"%d\" selected>%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
+						snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\" selected>%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
 					}
 					else
 					{
-						snprintf(temp_path, 256, "<option value=\"%d\">%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
+						snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\">%s</option>\n", pthIdx, PATH_NAME[pthIdx]);
 					}
-					strcat(html, temp_path);
-					free(temp_path);
-				}
-			}
+					strcat(html, temp_buf);
 		}
 		strcat(html, "</select></td>\n");
 		// strcat(html, "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" name=\"Path\" type=\"text\" value=\"" + String(config.tlm0_path) + "\" /></td>\n");
 		strcat(html, "</tr>\n");
 		strcat(html, "<tr>\n");
 		{
-			char *temp_comment = allocateStringMemory(512);
-			if (temp_comment)
-			{
-				snprintf(temp_comment, 512, "<td align=\"right\"><b>Text Comment:</b></td>\n<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" name=\"Comment\" type=\"text\" value=\"%s\" /></td>\n", config.tlm0_comment);
-				strcat(html, temp_comment);
-				free(temp_comment);
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<td align=\"right\"><b>Text Comment:</b></td>\n<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" name=\"Comment\" type=\"text\" value=\"%s\" /></td>\n", config.tlm0_comment);
+			strcat(html, temp_buf);
 		}
 		strcat(html, "</tr>\n");
 
-		{
-			char *temp_intervals = allocateStringMemory(1024);
-			if (temp_intervals)
-			{
-				snprintf(temp_intervals, 1024, "<tr><td style=\"text-align: right;\">Info Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" name=\"infoInv\" type=\"number\" value=\"%d\" />Sec.</td></tr>", config.tlm0_info_interval);
-				strcat(html, temp_intervals);
-				snprintf(temp_intervals, 1024, "<tr><td style=\"text-align: right;\">Data Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" name=\"dataInv\" type=\"number\" value=\"%d\" />Sec.</td></tr>", config.tlm0_data_interval);
-				strcat(html, temp_intervals);
-				free(temp_intervals);
-			}
-		}
+		snprintf(temp_buf, sizeof(temp_buf), "<tr><td style=\"text-align: right;\">Info Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" name=\"infoInv\" type=\"number\" value=\"%d\" />Sec.</td></tr>", config.tlm0_info_interval);
+		strcat(html, temp_buf);
+		snprintf(temp_buf, sizeof(temp_buf), "<tr><td style=\"text-align: right;\">Data Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" name=\"dataInv\" type=\"number\" value=\"%d\" />Sec.</td></tr>", config.tlm0_data_interval);
+		strcat(html, temp_buf);
 
 		char Pos2RFFlag[10] = "";
 		char Pos2INETFlag[10] = "";
@@ -9515,15 +9481,8 @@ void handle_tlm(AsyncWebServerRequest *request)
 			strcpy(Pos2RFFlag, "checked");
 		if (config.tlm0_2inet)
 			strcpy(Pos2INETFlag, "checked");
-		{
-			char *temp_channels = allocateStringMemory(1024);
-			if (temp_channels)
-			{
-				snprintf(temp_channels, 1024, "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag, Pos2INETFlag);
-				strcat(html, temp_channels);
-				free(temp_channels);
-			}
-		}
+		snprintf(temp_buf, sizeof(temp_buf), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag, Pos2INETFlag);
+		strcat(html, temp_buf);
 
 		// strcat(html, "<tr>\n");
 		// strcat(html, "<td align=\"right\"><b>Time Stamp:</b></td>\n");
@@ -9534,15 +9493,9 @@ void handle_tlm(AsyncWebServerRequest *request)
 		// strcat(html, "</tr>\n");
 		for (int ax = 0; ax < 5; ax++)
 		{
-			{
-				char *temp_channel_a = allocateStringMemory(512);
-				if (temp_channel_a)
-				{
-					snprintf(temp_channel_a, 512, "<tr><td align=\"right\"><b>Channel A%d:</b></td>\n", ax + 1);
-					strcat(html, temp_channel_a);
-					free(temp_channel_a);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Channel A%d:</b></td>\n", ax + 1);
+			strcat(html, temp_buf);
+
 			strcat(html, "<td align=\"center\">\n");
 			strcat(html, "<table>");
 
@@ -9550,65 +9503,30 @@ void handle_tlm(AsyncWebServerRequest *request)
 
 			strcat(html, "<tr><td style=\"text-align: right;\">Type/Name:</td>\n");
 			strcat(html, "<td style=\"text-align: left;\">Sensor Type: ");
-			{
-				char *temp_select = allocateStringMemory(256);
-				if (temp_select)
-				{
-					snprintf(temp_select, 256, "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
-					strcat(html, temp_select);
-					free(temp_select);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax, ax);
+			strcat(html, temp_buf);
 			for (uint8_t idx = 0; idx < SYSTEM_LEN; idx++)
 			{
-				{
-					char *temp_option = allocateStringMemory(256);
-					if (temp_option)
-					{
 						if (config.tml0_data_channel[ax] == idx)
 						{
-							snprintf(temp_option, 256, "<option value=\"%d\" selected>%s</option>\n", idx, SYSTEM_NAME[idx]);
+							snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\" selected>%s</option>\n", idx, SYSTEM_NAME[idx]);
 						}
 						else
 						{
-							snprintf(temp_option, 256, "<option value=\"%d\">%s</option>\n", idx, SYSTEM_NAME[idx]);
+							snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\">%s</option>\n", idx, SYSTEM_NAME[idx]);
 						}
-						strcat(html, temp_option);
-						free(temp_option);
-					}
-				}
+						strcat(html, temp_buf);
 			}
 			strcat(html, "</select></td>\n");
 
-			{
-				char *temp_param = allocateStringMemory(512);
-				if (temp_param)
-				{
-					snprintf(temp_param, 512, "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.tlm0_PARM[ax]);
-					strcat(html, temp_param);
-					free(temp_param);
-				}
-			}
-			{
-				char *temp_unit = allocateStringMemory(512);
-				if (temp_unit)
-				{
-					snprintf(temp_unit, 512, "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.tlm0_UNIT[ax]);
-					strcat(html, temp_unit);
-					free(temp_unit);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.tlm0_PARM[ax]);
+			strcat(html, temp_buf);
+			snprintf(temp_buf, sizeof(temp_buf), "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, config.tlm0_UNIT[ax]);
+			strcat(html, temp_buf);
 			strcat(html, "</tr>\n");
-			{
-				char *temp_eqns = allocateStringMemory(1024);
-				if (temp_eqns)
-				{
-					snprintf(temp_eqns, 1024, "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns%da\" type=\"number\" value=\"%.3f\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns%db\" type=\"number\" value=\"%.3f\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns%dc\" type=\"number\" value=\"%.3f\" /> (av<sup>2</sup>+bv+c)</td></tr>\n",
+			snprintf(temp_buf, sizeof(temp_buf), "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns%da\" type=\"number\" value=\"%.3f\" />  b:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns%db\" type=\"number\" value=\"%.3f\" /> c:<input min=\"-9999\" max=\"9999\" step=\"0.0001\" name=\"eqns%dc\" type=\"number\" value=\"%.3f\" /> (av<sup>2</sup>+bv+c)</td></tr>\n",
 							 ax, config.tlm0_EQNS[ax][0], ax, config.tlm0_EQNS[ax][1], ax, config.tlm0_EQNS[ax][2]);
-					strcat(html, temp_eqns);
-					free(temp_eqns);
-				}
-			}
+			strcat(html, temp_buf);
 			strcat(html, "</table></td>");
 			strcat(html, "</tr>\n");
 		}
@@ -9616,82 +9534,40 @@ void handle_tlm(AsyncWebServerRequest *request)
 		uint8_t b = 1;
 		for (int ax = 0; ax < 8; ax++)
 		{
-			{
-				char *temp_channel_b = allocateStringMemory(512);
-				if (temp_channel_b)
-				{
-					snprintf(temp_channel_b, 512, "<tr><td align=\"right\"><b>Channel B%d:</b></td>\n", ax + 1);
-					strcat(html, temp_channel_b);
-					free(temp_channel_b);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Channel B%d:</b></td>\n", ax + 1);
+			strcat(html, temp_buf);
 			strcat(html, "<td align=\"center\">\n");
 			strcat(html, "<table>");
 
 			// strcat(html, "<tr><td style=\"text-align: right;\">Type/Name:</td>\n");
 			strcat(html, "<td style=\"text-align: left;\">Type: ");
-			{
-				char *temp_select_b = allocateStringMemory(256);
-				if (temp_select_b)
-				{
-					snprintf(temp_select_b, 256, "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax + 5, ax);
-					strcat(html, temp_select_b);
-					free(temp_select_b);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<select name=\"sensorCH%d\" id=\"sensorCH%d\">\n", ax + 5, ax);
+			strcat(html, temp_buf);
 			for (uint8_t idx = 0; idx < SYSTEM_BIT_LEN; idx++)
 			{
-				{
-					char *temp_option_b = allocateStringMemory(256);
-					if (temp_option_b)
-					{
 						if (config.tml0_data_channel[ax + 5] == idx)
 						{
-							snprintf(temp_option_b, 256, "<option value=\"%d\" selected>%s</option>\n", idx, SYSTEM_BITS_NAME[idx]);
+							snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\" selected>%s</option>\n", idx, SYSTEM_BITS_NAME[idx]);
 						}
 						else
 						{
-							snprintf(temp_option_b, 256, "<option value=\"%d\">%s</option>\n", idx, SYSTEM_BITS_NAME[idx]);
+							snprintf(temp_buf, sizeof(temp_buf), "<option value=\"%d\">%s</option>\n", idx, SYSTEM_BITS_NAME[idx]);
 						}
-						strcat(html, temp_option_b);
-						free(temp_option_b);
-					}
-				}
+						strcat(html, temp_buf);
 			}
 			strcat(html, "</select></td>\n");
 
-			{
-				char *temp_param_b = allocateStringMemory(512);
-				if (temp_param_b)
-				{
-					snprintf(temp_param_b, 512, "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax + 5, config.tlm0_PARM[ax + 5]);
-					strcat(html, temp_param_b);
-					free(temp_param_b);
-				}
-			}
-			{
-				char *temp_unit_b = allocateStringMemory(512);
-				if (temp_unit_b)
-				{
-					snprintf(temp_unit_b, 512, "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax + 5, config.tlm0_UNIT[ax + 5]);
-					strcat(html, temp_unit_b);
-					free(temp_unit_b);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<td style=\"text-align: left;\">Parameter: <input maxlength=\"10\" size=\"8\" name=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax + 5, config.tlm0_PARM[ax + 5]);
+			strcat(html, temp_buf);
+			snprintf(temp_buf, sizeof(temp_buf), "<td style=\"text-align: left;\">Unit: <input maxlength=\"8\" size=\"5\" name=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax + 5, config.tlm0_UNIT[ax + 5]);
+			strcat(html, temp_buf);
 			char LowFlag[20] = "", HighFlag[20] = "";
 			if (config.tlm0_BITS_Active & b)
 				strcpy(HighFlag, "checked=\"checked\"");
 			else
 				strcpy(LowFlag, "checked=\"checked\"");
-			{
-				char *temp_radio_b = allocateStringMemory(512);
-				if (temp_radio_b)
-				{
-					snprintf(temp_radio_b, 512, "<td style=\"text-align: left;\"> Active:<input type=\"radio\" name=\"bitact%d\" value=\"0\" %s/>LOW <input type=\"radio\" name=\"bitact%d\" value=\"1\" %s/>HIGH </td>\n", ax, LowFlag, ax, HighFlag);
-					strcat(html, temp_radio_b);
-					free(temp_radio_b);
-				}
-			}
+			snprintf(temp_buf, sizeof(temp_buf), "<td style=\"text-align: left;\"> Active:<input type=\"radio\" name=\"bitact%d\" value=\"0\" %s/>LOW <input type=\"radio\" name=\"bitact%d\" value=\"1\" %s/>HIGH </td>\n", ax, LowFlag, ax, HighFlag);
+			strcat(html, temp_buf);
 			strcat(html, "</tr>\n");
 			// strcat(html, "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "a\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "b\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax + 1) + "c\" type=\"number\" value=\"" + String(config.tlm0_EQNS[ax][2], 3) + "\" /> (av<sup>2</sup>+bv+c)</td></tr>\n";
 			strcat(html, "</table></td>");
@@ -9832,6 +9708,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 	else
 	{
 		// Allocate initial memory for HTML content
+		char temp_buffer[512];
 		char *html = allocateStringMemory(25000); // Start with 8KB buffer
 		if (!html)
 		{
@@ -9984,47 +9861,19 @@ void handle_sensor(AsyncWebServerRequest *request)
 				strcat(html, "<td align=\"center\">\n");
 				if (config.sensor[ax].enable)
 				{
-					{
-						char *temp_fieldset = allocateStringMemory(256);
-						if (temp_fieldset)
-						{
-							snprintf(temp_fieldset, 256, "<fieldset id=\"SenGrp%d\">\n", ax + 1);
-							strcat(html, temp_fieldset);
-							free(temp_fieldset);
-						}
-					}
+					snprintf(temp_buffer, sizeof(temp_buffer), "<fieldset id=\"SenGrp%d\">\n", ax + 1);
+					strcat(html, temp_buffer);
 				}
 				else
 				{
-					{
-						char *temp_fieldset = allocateStringMemory(256);
-						if (temp_fieldset)
-						{
-							snprintf(temp_fieldset, 256, "<fieldset id=\"SenGrp%d\" disabled>\n", ax + 1);
-							strcat(html, temp_fieldset);
-							free(temp_fieldset);
-						}
-					}
+					snprintf(temp_buffer, sizeof(temp_buffer), "<fieldset id=\"SenGrp%d\" disabled>\n", ax + 1);
+					strcat(html, temp_buffer);
 				}
 
-				{
-					char *temp_legend = allocateStringMemory(512);
-					if (temp_legend)
-					{
-						snprintf(temp_legend, 512, "<legend>SEN#%d-%s</legend>\n", ax + 1, config.sensor[ax].parm);
-						strcat(html, temp_legend);
-						free(temp_legend);
-					}
-				}
-				{
-					char *temp_input = allocateStringMemory(512);
-					if (temp_input)
-					{
-						snprintf(temp_input, 512, "<input id=\"sVal%d\" style=\"text-align:right;\" size=\"5\" type=\"text\" value=\"%.2f\" readonly/> %s\n", ax, sen[ax].sample, config.sensor[ax].unit);
-						strcat(html, temp_input);
-						free(temp_input);
-					}
-				}
+				snprintf(temp_buffer, sizeof(temp_buffer), "<legend>SEN#%d-%s</legend>\n", ax + 1, config.sensor[ax].parm);
+				strcat(html, temp_buffer);
+				snprintf(temp_buffer, sizeof(temp_buffer), "<input id=\"sVal%d\" style=\"text-align:right;\" size=\"5\" type=\"text\" value=\"%.2f\" readonly/> %s\n", ax, sen[ax].sample, config.sensor[ax].unit);
+				strcat(html, temp_buffer);
 				strcat(html, "</td>\n");
 				ax++;
 				if (ax >= SENSOR_NUMBER)
@@ -10044,26 +9893,14 @@ void handle_sensor(AsyncWebServerRequest *request)
 
 		for (int ax = 0; ax < SENSOR_NUMBER; ax++)
 		{
-			{
-				char *temp_sensor = allocateStringMemory(256);
-				if (temp_sensor)
-				{
-					snprintf(temp_sensor, 256, "<tr><td align=\"right\"><b>SENSOR#%d:</b><br />\n", ax + 1);
-					strcat(html, temp_sensor);
-					free(temp_sensor);
-				}
-			}
+			snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td align=\"right\"><b>SENSOR#%d:</b><br />\n", ax + 1);
+			strcat(html, temp_buffer);
 			EnFlag = "";
 			if (config.sensor[ax].enable)
 				EnFlag = "checked";
 			{
-				char *temp_checkbox = allocateStringMemory(256);
-				if (temp_checkbox)
-				{
-					snprintf(temp_checkbox, 256, "<label class=\"switch\"><input type=\"checkbox\" name=\"En%d\" value=\"OK\" %s><span class=\"slider round\"></span></label>", ax, EnFlag.c_str());
-					strcat(html, temp_checkbox);
-					free(temp_checkbox);
-				}
+				snprintf(temp_buffer, sizeof(temp_buffer), "<label class=\"switch\"><input type=\"checkbox\" name=\"En%d\" value=\"OK\" %s><span class=\"slider round\"></span></label>", ax, EnFlag.c_str());
+				strcat(html, temp_buffer);
 			}
 			strcat(html, "</td><td align=\"center\">\n");
 			strcat(html, "<table>");
@@ -10071,13 +9908,8 @@ void handle_sensor(AsyncWebServerRequest *request)
 			strcat(html, "<tr><td style=\"text-align: right;\">Type:</td>\n");
 			strcat(html, "<td style=\"text-align: left;\">");
 			{
-				char *temp_select = allocateStringMemory(256);
-				if (temp_select)
-				{
-					snprintf(temp_select, 256, "<select name=\"sensorCH%d\" id=\"sensorCH%d\" onchange=\"selSensorType(%d)\">\n", ax, ax, ax);
-					strcat(html, temp_select);
-					free(temp_select);
-				}
+				snprintf(temp_buffer, sizeof(temp_buffer), "<select name=\"sensorCH%d\" id=\"sensorCH%d\" onchange=\"selSensorType(%d)\">\n", ax, ax, ax);
+				strcat(html, temp_buffer);
 			}
 			// for (uint8_t idx = 0; idx < SENSOR_NAME_NUM; idx++)
 			// {
@@ -10092,35 +9924,15 @@ void handle_sensor(AsyncWebServerRequest *request)
 			// }
 			strcat(html, "</select></td>\n");
 
-			{
-				char *temp_name = allocateStringMemory(512);
-				if (temp_name)
-				{
-					snprintf(temp_name, 512, "<td style=\"text-align: left;\">Name: <input maxlength=\"15\" size=\"15\" name=\"param%d\" id=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, ax, config.sensor[ax].parm);
-					strcat(html, temp_name);
-					free(temp_name);
-				}
-			}
-			{
-				char *temp_unit = allocateStringMemory(512);
-				if (temp_unit)
-				{
-					snprintf(temp_unit, 512, "<td style=\"text-align: left;\">Unit: <input maxlength=\"10\" size=\"5\" name=\"unit%d\" id=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, ax, config.sensor[ax].unit);
-					strcat(html, temp_unit);
-					free(temp_unit);
-				}
-			}
+			snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\">Name: <input maxlength=\"15\" size=\"15\" name=\"param%d\" id=\"param%d\" type=\"text\" value=\"%s\" /></td>\n", ax, ax, config.sensor[ax].parm);
+			strcat(html, temp_buffer);
+
+			snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\">Unit: <input maxlength=\"10\" size=\"5\" name=\"unit%d\" id=\"unit%d\" type=\"text\" value=\"%s\" /></td>\n", ax, ax, config.sensor[ax].unit);
+			strcat(html, temp_buffer);
 			strcat(html, "</tr>\n");
 			// strcat(html, "<tr><td style=\"text-align: right;\">Port:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "a\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[0], 3) + "\" />  b:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "b\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[1], 3) + "\" /> c:<input min=\"-999\" max=\"999\" step=\"0.1\" name=\"eqns" + String(ax) + "c\" type=\"number\" value=\"" + String(config.sensor[ax].eqns[2], 3) + "\" /> (av<sup>2</sup>+bv+c)</td></tr>\n";
-			{
-				char *temp_port = allocateStringMemory(256);
-				if (temp_port)
-				{
-					snprintf(temp_port, 256, "<tr><td style=\"text-align: right;\">PORT:</td>\n<td style=\"text-align: left;\">\n<select name=\"sensorP%d\" id=\"sensorP%d\" onchange=\"selSensor(%d)\">\n", ax, ax, ax);
-					strcat(html, temp_port);
-					free(temp_port);
-				}
-			}
+			snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td style=\"text-align: right;\">PORT:</td>\n<td style=\"text-align: left;\">\n<select name=\"sensorP%d\" id=\"sensorP%d\" onchange=\"selSensor(%d)\">\n", ax, ax, ax);
+			strcat(html, temp_buffer);
 			// for (uint8_t idx = 0; idx < SENSOR_PORT_NUM; idx++)
 			// {
 			// 	if (config.sensor[ax].port == idx)
@@ -10133,36 +9945,15 @@ void handle_sensor(AsyncWebServerRequest *request)
 			// 	}
 			// }
 			strcat(html, "</select></td>\n");
-			{
-				char *temp_addr = allocateStringMemory(512);
-				if (temp_addr)
-				{
-					snprintf(temp_addr, 512, "<td style=\"text-align: left;\">Addr/Reg/GPIO: <input style=\"text-align:right;\" min=\"0\" max=\"6500\" step=\"1\" name=\"address%d\" id=\"address%d\" type=\"number\" value=\"%d\" /></td>\n", ax, ax, config.sensor[ax].address);
-					strcat(html, temp_addr);
-					free(temp_addr);
-				}
-			}
-			{
-				char *temp_sample = allocateStringMemory(512);
-				if (temp_sample)
-				{
-					snprintf(temp_sample, 512, "<td style=\"text-align: left;\">Sample: <input style=\"text-align:right;\" min=\"0\" max=\"9999\" step=\"1\" name=\"sample%d\" type=\"number\" value=\"%d\" />Sec.\n", ax, config.sensor[ax].samplerate);
-					strcat(html, temp_sample);
-					snprintf(temp_sample, 512, "Average: <input style=\"text-align:right;\" min=\"0\" max=\"999\" step=\"1\" name=\"avg%d\" type=\"number\" value=\"%d\" />Sec.</td></tr>\n", ax, config.sensor[ax].averagerate);
-					strcat(html, temp_sample);
-					free(temp_sample);
-				}
-			}
-			{
-				char *temp_eqns = allocateStringMemory(1024);
-				if (temp_eqns)
-				{
-					snprintf(temp_eqns, 1024, "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns%da\" type=\"number\" value=\"%.5f\" />  b:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns%db\" type=\"number\" value=\"%.5f\" /> c:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns%dc\" type=\"number\" value=\"%.5f\" /> (av<sup>2</sup>+bv+c)</td></tr>\n",
+			snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\">Addr/Reg/GPIO: <input style=\"text-align:right;\" min=\"0\" max=\"6500\" step=\"1\" name=\"address%d\" id=\"address%d\" type=\"number\" value=\"%d\" /></td>\n", ax, ax, config.sensor[ax].address);
+			strcat(html, temp_buffer);
+			snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\">Sample: <input style=\"text-align:right;\" min=\"0\" max=\"9999\" step=\"1\" name=\"sample%d\" type=\"number\" value=\"%d\" />Sec.\n", ax, config.sensor[ax].samplerate);
+			strcat(html, temp_buffer);
+			snprintf(temp_buffer, sizeof(temp_buffer), "Average: <input style=\"text-align:right;\" min=\"0\" max=\"999\" step=\"1\" name=\"avg%d\" type=\"number\" value=\"%d\" />Sec.</td></tr>\n", ax, config.sensor[ax].averagerate);
+			strcat(html, temp_buffer);
+			snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td style=\"text-align: right;\">EQNS:</td><td colspan=\"3\" style=\"text-align: left;\">a:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns%da\" type=\"number\" value=\"%.5f\" />  b:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns%db\" type=\"number\" value=\"%.5f\" /> c:<input min=\"-999\" max=\"999\" step=\"0.00001\" name=\"eqns%dc\" type=\"number\" value=\"%.5f\" /> (av<sup>2</sup>+bv+c)</td></tr>\n",
 							 ax, config.sensor[ax].eqns[0], ax, config.sensor[ax].eqns[1], ax, config.sensor[ax].eqns[2]);
-					strcat(html, temp_eqns);
-					free(temp_eqns);
-				}
-			}
+			strcat(html, temp_buffer);
 			strcat(html, "</table></td>");
 			strcat(html, "</tr>\n");
 		}
@@ -10178,34 +9969,20 @@ void handle_sensor(AsyncWebServerRequest *request)
 		strcat(html, "typeArry = new Array(");
 		for (uint8_t idx = 0; idx < SENSOR_NAME_NUM; idx++)
 		{
-			{
-				char *temp_array_item = allocateStringMemory(256);
-				if (temp_array_item)
-				{
-					snprintf(temp_array_item, 256, "'%s'", SENSOR_NAME[idx]);
-					strcat(html, temp_array_item);
-					if (idx < SENSOR_NAME_NUM - 1)
-						strcat(html, ",");
-					free(temp_array_item);
-				}
-			}
+			snprintf(temp_buffer, sizeof(temp_buffer), "'%s'", SENSOR_NAME[idx]);
+			strcat(html, temp_buffer);
+			if (idx < SENSOR_NAME_NUM - 1)
+				strcat(html, ",");
 		}
 		strcat(html, ");\n");
 		strcat(html, "if (typeof portArry === 'undefined'){let portArry = [];};\n");
 		strcat(html, "portArry = new Array(");
 		for (uint8_t idx = 0; idx < SENSOR_PORT_NUM; idx++)
 		{
-			{
-				char *temp_port_item = allocateStringMemory(256);
-				if (temp_port_item)
-				{
-					snprintf(temp_port_item, 256, "'%s'", SENSOR_PORT[idx]);
-					strcat(html, temp_port_item);
-					if (idx < SENSOR_PORT_NUM - 1)
-						strcat(html, ",");
-					free(temp_port_item);
-				}
-			}
+			snprintf(temp_buffer, sizeof(temp_buffer), "'%s'", SENSOR_PORT[idx]);
+			strcat(html, temp_buffer);
+			if (idx < SENSOR_PORT_NUM - 1)
+				strcat(html, ",");
 		}
 		strcat(html, ");\n");
 		// strcat(html, "delete typeSel;delete listType;delete portSel;delete listPort;\n";
@@ -10215,17 +9992,10 @@ void handle_sensor(AsyncWebServerRequest *request)
 		strcat(html, "if (typeof listPort === 'undefined'){var listPort = [];};\n");
 		for (int i = 0; i < 10; i++)
 		{
-			{
-				char *temp_list = allocateStringMemory(512);
-				if (temp_list)
-				{
-					snprintf(temp_list, 512, "listType[%d] = document.querySelector('#sensorCH%d');typeSel[%d]=%d;\n", i, i, i, config.sensor[i].type);
-					strcat(html, temp_list);
-					snprintf(temp_list, 512, "listPort[%d] = document.querySelector('#sensorP%d');portSel[%d]=%d;\n", i, i, i, config.sensor[i].port);
-					strcat(html, temp_list);
-					free(temp_list);
-				}
-			}
+			snprintf(temp_buffer, sizeof(temp_buffer), "listType[%d] = document.querySelector('#sensorCH%d');typeSel[%d]=%d;\n", i, i, i, config.sensor[i].type);
+			strcat(html, temp_buffer);
+			snprintf(temp_buffer, sizeof(temp_buffer), "listPort[%d] = document.querySelector('#sensorP%d');portSel[%d]=%d;\n", i, i, i, config.sensor[i].port);
+			strcat(html, temp_buffer);
 		}
 
 		strcat(html, "for (let n = 0; n < 10; n++){\n");
@@ -11728,6 +11498,55 @@ void handle_ota_url(AsyncWebServerRequest *request)
 	xTaskCreate(ota_url_task, "ota_url_task", 8192, urlBuf, 5, NULL);
 }
 
+// Remote version file published by copy_firmware.py, checked against the
+// running VERSION/VERSION_BUILD to let the "about" page report new releases.
+#define VERSION_CHECK_URL "http://fw.nakhonthai.net/LoRa/version.json"
+
+void handle_check_version(AsyncWebServerRequest *request)
+{
+	if (!request->authenticate(config.http_username, config.http_password))
+	{
+		return request->requestAuthentication();
+	}
+
+	HTTPClient http;
+	http.begin(VERSION_CHECK_URL);
+	http.setTimeout(5000);
+	int httpCode = http.GET();
+
+	if (httpCode != HTTP_CODE_OK)
+	{
+		http.end();
+		char errBuf[100];
+		snprintf(errBuf, sizeof(errBuf), "{\"error\":\"HTTP GET failed, code=%d\"}", httpCode);
+		request->send(500, "application/json", errBuf);
+		return;
+	}
+
+	String payload = http.getString();
+	http.end();
+
+	JsonDocument doc;
+	DeserializationError err = deserializeJson(doc, payload);
+	if (err)
+	{
+		request->send(500, "application/json", "{\"error\":\"Invalid version data\"}");
+		return;
+	}
+
+	const char *latestVersion = doc["version"] | "";
+	const char *latestBuild = doc["build"] | "";
+	const char *latestDate = doc["date"] | "";
+
+	bool updateAvailable = (strcmp(latestVersion, VERSION) != 0) || (strcmp(latestBuild, VERSION_BUILD) != 0);
+
+	char resp[400];
+	snprintf(resp, sizeof(resp),
+			 "{\"current_version\":\"%s\",\"current_build\":\"%s\",\"latest_version\":\"%s\",\"latest_build\":\"%s\",\"latest_date\":\"%s\",\"update_available\":%s}",
+			 VERSION, VERSION_BUILD, latestVersion, latestBuild, latestDate, updateAvailable ? "true" : "false");
+	request->send(200, "application/json", resp);
+}
+
 void handle_about(AsyncWebServerRequest *request)
 {
 	if (!request->authenticate(config.http_username, config.http_password))
@@ -11740,7 +11559,7 @@ void handle_about(AsyncWebServerRequest *request)
 	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
 	// Allocate memory for HTML content
-	char *webString = allocateStringMemory(8192); // Start with 8KB buffer
+	char *webString = allocateStringMemory(16384); // Start with 16KB buffer
 	if (!webString)
 	{
 		request->send(500, "text/html", "Memory allocation failed");
@@ -12076,11 +11895,31 @@ void handle_about(AsyncWebServerRequest *request)
 	{
 		char ota_url_buf[200];
 		snprintf(ota_url_buf, sizeof(ota_url_buf), "http://fw.nakhonthai.net/LoRa/%s", FirmwareOTA);
+
+		// Derive the board-specific firmware name prefix (FirmwareOTA minus the
+		// trailing "_V<ver><build>.bin") so the client JS can rebuild the filename
+		// for a newer release once /check_version reports one is available.
+		char FirmwarePrefix[50] = "";
+		{
+			char suffix[40];
+			snprintf(suffix, sizeof(suffix), "_V%s%s.bin", verNoDot, VERSION_BUILD);
+			size_t suffixLen = strlen(suffix);
+			size_t fwLen = strlen(FirmwareOTA);
+			if (fwLen > suffixLen)
+			{
+				size_t prefixLen = fwLen - suffixLen;
+				if (prefixLen >= sizeof(FirmwarePrefix))
+					prefixLen = sizeof(FirmwarePrefix) - 1;
+				memcpy(FirmwarePrefix, FirmwareOTA, prefixLen);
+				FirmwarePrefix[prefixLen] = '\0';
+			}
+		}
+
 		strcat(webString, "<table>");
 		strcat(webString, "<th colspan=\"2\"><span><b>OTA Online Firmware Update</b></span></th>\n");
 		char ota_row[512];
 		snprintf(ota_row, sizeof(ota_row),
-			"<tr><td align=\"right\"><b>Firmware File:</b></td><td align=\"left\"><a href=\"%s\" target=\"_blank\">%s</a></td></tr>\n",
+			"<tr><td align=\"right\"><b>Firmware File:</b></td><td align=\"left\"><a id=\"fw_file_link\" href=\"%s\" target=\"_blank\">%s</a></td></tr>\n",
 			ota_url_buf, FirmwareOTA);
 		strcat(webString, ota_row);
 		snprintf(ota_row, sizeof(ota_row),
@@ -12091,12 +11930,53 @@ void handle_about(AsyncWebServerRequest *request)
 		snprintf(ota_row, sizeof(ota_row),
 			"<tr><td colspan=\"2\" align=\"right\"><div class=\"col-sm-3 col-xs-4\">"
 			"<input type='hidden' id='ota_url' value='%s'>"
+			"<input type='hidden' id='fw_prefix' value='%s'>"
+			"<input type='button' class=\"btn btn-danger\" id=\"check_ver_btn\" value='Check New Version'>"
 			"<input type='button' class=\"btn btn-danger\" id=\"ota_sumbit\" value='Firmware Update'>"
 			"</div></td></tr>\n",
-			ota_url_buf);
+			ota_url_buf, FirmwarePrefix);
 		strcat(webString, ota_row);
 		strcat(webString, "</table><br />\n");
 	}
+
+	// strcat(webString, "<table>");
+	// strcat(webString, "<th colspan=\"2\"><span><b>Check for New Version</b></span></th>\n");
+	// strcat(webString, "<tr><td align=\"right\"><b>Update Server:</b></td><td align=\"left\"><a href=\"" VERSION_CHECK_URL "\" target=\"_blank\">" VERSION_CHECK_URL "</a></td></tr>\n");
+	// strcat(webString, "<tr><td align=\"right\"><b>Status:</b></td><td align=\"left\"><span id='ver_check_result'>-</span></td></tr>\n");
+	// strcat(webString, "<tr><td colspan=\"2\" align=\"right\"><div class=\"col-sm-3 col-xs-4\"><input type='button' class=\"btn btn-danger\" id=\"check_ver_btn\" value='Check New Version'></div></td></tr>\n");
+	// strcat(webString, "</table><br />\n");
+
+	strcat(webString, "<script>"
+					  "document.getElementById('check_ver_btn').addEventListener('click', function(){"
+					  "document.getElementById('check_ver_btn').disabled = true;"
+					  "document.getElementById('ota_prg').innerHTML = 'Checking...';"
+					  "$.ajax({"
+					  "url: '/check_version',"
+					  "type: 'GET',"
+					  "dataType: 'json',"
+					  "success: function(d) {"
+					  "document.getElementById('check_ver_btn').disabled = false;"
+					  "if (d.update_available) {"
+					  "var noDotVer = d.latest_version.replace(/\\./g, '');"
+					  "var prefix = document.getElementById('fw_prefix').value;"
+					  "var newFile = prefix + '_V' + noDotVer + d.latest_build + '.bin';"
+					  "var newUrl = 'http://fw.nakhonthai.net/LoRa/' + newFile;"
+					  "var fwLink = document.getElementById('fw_file_link');"
+					  "fwLink.href = newUrl;"
+					  "fwLink.innerHTML = newFile;"
+					  "document.getElementById('ota_url').value = newUrl;"
+					  "document.getElementById('ota_prg').innerHTML = 'New version available: V' + d.latest_version + d.latest_build + ' (' + d.latest_date + ') - firmware link updated.';"
+					  "} else {"
+					  "document.getElementById('ota_prg').innerHTML = 'You are using the latest version.';"
+					  "}"
+					  "},"
+					  "error: function(a, b, c) {"
+					  "document.getElementById('check_ver_btn').disabled = false;"
+					  "document.getElementById('ota_prg').innerHTML = 'Error checking version: ' + c;"
+					  "}"
+					  "});"
+					  "});"
+					  "</script>");
 
 	strcat(webString, "<script>"
 					  "document.getElementById('ota_sumbit').addEventListener('click', function(){"
@@ -12140,8 +12020,8 @@ void handle_gnss(AsyncWebServerRequest *request)
 	}
 	strcpy(webString, "<html>\n<head>\n");
 	strcat(webString, "<script src=\"https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js\"></script>\n");
-	strcat(webString, "<script src=\"https://code.highcharts.com/highcharts.js\"></script>\n");
-	strcat(webString, "<script src=\"https://code.highcharts.com/highcharts-more.js\"></script>\n");
+	//strcat(webString, "<script src=\"https://code.highcharts.com/highcharts.js\"></script>\n");
+	//strcat(webString, "<script src=\"https://code.highcharts.com/highcharts-more.js\"></script>\n");
 	strcat(webString, "<script language=\"JavaScript\">");
 
 	// Add some life
@@ -12174,95 +12054,33 @@ void handle_gnss(AsyncWebServerRequest *request)
 	strcat(webString, "<th colspan=\"2\" style=\"background-color: #00BCD4;\"><span><b>GNSS Information</b></span></th>\n");
 	// strcat(webString, "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>");
 
-	{
-		char *temp_en = allocateStringMemory(512);
-		if (temp_en)
-		{
-			snprintf(temp_en, 512, "<tr><td align=\"right\"><b>Enable: </b></td><td align=\"left\"> <label id=\"en\">%d</label></td></tr>", config.gnss_enable);
-			strcat(webString, temp_en);
-			free(temp_en);
-		}
-	}
+	char temp_buf[256];
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Enable: </b></td><td align=\"left\"> <label id=\"en\">%d</label></td></tr>", config.gnss_enable);
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_lat = allocateStringMemory(512);
-		if (temp_lat)
-		{
-			snprintf(temp_lat, 512, "<tr><td align=\"right\"><b>Latitude: </b></td><td align=\"left\"> <label id=\"lat\">%.5f</label></td></tr>", gps.location.lat());
-			strcat(webString, temp_lat);
-			free(temp_lat);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Latitude: </b></td><td align=\"left\"> <label id=\"lat\">%.5f</label></td></tr>", gps.location.lat());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_lng = allocateStringMemory(512);
-		if (temp_lng)
-		{
-			snprintf(temp_lng, 512, "<tr><td align=\"right\"><b>Longitude: </b></td><td align=\"left\"> <label id=\"lng\">%.5f</label></td></tr>", gps.location.lng());
-			strcat(webString, temp_lng);
-			free(temp_lng);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Longitude: </b></td><td align=\"left\"> <label id=\"lng\">%.5f</label></td></tr>", gps.location.lng());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_alt = allocateStringMemory(512);
-		if (temp_alt)
-		{
-			snprintf(temp_alt, 512, "<tr><td align=\"right\"><b>Altitude: </b></td><td align=\"left\"> <label id=\"alt\">%.2f</label> m.</td></tr>", gps.altitude.meters());
-			strcat(webString, temp_alt);
-			free(temp_alt);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Altitude: </b></td><td align=\"left\"> <label id=\"alt\">%.2f</label> m.</td></tr>", gps.altitude.meters());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_spd = allocateStringMemory(512);
-		if (temp_spd)
-		{
-			snprintf(temp_spd, 512, "<tr><td align=\"right\"><b>Speed: </b></td><td align=\"left\"> <label id=\"spd\">%.2f</label> km/h</td></tr>", gps.speed.kmph());
-			strcat(webString, temp_spd);
-			free(temp_spd);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Speed: </b></td><td align=\"left\"> <label id=\"spd\">%.2f</label> km/h</td></tr>", gps.speed.kmph());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_csd = allocateStringMemory(512);
-		if (temp_csd)
-		{
-			snprintf(temp_csd, 512, "<tr><td align=\"right\"><b>Course: </b></td><td align=\"left\"> <label id=\"csd\">%.1f</label></td></tr>", gps.course.deg());
-			strcat(webString, temp_csd);
-			free(temp_csd);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Course: </b></td><td align=\"left\"> <label id=\"csd\">%.1f</label></td></tr>", gps.course.deg());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_hdop = allocateStringMemory(512);
-		if (temp_hdop)
-		{
-			snprintf(temp_hdop, 512, "<tr><td align=\"right\"><b>HDOP: </b></td><td align=\"left\"> <label id=\"hdop\">%.2f</label> </td></tr>", gps.hdop.hdop());
-			strcat(webString, temp_hdop);
-			free(temp_hdop);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>HDOP: </b></td><td align=\"left\"> <label id=\"hdop\">%.2f</label> </td></tr>", gps.hdop.hdop());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_sat = allocateStringMemory(512);
-		if (temp_sat)
-		{
-			snprintf(temp_sat, 512, "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">%d</label> </td></tr>", gps.satellites.value());
-			strcat(webString, temp_sat);
-			free(temp_sat);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">%d</label> </td></tr>", gps.satellites.value());
+	strcat(webString, temp_buf);
 
-	{
-		char *temp_time = allocateStringMemory(512);
-		if (temp_time)
-		{
-			snprintf(temp_time, 512, "<tr><td align=\"right\"><b>Time: </b></td><td align=\"left\"> <label id=\"time\">%d</label> </td></tr>", gps.time.value());
-			strcat(webString, temp_time);
-			free(temp_time);
-		}
-	}
+	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Time: </b></td><td align=\"left\"> <label id=\"time\">%d</label> </td></tr>", gps.time.value());
+	strcat(webString, temp_buf);
 
 	strcat(webString, "</table><table>");
 	strcat(webString, "<tr><td><b>Terminal:</b><br /><textarea id=\"raw_txt\" name=\"raw_txt\" rows=\"30\" cols=\"80\" /></textarea></td></tr>\n");
@@ -12466,6 +12284,9 @@ void webService()
 
 	async_server.on("/ota_url", HTTP_POST, [](AsyncWebServerRequest *request)
 					{ handle_ota_url(request); });
+
+	async_server.on("/check_version", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_check_version(request); });
 
 	lastheard_events.onConnect([](AsyncEventSourceClient *client)
 							   {
