@@ -307,16 +307,14 @@ bool hdlcParseBit(Hdlc *hdlc, bool bit, uint8_t *data, size_t &idx, bool ax25)
     // Increment the bitIndex and check if we have a complete byte
     if (++hdlc->bitIndex >= 8)
     {
-        if (ax25)
-        {
-            if ((hdlc->currentByte == HDLC_FLAG ||
-                 hdlc->currentByte == HDLC_RESET ||
-                 hdlc->currentByte == AX25_ESC))
-            {
-                data[idx++] = AX25_ESC;
-            }
-        }
-
+        // Note: no byte-level unescaping here. The stuffed-bit removal above
+        // (the 0x3f/0x3e check) already performs real HDLC bit-unstuffing, so
+        // currentByte is a legitimate decoded frame byte and can validly equal
+        // 0x7E/0x7F/0x1B (e.g. an AX.25 address SSID byte with SSID=15).
+        // Inserting an extra AX25_ESC byte here (as hdlcParse()'s software-FIFO
+        // path does) corrupts real AX.25 frames by shifting every following
+        // byte, breaking the FCS check in ax25_decode() and causing valid
+        // incoming packets (again, especially SSID=15) to be rejected.
         data[idx++] = hdlc->currentByte;
 
         // Wipe received byte and reset bit index to 0
@@ -992,10 +990,15 @@ char ax25_encode(ax25frame &frame,char *raw, int size)
 
 uint8_t *ax25_putRaw(uint8_t *raw, AX25Ctx *ctx, uint8_t c)
 {
-    if (c == HDLC_FLAG || c == HDLC_RESET || c == AX25_ESC)
-    {
-        *raw++ = AX25_ESC;
-    }
+    // Note: no byte-level escaping here. hdlcFrame() builds a raw AX.25 frame
+    // that is bit-stuffed afterwards by bit_stuffing(), which is the correct,
+    // standard way to make control-like byte values (e.g. 0x7E/0x7F) safe on
+    // the wire. Inserting an extra AX25_ESC byte here (as used by the
+    // software-FIFO TX path in ax25_putchar) would corrupt the frame content,
+    // since real receivers only understand bit stuffing, not this escape byte.
+    // This previously caused every address with SSID=15 (whose SSID byte
+    // encodes to exactly 0x7E or 0x7F) to be transmitted as a malformed
+    // frame, reported by receivers as an HDLC error.
     ctx->crc_out = update_crc_ccit(c, ctx->crc_out);
     *raw++ = c;
     return raw;

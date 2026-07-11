@@ -1118,6 +1118,20 @@ void event_lastHeard(bool gethtml)
 		pkgListType pkg = getPkgList(i);
 		if (pkg.time > 0)
 		{
+			// if (pkg.raw == nullptr || pkg.length == 0)
+			// 	continue;
+			// bool validText = true;
+			// for (size_t ci = 0; ci < pkg.length; ci++)
+			// {
+			// 	if (!isprint((unsigned char)pkg.raw[ci]))
+			// 	{
+			// 		validText = false;
+			// 		break;
+			// 	}
+			// }
+			// if (!validText)
+			// 	continue;
+
 			int packet = pkg.pkg;
 			char *pos_gt = strchr(pkg.raw, '>'); // Find first position of '>'
 			int start_val = pos_gt ? (pos_gt - pkg.raw) : -1;
