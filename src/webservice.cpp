@@ -1026,7 +1026,6 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 #endif
 	strcat(html, "<th><span>SPIFFS(KByte)</span></th>\n");
 	if (VBat_Flag){
-		VbatRead=true;
 		strcat(html, "<th><span>VBat(V)</span></th>\n");
 	}
 	strcat(html, "<th><span>CPU(Mhz)</span></th>\n");

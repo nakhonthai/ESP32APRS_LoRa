@@ -6592,11 +6592,14 @@ void loop()
     if (millis() > timeTask)
     {
         timeTask = millis() + 10000; // ⏱️ เช็คทุกๆ 10 วินาที
+        VbatRead=true;
+        VBat_Flag=false;
 #if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2)
         if (VbatRead)
         {
             VbatRead = false;
             VBat = (double)PMU.getBattVoltage() / 1000;
+            VBat_Flag=true;
         }
 #elif defined(HELTEC_HTIT_TRACKER)
         if (VbatRead)
@@ -6606,6 +6609,7 @@ void loop()
             analogSetAttenuation(ADC_11db);
             digitalWrite(2, HIGH);
             VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+            VBat_Flag=true;
         }
 #elif defined(HELTEC_V3_GPS)
         if (VbatRead)
@@ -6615,6 +6619,7 @@ void loop()
             analogSetAttenuation(ADC_11db);
             digitalWrite(37, HIGH);
             VBat = (double)analogReadMilliVolts(1) / 201.15357F;
+            VBat_Flag=true;
         }
 #elif defined(APRS_LORA_HT)
         if (VbatRead)
@@ -6623,6 +6628,7 @@ void loop()
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);
             VBat = (double)analogReadMilliVolts(3) / 595.24F;
+            VBat_Flag=true;
         }
 #elif defined(T_BEAM_S3_1W)
         if (VbatRead)
@@ -6631,6 +6637,7 @@ void loop()
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);
             VBat = (double)analogReadMilliVolts(4) / 333.289F;
+            VBat_Flag=true;
         }
 #elif defined(BUOY)
         // #ifdef BUOY
@@ -6640,6 +6647,7 @@ void loop()
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);
             VBat = (double)analogReadMilliVolts(0) * 0.0028F;
+            VBat_Flag=true;
         }
         // TempNTC = getTempNTC();
 

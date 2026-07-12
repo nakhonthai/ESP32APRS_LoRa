@@ -266,6 +266,7 @@ bool getBAT(uint8_t port)
     {
         if (config.sensor[i].type == SENSOR_BAT_VOLTAGE)
         {
+            if (config.sensor[i].port == port){
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
             VBat = (double)PMU.getBattVoltage() / 1000;
             sensorUpdate(i, VBat);
@@ -289,13 +290,19 @@ bool getBAT(uint8_t port)
             VBat = (double)analogReadMilliVolts(3) / 595.24F;
             sensorUpdate(i, VBat);
 #elif defined(T_BEAM_S3_1W)
-            VBat = (double)analogReadMilliVolts(4) / 333.289F;            
+            // if(!VBat_Flag){
+            //     analogReadResolution(12);
+            //     analogSetAttenuation(ADC_11db);
+            //     VBat = (double)analogReadMilliVolts(4) / 333.289F;    
+            // }
+            sensorUpdate(i, VBat);        
 #elif defined(BUOY)
             analogReadResolution(12);
             analogSetAttenuation(ADC_11db);
             VBat = (double)analogReadMilliVolts(0) / 595.24F;
             sensorUpdate(i, VBat);
 #endif
+            }
         }
         else if (config.sensor[i].type == SENSOR_BAT_PERCENT)
         {
@@ -1327,7 +1334,7 @@ bool getSensor(int cfgIdx)
         // break;  
         // #endif
     case PORT_BATTERY:
-        getBAT(0);
+        getBAT(port);
         return true;
         break;
     case PORT_CPU_TEMP:
