@@ -427,6 +427,7 @@ bool lastHeard_Flag = 0;
 unsigned long lastHeardTimeout = 0;
 
 RTC_DATA_ATTR bool gps_mode;
+RTC_DATA_ATTR bool pwr_status = 0;
 
 boolean KISS = false;
 bool aprsUpdate = false;
@@ -640,50 +641,31 @@ bool setupPower()
         // PMU.disablePwrOk();               // Disable PWR_OK pin, not used
         PMU.setSysPowerDownVoltage(2600); // Set VSYS off voltage as 2800mV, Adjustment range 2600mV ~ 3300mV
         // PMU.setPowerKeyPressOnTime(0b10010101);
-        delay(500);
         PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
-        delay(500);
+        PMU.enableDC1();         // Enable DC1
         PMU.setDC3Voltage(3500); // Set DC3 voltage to 3500mV ,VRF_V
-        delay(500);
+        PMU.enableDC3();         // Enable DC3
         PMU.setDC4Voltage(3500); // Set DC4 voltage to 3500mV ,VRF_U
-        delay(500);
+        PMU.enableDC4();         // Enable DC4
         PMU.setALDO1Voltage(3000); // Set ALDO1 voltage to 3000mV
-        delay(500);
+        PMU.enableALDO1();         // Enable ALDO1
         PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to 3300mV
-        delay(500);
+        PMU.enableALDO2();         // Enable ALDO2
         PMU.setDLDO1Voltage(3300);           // Set DLDO1 voltage to 3300mV
+        PMU.enableDLDO1();         // Enable DLDO1
         PMU.setDLDO2Voltage(3300);           // Set DLDO2 voltage to 3300mV
+        PMU.enableDLDO2();         // Enable DLDO2
         PMU.writeRegister(0x90, 0b00000001); // GPIO0 GSM_PWR
         PMU.writeRegister(0x91, 0b00000011); // GPIO1
         PMU.writeRegister(0x92, 0b00000011); // GPIO2
         // PMU.writeRegister(0x93, 0b00001000); // GPIO3
         PMU.writeRegister(0x81, 0);
         PMU.writeRegister(0x36, 0b00001000); // PEK parameter
-        delay(500);
         PMU.writeRegister(0x28, 0xFF);
-        delay(500);
-        // PMU.writeRegister(0x15, 0b10000001); // Set LDO0 voltage to 5000mV/1500mA
-        PMU.writeRegister(0x15, 0b00000001); // Set LDO0 voltage to 5000mV/1500mA
-        delay(500);
-        PMU.writeRegister(0x12, 0xBF);
-
-        // PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
-        // PMU.enableDC1();         // Enable DC1
-        // PMU.setDC2Voltage(3300); // Set DC2 voltage to 3300mV
-        // PMU.enableDC2();         // Enable DC2
-        //  PMU.setDC3Voltage(3300); // Set DC3 voltage to 3300mV
-        //  PMU.enableDC3();         // Enable DC3
-        //  PMU.setDC4Voltage(3300); // Set DC4 voltage to 3300mV
-        //  PMU.enableDC4();         // Enable DC4
-        //  PMU.setALDO1Voltage(3300); // Set ALDO1 voltage to 3300mV
-        //  PMU.enableALDO1();         // Enable ALDO1
-        //  PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to
-        //  PMU.enableALDO2();         // Enable ALDO2
-        //  PMU.setDLDO1Voltage(3300); // Set DLDO1 voltage to 3300mV
-        //  PMU.enableDLDO1();         // Enable DLDO1
-        //  PMU.setDLDO2Voltage(3300); // Set DLDO2 voltage to 3300mV
-        //  PMU.enableDLDO2();         // Enable DLDO2
-
+        PMU.setLDO0Voltage(5000); // Set LDO0 voltage to 5000mV
+        PMU.enableLDO0();         // Enable LDO0
+        //PMU.writeRegister(0x12, 0xBF);
+        
         delay(200);
         log_d("DCDC=======================================================================");
         log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
@@ -693,7 +675,7 @@ bool setupPower()
         log_d("ALDO=======================================================================");
         log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
         log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
-        // log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableLDO0 ? "+" : "-", PMU.getLDO0Voltage());
+        log_d("LDO0 : %s   Voltage:%u mV\n", PMU.isEnableLDO0() ? "+" : "-", PMU.getLDO0Voltage());
         log_d("BLDO=======================================================================");
         log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableDLDO1() ? "+" : "-", PMU.getDLDO1Voltage());
         log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableDLDO2() ? "+" : "-", PMU.getDLDO2Voltage());
@@ -1380,6 +1362,15 @@ void PowerOn()
 #ifdef ST7735_LED_K_Pin
     ledcWrite(ST7735_LED_K_Pin, (uint32_t)config.disp_brightness);
 #endif
+
+#ifdef NAWS4
+    PMU.enableLDO0(); //RS485 Power
+    PMU.enableDLDO2(); //RS485 Module
+    PMU.enableDLDO1(); //Gygro Sensor
+    PMU.enableALDO1(); //Pyranometer Sensor
+    PMU.enableALDO2(); //Anemometer Sensor
+#endif
+
     // Power ON
     if (config.pwr_active)
     {
@@ -1391,12 +1382,20 @@ void PowerOn()
         pinMode(config.pwr_gpio, OUTPUT_OPEN_DRAIN);
         digitalWrite(config.pwr_gpio, LOW);
     }
+    pwr_status = true;
 }
 
 void PowerOff()
 {
 #ifdef ST7735_LED_K_Pin
     ledcWrite(ST7735_LED_K_Pin, 0);
+#endif
+#ifdef NAWS4
+    PMU.disableLDO0(); //RS485 Power
+    PMU.disableDLDO2(); //RS485 Module
+    PMU.disableDLDO1(); //Gygro Sensor
+    PMU.disableALDO1(); //Pyranometer Sensor
+    PMU.disableALDO2(); //Anemometer Sensor
 #endif
     // Power OFF
     if (config.pwr_active)
@@ -1409,6 +1408,7 @@ void PowerOff()
         pinMode(config.pwr_gpio, OUTPUT_OPEN_DRAIN);
         digitalWrite(config.pwr_gpio, HIGH);
     }
+    pwr_status = false;
 }
 
 char EVENT_TX_POSITION = 0;
@@ -2919,6 +2919,31 @@ void defaultConfig()
     config.i2c_sck_pin = 15;
     config.pwr_gpio = -1;
     config.pwr_active = 0;
+#elif defined(TTGO_T1)
+    config.rf_en = true;
+    config.rf_type = RF_SX1278;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = -1; // HPDIO1->33
+    config.rf_reset_gpio = 26;
+    config.rf_dio0_gpio = 25;
+    config.rf_nss_gpio = 27;
+    config.rf_sclk_gpio = 14;
+    config.rf_miso_gpio = 2;
+    config.rf_mosi_gpio = 15;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.uart1_rx_gpio = 32;
+    config.uart1_tx_gpio = 33;
+    config.i2c_enable = true;
+    config.i2c_sda_pin = 22;
+    config.i2c_sck_pin = 21;
+    config.pwr_gpio = -1;
+    config.pwr_active = 0;    
 #elif defined(TTGO_LORA32_V1_6)
     config.rf_en = true;
     config.rf_type = RF_SX1276;
@@ -3218,8 +3243,8 @@ void defaultConfig()
     config.rf_sf = 8;
     config.rf_cr = 5;
     config.rf_power = 20;
-    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
-    config.rf_rx_gpio = -1;
+    config.rf_tx_gpio = -1;
+    config.rf_rx_gpio = 39; //T-Beam BPF SX1278 LoRa LNA Control ,set High turn on LNA , RX Mode
     config.rf_dio1_gpio = 21;
     config.rf_reset_gpio = 18;
     config.rf_dio0_gpio = 14;
@@ -6701,80 +6726,6 @@ void loop()
         log_d("Task process APRS=%iuS\t NETWORK=%iuS\t GPS=%iuS\t SERIAL=%iuS\t \n", timerAPRS, timerNetwork, timerGPS, timerSerial);
         log_d("Free heap: %s KB \tMin Heap: %s KB \tWiFi:%s ,RSSI:%s dBm", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String((float)ESP.getMinFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str());
         // log_d("Free Heap: %s KB \tMin Heap: %s KB \tWiFi:%s ,RSSI:%s dBm ,BAT: %0.3fV ,Temp: %0.2fC", String((float)ESP.getFreeHeap() / 1000, 1).c_str(), String(WiFi.SSID()).c_str(), String(WiFi.RSSI()).c_str(), VBat, TempNTC);
-#ifdef NAWS4
-// int i2c_timeout = 0;
-//         while (i2c_busy)
-//         {
-//             delay(10);
-//             if (++i2c_timeout > 20)
-//                 break;
-//         }
-//         i2c_busy = true;
-//     Wire.beginTransmission(0x30);
-//     byte error = Wire.endTransmission();
-//     if(error!=0){
-//         if(setupPower())
-//         {
-//             APRS_init(&config);
-//         }
-//     }
-//     i2c_busy = false;
-#endif
-        // bool result = PMU.begin(Wire, AXP152_SLAVE_ADDRESS, PMU_I2C_SDA, PMU_I2C_SCL);
-        // if (result == false)
-        // {
-        //     //while (1)
-        //     //{
-        //         log_d("PMU is not online...");
-        //         //delay(500);
-        //     //}
-        // }else
-        // if(1){
-        //     log_d("PMU is online");
-        //     PMU.setDC1Voltage(3300); // Set DC1 voltage to 3300mV
-        //     PMU.setDC3Voltage(3300); // Set DC3 voltage to 3300mV ,VRF_V
-        //      PMU.setDC4Voltage(3400); // Set DC4 voltage to VRF_U
-        //      PMU.setALDO1Voltage(3300); // Set ALDO1 voltage to 3300mV
-        //     PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to
-        //     PMU.setDLDO1Voltage(3300); // Set DLDO1 voltage to 3300mV
-        //     PMU.setDLDO2Voltage(3300); // Set DLDO2 voltage to 3300mV
-        //     PMU.writeRegister(0x12,0xBF);
-        //     //PMU.enableDC1();         // Enable DC1
-        //     //PMU.setDC2Voltage(3300); // Set DC2 voltage to 3300mV
-        //     //PMU.enableDC2();         // Enable DC2
-        //     //PMU.setDC3Voltage(3300); // Set DC3 voltage to 3300mV
-        //     //PMU.enableDC3();         // Enable DC3
-        //      //PMU.enableDC4();         // Enable DC4
-        //     // PMU.setALDO1Voltage(3300); // Set ALDO1 voltage to 3300mV
-        //     // PMU.enableALDO1();         // Enable ALDO1
-        //     // PMU.setALDO2Voltage(3300); // Set ALDO2 voltage to
-        //     // PMU.enableALDO2();         // Enable ALDO2
-        //     // PMU.setDLDO1Voltage(3300); // Set DLDO1 voltage to 3300mV
-        //     // PMU.enableDLDO1();         // Enable DLDO1
-        //     // PMU.setDLDO2Voltage(3300); // Set DLDO2 voltage to 3300mV
-        //     // PMU.enableDLDO2();         // Enable DLDO2
-        //     // PMU.disableDC2(); // Disable DC2
-        //     // PMU.disableDC3(); // Disable DC3
-        //     // PMU.disableALDO1(); // Disable ALDO1
-        //     // PMU.disableALDO2(); // Disable ALDO2
-        //     // PMU.disableDLDO1(); // Disable DLDO1
-        //     // PMU.disableDLDO2(); // Disable DLDO2
-
-        //     delay(100);
-        //     log_d("DCDC=======================================================================");
-        //     log_d("DC1  : %s   Voltage:%u mV \n", PMU.isEnableDC1() ? "+" : "-", PMU.getDC1Voltage());
-        //     //log_d("DC2  : %s   Voltage:%u mV \n", PMU.isEnableDC2() ? "+" : "-", PMU.getDC2Voltage());
-        //     log_d("DC3  : %s   Voltage:%u mV \n", PMU.isEnableDC3() ? "+" : "-", PMU.getDC3Voltage());
-        //     log_d("DC4  : %s   Voltage:%u mV \n", PMU.isEnableDC4() ? "+" : "-", PMU.getDC4Voltage());
-        //     log_d("ALDO=======================================================================");
-        //     log_d("ALDO1: %s   Voltage:%u mV\n", PMU.isEnableALDO1() ? "+" : "-", PMU.getALDO1Voltage());
-        //     log_d("ALDO2: %s   Voltage:%u mV\n", PMU.isEnableALDO2() ? "+" : "-", PMU.getALDO2Voltage());
-        //     //log_d("ALDO3: %s   Voltage:%u mV\n", PMU.isEnableLDO0 ? "+" : "-", PMU.getLDO0Voltage());
-        //     log_d("BLDO=======================================================================");
-        //     log_d("BLDO1: %s   Voltage:%u mV\n", PMU.isEnableDLDO1() ? "+" : "-", PMU.getDLDO1Voltage());
-        //     log_d("BLDO2: %s   Voltage:%u mV\n", PMU.isEnableDLDO2() ? "+" : "-", PMU.getDLDO2Voltage());
-        //     log_d("===========================================================================");
-        // }
 
         if ((config.reset_timeout > 0) && (millis() > autoResetTimeout))
         {
@@ -10341,9 +10292,18 @@ void PPPOS_Start()
             sprintf(pppStatus.oper, "%s", PPP.operatorName().c_str());
             sprintf(pppStatus.imsi, "%s", PPP.IMSI().c_str());
             log_d("IMSI: %s", pppStatus.imsi);
-            pppStatus.rssi = PPP.RSSI();
+            int csq = PPP.RSSI();
+            if (csq == 99 || csq < 0)
+            {
+                pppStatus.rssi = -127; // unknown / not detectable
+            }
+            else
+            {
+                // 3GPP TS 27.007: CSQ 0..31 -> -113..-51 dBm, 2 dBm per step
+                pppStatus.rssi = -113 + (2 * csq);
+            }
             log_d("Operator: %s", pppStatus.oper);
-            log_d("RSSI: %d dBm", pppStatus.rssi);
+            log_d("CSQ raw: %d, RSSI: %d dBm", csq, pppStatus.rssi);
             PPP.started(); // Start the PPP connection
             //   if(PPP.sms("0984958488","Test SMS from ESP32")){
             //       log_d("SMS sent successfully!");

@@ -1,0 +1,4 @@
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C

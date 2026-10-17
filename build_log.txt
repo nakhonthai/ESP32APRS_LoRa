@@ -1,0 +1,158 @@
+﻿Warning! Ignore unknown configuration option `platform_old` in section [env]
+Processing NAWS4-ESP32S3 (board: esp32-s3-devkitc-1; platform: https://github.com/pioarduino/platform-espressif32/releases/download/stable/platform-espressif32.zip; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-s3-devkitc-1.html
+PLATFORM: Espressif 32 (53.3.10) > Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)
+HARDWARE: ESP32S3 240MHz, 320KB RAM, 8MB Flash
+DEBUG: Current (esp-builtin) On-board (esp-builtin) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 3.1.0 
+ - framework-arduinoespressif32-libs @ 5.3.0+sha.083aad99cf 
+ - tool-esptoolpy @ 4.8.5 
+ - tool-mklittlefs @ 3.2.0 
+ - tool-openocd-esp32 @ 2.1100.20220706 (11.0) 
+ - tool-riscv32-esp-elf-gdb @ 14.2.0+20240403 
+ - tool-xtensa-esp-elf-gdb @ 14.2.0+20240403 
+ - toolchain-riscv32-esp @ 13.2.0+20240530 
+ - toolchain-xtensa-esp-elf @ 13.2.0+20240530
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 87 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- base64 @ 1.4.0
+|-- TinyGPSPlus @ 1.1.0
+|-- Adafruit NeoPixel @ 1.15.5
+|-- EspSoftwareSerial @ 8.1.0
+|-- ModbusMaster @ 2.0.1
+|-- Adafruit BME280 Library @ 2.3.0
+|-- Adafruit BMP280 Library @ 2.6.8
+|-- Adafruit Si7021 Library @ 1.5.3
+|-- Adafruit CCS811 Library @ 1.1.3
+|-- Adafruit INA219 @ 1.2.3
+|-- Adafruit ADS1X15 @ 2.6.2
+|-- Adafruit AHTX0 @ 2.0.6
+|-- MCP342x @ 1.0.4
+|-- arduino-sht @ 1.2.6
+|-- DallasTemperature @ 3.11.0
+|-- ArduinoJson @ 7.4.3
+|-- NimBLE-Arduino @ 2.5.0
+|-- PubSubClient @ 2.8.0
+|-- FS @ 3.1.0
+|-- LittleFS_esp32 @ 1.0.6
+|-- WiFi @ 3.1.0
+|-- BluetoothSerial @ 3.1.0
+|-- Queue @ 1.9
+|-- ESP32Ping @ 1.2
+|-- esp_wireguard @ 0.4.2
+|-- Adafruit GFX Library @ 1.11.11
+|-- Adafruit_GFX_Buffer @ 1.0.0
+|-- Adafruit BusIO @ 1.17.4
+|-- Adafruit SSD1306 @ 2.5.7
+|-- LibAPRS_LoRa
+|-- Networking @ 3.1.0
+|-- src
+|-- PPP @ 3.1.0
+|-- NetworkClientSecure @ 3.1.0
+|-- Wire @ 3.1.0
+|-- src
+|-- Adafruit Unified Sensor @ 1.1.15
+|-- ESPCPUTemp @ 0.2.0
+|-- TimeLib
+|-- ESPAsyncWebServer-esphome @ 3.3.0
+|-- HTTPClient @ 3.1.0
+|-- Update @ 3.1.0
+|-- WebServer @ 3.1.0
+Building in release mode
+Compiling .pio\build\NAWS4-ESP32S3\src\config.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\digirepeater.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\handleATCommand.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\igate.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\main.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\message.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\parse_aprs.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\sensor.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\weather.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\webservice.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\src\wireguard_vpn.cpp.o
+Building .pio\build\NAWS4-ESP32S3\bootloader.bin
+Generating partitions .pio\build\NAWS4-ESP32S3\partitions.bin
+esptool.py v4.8.5
+Creating esp32s3 image...
+Merged 2 ELF sections
+Successfully created esp32s3 image.
+Compiling .pio\build\NAWS4-ESP32S3\libf84\TinyGPSPlus\TinyGPS++.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib61f\Adafruit NeoPixel\Adafruit_NeoPixel.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib61f\Adafruit NeoPixel\Adafruit_Neopixel_RP2.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib61f\Adafruit NeoPixel\esp.c.o
+Compiling .pio\build\NAWS4-ESP32S3\lib61f\Adafruit NeoPixel\esp8266.c.o
+platformio.exe : cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+At line:1 char:107
++ ... ing]::UTF8; & "C:\Users\user\.platformio\penv\Scripts\platformio.exe" ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (cc1.exe: warnin...+ but not for C:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Compiling .pio\build\NAWS4-ESP32S3\lib61f\Adafruit NeoPixel\kendyte_k210.c.o
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+Compiling .pio\build\NAWS4-ESP32S3\lib61f\Adafruit NeoPixel\psoc6.c.o
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+Compiling .pio\build\NAWS4-ESP32S3\libb4f\EspSoftwareSerial\SoftwareSerial.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libdbe\ModbusMaster\ModbusMaster.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libdd2\Wire\Wire.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\liba95\SPI\SPI.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib638\Adafruit BusIO\Adafruit_BusIO_Register.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib638\Adafruit BusIO\Adafruit_GenericDevice.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib638\Adafruit BusIO\Adafruit_I2CDevice.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib638\Adafruit BusIO\Adafruit_SPIDevice.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libca4\Adafruit Unified Sensor\Adafruit_Sensor.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libd20\Adafruit BME280 Library\Adafruit_BME280.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib359\Adafruit BMP280 Library\Adafruit_BMP280.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libd42\Adafruit Si7021 Library\Adafruit_Si7021.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libed6\Adafruit CCS811 Library\Adafruit_CCS811.cpp.o
+Archiving .pio\build\NAWS4-ESP32S3\libf84\libTinyGPSPlus.a
+Compiling .pio\build\NAWS4-ESP32S3\lib03a\Adafruit INA219\Adafruit_INA219.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libf4b\Adafruit ADS1X15\Adafruit_ADS1X15.cpp.o
+Archiving .pio\build\NAWS4-ESP32S3\lib61f\libAdafruit NeoPixel.a
+Compiling .pio\build\NAWS4-ESP32S3\lib4ed\Adafruit AHTX0\Adafruit_AHTX0.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libdc9\MCP342x\MCP342x.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\libd2f\arduino-sht\SHTSensor.cpp.o
+Archiving .pio\build\NAWS4-ESP32S3\libdbe\libModbusMaster.a
+Compiling .pio\build\NAWS4-ESP32S3\lib830\OneWire\OneWire.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib435\DallasTemperature\DallasTemperature.cpp.o
+Archiving .pio\build\NAWS4-ESP32S3\libb4f\libEspSoftwareSerial.a
+Archiving .pio\build\NAWS4-ESP32S3\libdd2\libWire.a
+Archiving .pio\build\NAWS4-ESP32S3\liba95\libSPI.a
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLE2904.cpp.o
+Archiving .pio\build\NAWS4-ESP32S3\lib638\libAdafruit BusIO.a
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAddress.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAdvertisedDevice.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAdvertisementData.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAdvertising.cpp.o
+Archiving .pio\build\NAWS4-ESP32S3\libca4\libAdafruit Unified Sensor.a
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAttValue.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEBeacon.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLECharacteristic.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEClient.cpp.o
+Compiling .pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEDescriptor.cpp.o
+*** [.pio\build\NAWS4-ESP32S3\lib03a\Adafruit INA219\Adafruit_INA219.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\libd42\Adafruit Si7021 Library\Adafruit_Si7021.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\src\webservice.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\src\message.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\libf4b\Adafruit ADS1X15\Adafruit_ADS1X15.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAdvertisedDevice.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\libd20\Adafruit BME280 Library\Adafruit_BME280.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\libed6\Adafruit CCS811 Library\Adafruit_CCS811.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib359\Adafruit BMP280 Library\Adafruit_BMP280.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\src\main.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib435\DallasTemperature\DallasTemperature.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAddress.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLE2904.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\libdc9\MCP342x\MCP342x.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\libd2f\arduino-sht\SHTSensor.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib4ed\Adafruit AHTX0\Adafruit_AHTX0.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAdvertising.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib9ee\NimBLE-Arduino\NimBLEAdvertisementData.cpp.o] Error 1
+*** [.pio\build\NAWS4-ESP32S3\lib830\OneWire\OneWire.cpp.o] Error 1

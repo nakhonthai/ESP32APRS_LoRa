@@ -44,6 +44,7 @@ static inline void i2c1_unlock(){ if (i2c1_mutex) xSemaphoreGive(i2c1_mutex); }
 extern TinyGPSPlus gps;
 extern double VBat;
 extern double TempNTC;
+extern RTC_DATA_ATTR bool pwr_status;
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
 #include <XPowersLib.h>
 extern XPowersAXP2101 PMU;
@@ -1705,7 +1706,10 @@ void taskSensor(void *pvParameters)
 {
     bool cntEnable = false;
     log_d("Sensor Task Init");
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    do{
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }while(!pwr_status);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 #ifdef HELTEC_HTIT_TRACKER
     pinMode(2, INPUT_PULLUP);
     pinMode(1, ANALOG);
@@ -1748,6 +1752,7 @@ void taskSensor(void *pvParameters)
     for (;;)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS);
+        if(!pwr_status) continue;
         unsigned long tick=millis();
         for (int i = 0; i < SENSOR_NUMBER; i++)
         {

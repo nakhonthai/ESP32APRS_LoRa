@@ -6381,7 +6381,7 @@ void handle_system(AsyncWebServerRequest *request)
 			}
 		}
 
-#ifdef OLED
+#if defined OLED || defined ST7735_160x80
 		if (oledEN && !config.oled_enable)
 		{
 			// display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false); // initialize with the I2C addr 0x3C (for the 128x64)
@@ -11838,7 +11838,10 @@ void handle_about(AsyncWebServerRequest *request)
 		snprintf(temp_str2, 512, "<tr><td align=\"right\"><b>Operator:</b></td>\n<td align=\"left\">%s</td></tr>\n", pppStatus.oper);
 		strcat(webString, temp_str2);
 
-		snprintf(temp_str2, 512, "<tr><td align=\"right\"><b>RSSI:</b></td>\n<td align=\"left\">%d dBm</td></tr>\n", pppStatus.rssi);
+		if (pppStatus.rssi <= -127)
+			snprintf(temp_str2, 512, "<tr><td align=\"right\"><b>RSSI:</b></td>\n<td align=\"left\">N/A</td></tr>\n");
+		else
+			snprintf(temp_str2, 512, "<tr><td align=\"right\"><b>RSSI:</b></td>\n<td align=\"left\">%d dBm</td></tr>\n", pppStatus.rssi);
 		strcat(webString, temp_str2);
 
 		snprintf(temp_str2, 512, "<tr><td align=\"right\"><b>IP:</b></td>\n<td align=\"left\">%s</td></tr>\n", IPAddress(pppStatus.ip).toString().c_str());

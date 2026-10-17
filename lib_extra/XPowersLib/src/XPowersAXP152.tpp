@@ -318,20 +318,23 @@
      }
  
      /*
-      * Data Buffer
+      * Data Buffer (AXP152 has no dedicated data buffer registers 0x04-0x07;
+      * registers 0x04-0x06 are ADC results. Only provided for API compatibility)
       */
- 
-     bool writeDataBuffer(uint8_t *data, uint8_t size)
-     {
-         if (size > XPOWERS_AXP152_DATA_BUFFER_SIZE)return false;
-         return writeRegister(XPOWERS_AXP152_DATA_BUFFER1, data, size);
-     }
- 
-     bool readDataBuffer(uint8_t *data, uint8_t size)
-     {
-         if (size > XPOWERS_AXP152_DATA_BUFFER_SIZE)return false;
-         return readRegister(XPOWERS_AXP152_DATA_BUFFER1, data, size);
-     }
+
+         bool writeDataBuffer(uint8_t *data, uint8_t size)
+         {
+             (void)data;
+             (void)size;
+             return false;   // Not supported on AXP152
+         }
+
+         bool readDataBuffer(uint8_t *data, uint8_t size)
+         {
+             (void)data;
+             (void)size;
+             return false;   // Not supported on AXP152
+         }
  
      /*
       * PMU common configuration
@@ -956,17 +959,18 @@
         return 0;
      }
  
-     //  PWROK setting and PWROFF sequence control 25.
+     //  PWROK setting and PWROFF sequence control
      // Check the PWROK Pin enable after all dcdc/ldo output valid 128ms
+     // NOTE: AXP152 has no dedicated PWROK_SEQU_CTRL register 0x25; PWROK
+     // sequencing is controlled through register 0x32 (OFF_CTRL) instead.
      void enablePwrOk()
      {
-         //setRegisterBit(XPOWERS_AXP152_PWROK_SEQU_CTRL, 4);
-         setRegisterBit(XPOWERS_AXP152_PWROK_SEQU_CTRL, 7);
+         setRegisterBit(XPOWERS_AXP152_OFF_CTRL, 7);
      }
- 
+
      void disablePwrOk()
      {
-         clrRegisterBit(XPOWERS_AXP152_PWROK_SEQU_CTRL, 7);
+         clrRegisterBit(XPOWERS_AXP152_OFF_CTRL, 7);
      }
  
      // POWEROFF Delay 4ms after PWROK enable
@@ -1901,7 +1905,7 @@
  
      bool enableALDO2(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 21);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
      }
  
      bool disableALDO2(void)
@@ -1926,16 +1930,17 @@
          if(millivolt >= 3300) {
              add = 600; // if millivolt is greater than or equal to 1200, add 600
          }
-         uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL1_CTRL) & 0xF0;
+         uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL0_CTRL) & 0xF0;
          val |= (millivolt - XPOWERS_AXP152_ALDO2_VOL_MIN + add) / XPOWERS_AXP152_ALDO2_VOL_STEPS;
-         return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL1_CTRL, val);
+         return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL0_CTRL, val);
      }
- 
+
      uint16_t getALDO2Voltage(void)
      {
-        uint16_t add = 0;
-         uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL1_CTRL) & 0x0F;
-         if(val>=12) add= 600;
+         uint16_t add = 0;
+         // ALDO2 shares register 0x28 with ALDO1 (low nibble)
+         uint16_t val = readRegister(XPOWERS_AXP152_LDO_VOL0_CTRL) & 0x0F;
+         if (val >= 12) add = 600;
          return val * XPOWERS_AXP152_ALDO2_VOL_STEPS + XPOWERS_AXP152_ALDO2_VOL_MIN + add;
      }
  
@@ -1944,19 +1949,19 @@
       */
      bool isEnableALDO3(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 5);
      }
- 
+
      bool enableALDO3(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 5);
      }
- 
+
      bool disableALDO3(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 5);
      }
- 
+
      bool setALDO3Voltage(uint16_t millivolt)
      {
          if (millivolt % XPOWERS_AXP152_ALDO3_VOL_STEPS) {
@@ -1970,6 +1975,8 @@
              log_e("Mistake ! ALDO3 maximum output voltage is  %umV", XPOWERS_AXP152_ALDO3_VOL_MAX);
              return false;
          }
+         // NOTE: AXP152 (as used in this board) exposes ALDO3 voltage through
+         // register 0x94 (GPIO2/LDO3 voltage control), same as upstream XPowersLib
          uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL2_CTRL) & 0xE0;
          val |= (millivolt - XPOWERS_AXP152_ALDO3_VOL_MIN) / XPOWERS_AXP152_ALDO3_VOL_STEPS;
          return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL2_CTRL, val);
@@ -1986,19 +1993,19 @@
       */
      bool isEnableALDO4(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 3);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 4);
      }
- 
+
      bool enableALDO4(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 3);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 4);
      }
- 
+
      bool disableALDO4(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 3);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 4);
      }
- 
+
      bool setALDO4Voltage(uint16_t millivolt)
      {
          if (millivolt % XPOWERS_AXP152_ALDO4_VOL_STEPS) {
@@ -2012,6 +2019,8 @@
              log_e("Mistake ! ALDO4 maximum output voltage is  %umV", XPOWERS_AXP152_ALDO4_VOL_MAX);
              return false;
          }
+         // NOTE: AXP152 (as used in this board) exposes ALDO4 voltage through
+         // register 0x95 (GPIO3/LDO4 voltage control), same as upstream XPowersLib
          uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL3_CTRL) & 0xE0;
          val |= (millivolt - XPOWERS_AXP152_ALDO4_VOL_MIN) / XPOWERS_AXP152_ALDO4_VOL_STEPS;
          return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL3_CTRL, val);
@@ -2028,19 +2037,19 @@
      */
      bool isEnableBLDO1(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 1);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 3);
      }
- 
+
      bool enableBLDO1(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 1);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 3);
      }
- 
+
      bool disableBLDO1(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 1);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 3);
      }
- 
+
      bool setBLDO1Voltage(uint16_t millivolt)
      {
          if (millivolt % XPOWERS_AXP152_BLDO1_VOL_STEPS) {
@@ -2054,13 +2063,12 @@
              log_e("Mistake ! BLDO1 maximum output voltage is  %umV", XPOWERS_AXP152_BLDO1_VOL_MAX);
              return false;
          }
-         int val =  readRegister(XPOWERS_AXP152_LDO_VOL4_CTRL);
-         if (val == -1)return  false;
-         val &= 0xE0;
+         // NOTE: BLDO1 on this AXP152 board maps to register 0x96 (LDOGPIO2 voltage)
+         uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL4_CTRL) & 0xE0;
          val |= (millivolt - XPOWERS_AXP152_BLDO1_VOL_MIN) / XPOWERS_AXP152_BLDO1_VOL_STEPS;
          return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL4_CTRL, val);
      }
- 
+
      uint16_t getBLDO1Voltage(void)
      {
          int val =  readRegister(XPOWERS_AXP152_LDO_VOL4_CTRL);
@@ -2068,25 +2076,25 @@
          val &= 0x1F;
          return val * XPOWERS_AXP152_BLDO1_VOL_STEPS + XPOWERS_AXP152_BLDO1_VOL_MIN;
      }
- 
+
      /*
      * Power control BLDO2 functions
      */
      bool isEnableBLDO2(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 0);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 2);
      }
- 
+
      bool enableBLDO2(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 0);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 2);
      }
- 
+
      bool disableBLDO2(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 0);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 2);
      }
- 
+
      bool setBLDO2Voltage(uint16_t millivolt)
      {
          if (millivolt % XPOWERS_AXP152_BLDO2_VOL_STEPS) {
@@ -2100,11 +2108,12 @@
              log_e("Mistake ! BLDO2 maximum output voltage is  %umV", XPOWERS_AXP152_BLDO2_VOL_MAX);
              return false;
          }
+         // NOTE: BLDO2 on this AXP152 board maps to register 0x97 (GPIO3 voltage)
          uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL5_CTRL) & 0xE0;
          val |= (millivolt - XPOWERS_AXP152_BLDO2_VOL_MIN) / XPOWERS_AXP152_BLDO2_VOL_STEPS;
          return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL5_CTRL, val);
      }
- 
+
      uint16_t getBLDO2Voltage(void)
      {
          int val =  readRegister(XPOWERS_AXP152_LDO_VOL5_CTRL);
@@ -2112,25 +2121,25 @@
          val &= 0x1F;
          return val * XPOWERS_AXP152_BLDO2_VOL_STEPS + XPOWERS_AXP152_BLDO2_VOL_MIN;
      }
- 
+
      /*
      * Power control CPUSLDO functions
      */
      bool isEnableCPUSLDO(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 6);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 1);
      }
- 
+
      bool enableCPUSLDO(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 6);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 1);
      }
- 
+
      bool disableCPUSLDO(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 6);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 1);
      }
- 
+
      bool setCPUSLDOVoltage(uint16_t millivolt)
      {
          if (millivolt % XPOWERS_AXP152_CPUSLDO_VOL_STEPS) {
@@ -2144,11 +2153,12 @@
              log_e("Mistake ! CPULDO maximum output voltage is  %umV", XPOWERS_AXP152_CPUSLDO_VOL_MAX);
              return false;
          }
+         // NOTE: CPUSLDO on this AXP152 board maps to register 0x98 (GPIO voltage)
          uint16_t val =  readRegister(XPOWERS_AXP152_LDO_VOL6_CTRL) & 0xE0;
          val |= (millivolt - XPOWERS_AXP152_CPUSLDO_VOL_MIN) / XPOWERS_AXP152_CPUSLDO_VOL_STEPS;
          return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL6_CTRL, val);
      }
- 
+
      uint16_t getCPUSLDOVoltage(void)
      {
          int val =  readRegister(XPOWERS_AXP152_LDO_VOL6_CTRL);
@@ -2156,26 +2166,26 @@
          val &= 0x1F;
          return val * XPOWERS_AXP152_CPUSLDO_VOL_STEPS + XPOWERS_AXP152_CPUSLDO_VOL_MIN;
      }
- 
- 
+
+
      /*
      * Power control DLDO1 functions
      */
      bool isEnableDLDO1(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 1);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 3);
      }
- 
+
      bool enableDLDO1(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 1);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 3);
      }
- 
+
      bool disableDLDO1(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 1);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 3);
      }
- 
+
      bool setDLDO1Voltage(uint16_t millivolt)
      {
          if (millivolt % XPOWERS_AXP152_DLDO1_VOL_STEPS) {
@@ -2193,7 +2203,7 @@
          val |= (millivolt - XPOWERS_AXP152_DLDO1_VOL_MIN) / XPOWERS_AXP152_DLDO1_VOL_STEPS;
          return 0 == writeRegister(XPOWERS_AXP152_LDO_VOL7_CTRL, val);
      }
- 
+
      uint16_t getDLDO1Voltage(void)
      {
          int val =  readRegister(XPOWERS_AXP152_LDO_VOL7_CTRL);
@@ -2201,23 +2211,23 @@
          val &= 0x1F;
          return val * XPOWERS_AXP152_DLDO1_VOL_STEPS + XPOWERS_AXP152_DLDO1_VOL_MIN;
      }
- 
+
      /*
      * Power control DLDO2 functions
      */
      bool isEnableDLDO2(void)
      {
-         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 0);
+         return getRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
      }
- 
+
      bool enableDLDO2(void)
      {
-         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 0);
+         return setRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
      }
- 
+
      bool disableDLDO2(void)
      {
-         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL1, 0);
+         return clrRegisterBit(XPOWERS_AXP152_LDO_ONOFF_CTRL0, 2);
      }
  
      bool setDLDO2Voltage(uint16_t millivolt)
@@ -2247,6 +2257,52 @@
      }
  
  
+     /*
+     * Power control LDO0 (LDOIO0) functions
+     * Reg 0x15 : bit7 = enable, bits[4:0] = voltage code (1.8V ~ 3.3V, 100mV/step)
+     */
+     bool isEnableLDO0(void)
+     {
+         return getRegisterBit(XPOWERS_AXP152_LDO0_CTRL, 7);
+     }
+
+     bool enableLDO0(void)
+     {
+         return setRegisterBit(XPOWERS_AXP152_LDO0_CTRL, 7);
+     }
+
+     bool disableLDO0(void)
+     {
+         return clrRegisterBit(XPOWERS_AXP152_LDO0_CTRL, 7);
+     }
+
+     bool setLDO0Voltage(uint16_t millivolt)
+     {
+         if (millivolt % XPOWERS_AXP152_LDO0_VOL_STEPS) {
+             log_e("Mistake ! The steps is must %u mV", XPOWERS_AXP152_LDO0_VOL_STEPS);
+             return false;
+         }
+         if (millivolt < XPOWERS_AXP152_LDO0_VOL_MIN) {
+             log_e("Mistake ! LDO0 minimum output voltage is  %umV", XPOWERS_AXP152_LDO0_VOL_MIN);
+             return false;
+         } else if (millivolt > XPOWERS_AXP152_LDO0_VOL_MAX) {
+             log_e("Mistake ! LDO0 maximum output voltage is  %umV", XPOWERS_AXP152_LDO0_VOL_MAX);
+             return false;
+         }
+         uint16_t val =  readRegister(XPOWERS_AXP152_LDO0_CTRL) & 0xE0;
+         val |= (millivolt - XPOWERS_AXP152_LDO0_VOL_MIN) / XPOWERS_AXP152_LDO0_VOL_STEPS;
+         return 0 == writeRegister(XPOWERS_AXP152_LDO0_CTRL, val);
+     }
+
+     uint16_t getLDO0Voltage(void)
+     {
+         int val =  readRegister(XPOWERS_AXP152_LDO0_CTRL);
+         if (val == -1)return 0;
+         val &= 0x1F;
+         return val * XPOWERS_AXP152_LDO0_VOL_STEPS + XPOWERS_AXP152_LDO0_VOL_MIN;
+     }
+
+
      /*
       * Power ON OFF IRQ TIMMING Control method
       */

@@ -1,0 +1,170 @@
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+cc1.exe: warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for C
+In file included from src/main.cpp:29:
+C:/Users/user/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/include/driver/deprecated/driver/pcnt.h:15:2: warning: #warning "legacy pcnt driver is deprecated, please migrate to use driver/pulse_cnt.h" [-Wcpp]
+   15 | #warning "legacy pcnt driver is deprecated, please migrate to use driver/pulse_cnt.h"
+      |  ^~~~~~~
+In file included from src/main.cpp:31:
+C:/Users/user/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/include/driver/deprecated/driver/adc.h:19:2: warning: #warning "legacy adc driver is deprecated, please migrate to use esp_adc/adc_oneshot.h and esp_adc/adc_continuous.h for oneshot mode and continuous mode drivers respectively" [-Wcpp]
+   19 | #warning "legacy adc driver is deprecated, please migrate to use esp_adc/adc_oneshot.h and esp_adc/adc_continuous.h for oneshot mode and continuous mode drivers respectively"
+      |  ^~~~~~~
+In file included from src/main.cpp:32:
+C:/Users/user/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/include/esp_adc/deprecated/include/esp_adc_cal.h:17:2: warning: #warning "legacy adc calibration driver is deprecated, please migrate to use esp_adc/adc_cali.h and esp_adc/adc_cali_scheme.h" [-Wcpp]
+   17 | #warning "legacy adc calibration driver is deprecated, please migrate to use esp_adc/adc_cali.h and esp_adc/adc_cali_scheme.h"
+      |  ^~~~~~~
+In file included from lib_extra/XPowersLib/src/XPowersLib.h:52,
+                 from src/main.cpp:181:
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDc4FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1091:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET0' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET0'?
+ 1091 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET0);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET0
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDc3FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1098:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET0' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET0'?
+ 1098 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET0);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET0
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDc2FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1104:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET0' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET0'?
+ 1104 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET0);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET0
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDc1FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1110:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET0' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET0'?
+ 1110 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET0);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET0
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setAldo3FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1118:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET1' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET1'?
+ 1118 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET1);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET1
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setAldo2FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1124:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET1' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET1'?
+ 1124 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET1);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET1
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setAldo1FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1130:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET1' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET1'?
+ 1130 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET1);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET1
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDc5FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1137:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET1' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET1'?
+ 1137 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET1);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET1
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setCpuldoFastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1145:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET2' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET2'?
+ 1145 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET2);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET2
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setBldo2FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1152:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET2' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET2'?
+ 1152 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET2);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET2
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setBldo1FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1159:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET2' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET2'?
+ 1159 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET2);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET2
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setAldo4FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1166:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET2' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET2'?
+ 1166 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET2);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET2
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDldo2FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1174:33: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1174 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_CTRL);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setDldo1FastStartSequence(xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1181:33: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1181 |          int val = readRegister(XPOWERS_AXP152_FAST_PWRON_CTRL);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::setFastPowerOnLevel(xpowers_axp152_fast_on_opt_t, xpower_axp152_start_sequence_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1194:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET0' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET0'?
+ 1194 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET0);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET0
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1210:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET1' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET1'?
+ 1210 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET1);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET1
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1226:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET2' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET2'?
+ 1226 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET2);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET2
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1242:33: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1242 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_CTRL);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::disableFastPowerOn(xpowers_axp152_fast_on_opt_t)':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1259:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET0' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET0'?
+ 1259 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET0);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET0
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1275:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET1' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET1'?
+ 1275 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET1);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET1
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1291:33: error: 'XPOWERS_AXP152_FAST_PWRON_SET2' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_SET2'?
+ 1291 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_SET2);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_SET2
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1307:33: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1307 |              val = readRegister(XPOWERS_AXP152_FAST_PWRON_CTRL);
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                 XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::enableFastPowerOn()':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1321:25: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1321 |          setRegisterBit(XPOWERS_AXP152_FAST_PWRON_CTRL, 7);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                         XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::disableFastPowerOn()':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1326:25: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1326 |          clrRegisterBit(XPOWERS_AXP152_FAST_PWRON_CTRL, 7);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                         XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::enableFastWakeup()':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1331:25: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1331 |          setRegisterBit(XPOWERS_AXP152_FAST_PWRON_CTRL, 6);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                         XPOWERS_AXP2101_FAST_PWRON_CTRL
+lib_extra/XPowersLib/src/XPowersAXP152.tpp: In member function 'void XPowersAXP152::disableFastWakeup()':
+lib_extra/XPowersLib/src/XPowersAXP152.tpp:1336:25: error: 'XPOWERS_AXP152_FAST_PWRON_CTRL' was not declared in this scope; did you mean 'XPOWERS_AXP2101_FAST_PWRON_CTRL'?
+ 1336 |          clrRegisterBit(XPOWERS_AXP152_FAST_PWRON_CTRL, 6);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                         XPOWERS_AXP2101_FAST_PWRON_CTRL
+src/main.cpp: In function 'void loop()':
+src/main.cpp:7281:59: warning: 'ESP_EXT1_WAKEUP_ALL_LOW' is deprecated: wakeup mode "ALL_LOW" is no longer supported after ESP32,     please use ESP_EXT1_WAKEUP_ANY_LOW instead [-Wdeprecated-declarations]
+ 7281 |                         esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
+      |                                                           ^~~~~~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/user/.platformio/packages/framework-arduinoespressif32@src-e5a7fd5d9117bd8a322277fde59ac3d3/cores/esp32/esp32-hal.h:33,
+                 from C:/Users/user/.platformio/packages/framework-arduinoespressif32@src-e5a7fd5d9117bd8a322277fde59ac3d3/cores/esp32/Arduino.h:36,
+                 from src/main.cpp:10:
+C:/Users/user/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/include/esp_hw_support/include/esp_sleep.h:39:5: note: declared here
+   39 |     ESP_EXT1_WAKEUP_ALL_LOW __attribute__((deprecated("wakeup mode \"ALL_LOW\" is no longer supported after ESP32, \
+      |     ^~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp:7390:55: warning: 'ESP_EXT1_WAKEUP_ALL_LOW' is deprecated: wakeup mode "ALL_LOW" is no longer supported after ESP32,     please use ESP_EXT1_WAKEUP_ANY_LOW instead [-Wdeprecated-declarations]
+ 7390 |                     esp_sleep_enable_ext1_wakeup(0x1, ESP_EXT1_WAKEUP_ALL_LOW);
+      |                                                       ^~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/user/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/include/esp_hw_support/include/esp_sleep.h:39:5: note: declared here
+   39 |     ESP_EXT1_WAKEUP_ALL_LOW __attribute__((deprecated("wakeup mode \"ALL_LOW\" is no longer supported after ESP32, \
+      |     ^~~~~~~~~~~~~~~~~~~~~~~
+*** [.pio\build\NAWS4-ESP32S3\src\main.cpp.o] Error 1
+lib/OneWire/OneWire.cpp:599:22: warning: extra tokens at end of #undef directive
+  599 | #  undef noInterrupts() {portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;portENTER_CRITICAL(&mux)
+      |                      ^
+lib/OneWire/OneWire.cpp:600:20: warning: extra tokens at end of #undef directive
+  600 | #  undef interrupts() portEXIT_CRITICAL(&mux);}
+      |                    ^
+========================= [FAILED] Took 150.29 seconds =========================
+Environment    Status    Duration
+-------------  --------  ------------
+NAWS4-ESP32S3  FAILED    00:02:30.287
+==================== 1 failed, 0 succeeded in 00:02:30.287 ====================

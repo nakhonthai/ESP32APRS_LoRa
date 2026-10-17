@@ -8,13 +8,6 @@
 #define XPOWERS_AXP152_STATUS2                          (0x01)
 #define XPOWERS_AXP152_IC_TYPE                          (0x03)
 
-
-#define XPOWERS_AXP152_DATA_BUFFER1                     (0x04)
-#define XPOWERS_AXP152_DATA_BUFFER2                     (0x05)
-#define XPOWERS_AXP152_DATA_BUFFER3                     (0x06)
-#define XPOWERS_AXP152_DATA_BUFFER4                     (0x07)
-#define XPOWERS_AXP152_DATA_BUFFER_SIZE                 (4u)
-
 #define XPOWERS_AXP152_COMMON_CONFIG                    (0x10)
 #define XPOWERS_AXP152_BATFET_CTRL                      (0x12)
 #define XPOWERS_AXP152_DIE_TEMP_CTRL                    (0x13)
@@ -33,15 +26,40 @@
 #define XPOWERS_AXP152_PWROFF_STATUS                    (0x21)
 #define XPOWERS_AXP152_PWROFF_EN                        (0x22)
 #define XPOWERS_AXP152_DC_OVP_UVP_CTRL                  (0x23)
-#define XPOWERS_AXP152_VOFF_SET                         (0x31)
-#define XPOWERS_AXP152_PWROK_SEQU_CTRL                  (0x31)
-#define XPOWERS_AXP152_SLEEP_WAKEUP_CTRL                (0x26)
-#define XPOWERS_AXP152_IRQ_OFF_ON_LEVEL_CTRL            (0x36)
+// DCDC2 output voltage control (0.5~1.2V @10mV/step, 1.22~1.54V @20mV/step)
+#define XPOWERS_AXP152_DC_VOL2_CTRL                     (0x23) //DC-DC2
+// DCDC2 voltage slew rate control
+#define XPOWERS_AXP152_DCDC2_V_RAMP                     (0x25)
+// DCDC1 output voltage control (1.7~3.5V @100mV/step)
+#define XPOWERS_AXP152_DC_VOL1_CTRL                     (0x26) //DC-DC1
+// DCDC3 output voltage control (0.7~3.5V @25mV/step)
+#define XPOWERS_AXP152_DC_VOL3_CTRL                     (0x27) //DC-DC3
+// ALDO1/ALDO2 output voltage control (0.5~3.5V @100mV/step)
+#define XPOWERS_AXP152_LDO_VOL0_CTRL                    (0x28) //ALDO1 (high nibble) / ALDO2 (low nibble)
+// DLDO1 output voltage control (0.7~3.5V @100mV/step)
+#define XPOWERS_AXP152_LDO_VOL7_CTRL                    (0x29) //DLDO1
+// DLDO2 output voltage control (0.7~3.5V @100mV/step)
+#define XPOWERS_AXP152_LDO_VOL8_CTRL                    (0x2A) //DLDO2
+// DCDC4 output voltage control (0.7~3.5V @25mV/step)
+#define XPOWERS_AXP152_DC_VOL4_CTRL                     (0x2B) //DC-DC4
 
-#define XPOWERS_AXP152_FAST_PWRON_SET0                  (0x28)
-#define XPOWERS_AXP152_FAST_PWRON_SET1                  (0x29)
-#define XPOWERS_AXP152_FAST_PWRON_SET2                  (0x2A)
-#define XPOWERS_AXP152_FAST_PWRON_CTRL                  (0x2B)
+// Fast power-on start sequence registers
+#define XPOWERS_AXP152_FAST_PWRON_SET0                  (0x28) // DCDC1~DCDC4 start sequence
+#define XPOWERS_AXP152_FAST_PWRON_SET1                  (0x29) // DCDC5 / ALDO1~ALDO3 start sequence
+#define XPOWERS_AXP152_FAST_PWRON_SET2                  (0x2A) // ALDO4 / BLDO1~BLDO2 / CPULDO start sequence
+#define XPOWERS_AXP152_FAST_PWRON_CTRL                  (0x2B) // DLDO1~DLDO2 start sequence / enable
+
+// Register 0x31: VOFF - minimum system voltage before PMU shutdown
+#define XPOWERS_AXP152_VOFF_SET                         (0x31)
+// Register 0x32: OFF control (PWROK sequencing / shutdown control)
+#define XPOWERS_AXP152_OFF_CTRL                         (0x32)
+// Register 0x37: DCDC switching frequency control
+#define XPOWERS_AXP152_DCDC_FREQ                        (0x37)
+// Register 0x80: DCDC forced-PWM / power-down mode control
+#define XPOWERS_AXP152_DCDC_MODE                        (0x80)
+
+// Register 0x36 PEK (power-enable key) level control
+#define XPOWERS_AXP152_IRQ_OFF_ON_LEVEL_CTRL            (0x36)
 
 #define XPOWERS_AXP152_ADC_CHANNEL_CTRL                 (0x30)
 #define XPOWERS_AXP152_ADC_DATA_RELUST0                 (0x34)
@@ -104,34 +122,47 @@
 
 #define XPOWERS_AXP152_BTN_BAT_CHG_VOL_SET              (0x6A)
 
+// LDO0 (LDOIO0) output voltage control - also used for LDO0 enable
+// Reg 0x15 : bit7 = LDO0 enable, bits[4:0] = output voltage code
+#define XPOWERS_AXP152_LDO0_CTRL                        (0x15)
 
-#define XPOWERS_AXP152_DC_ONOFF_DVM_CTRL                (0x12)//
+#define XPOWERS_AXP152_LDO0_VOL_MIN                     (1800)
+#define XPOWERS_AXP152_LDO0_VOL_MAX                     (3300)
+#define XPOWERS_AXP152_LDO0_VOL_STEPS                   (100u)
+
+// GPIO/LDO voltage control registers (upstream AXP152 register map 0x90-0x9D)
+#define XPOWERS_AXP152_GPIO0_CTRL                       (0x90)
+#define XPOWERS_AXP152_GPIO1_CTRL                       (0x91)
+#define XPOWERS_AXP152_GPIO2_CTRL                       (0x92)
+#define XPOWERS_AXP152_GPIO3_CTRL                       (0x93)
+#define XPOWERS_AXP152_LDOGPIO2_V_OUT                   (0x96)
+#define XPOWERS_AXP152_GPIO_INPUT                       (0x97)
+#define XPOWERS_AXP152_PWM0_FREQ_X                      (0x98)
+#define XPOWERS_AXP152_PWM0_FREQ_Y                      (0x99)
+#define XPOWERS_AXP152_PWM0_DUTY_CYCLE                  (0x9A)
+#define XPOWERS_AXP152_PWM1_FREQ_X                      (0x9B)
+#define XPOWERS_AXP152_PWM1_FREQ_Y                      (0x9C)
+#define XPOWERS_AXP152_PWM1_DUTY_CYCLE                  (0x9D)
+
+// Board-specific voltage control registers (kept for API compatibility with .tpp)
+#define XPOWERS_AXP152_LDO_VOL2_CTRL                    (0x94) //ALDO3
+#define XPOWERS_AXP152_LDO_VOL3_CTRL                    (0x95) //ALDO4
+#define XPOWERS_AXP152_LDO_VOL4_CTRL                    (0x96) //BLDO1
+#define XPOWERS_AXP152_LDO_VOL5_CTRL                    (0x97) //BLDO2
+#define XPOWERS_AXP152_LDO_VOL6_CTRL                    (0x98) //CPUSLDO
+
+// Internal register mappings used by the module enable/disable functions
+// (per datasheet chapter "Internal Registers")
+#define XPOWERS_AXP152_DC_ONOFF_DVM_CTRL                (0x12)
 #define XPOWERS_AXP152_DC_FORCE_PWM_CTRL                (0x80)
-#define XPOWERS_AXP152_DC_VOL0_CTRL                     (0x26) //DC-DC0
-#define XPOWERS_AXP152_DC_VOL1_CTRL                     (0x26) //DC-DC1
-#define XPOWERS_AXP152_DC_VOL2_CTRL                     (0x25) //DC-DC2
-#define XPOWERS_AXP152_DC_VOL3_CTRL                     (0x27) //DC-DC3
-#define XPOWERS_AXP152_DC_VOL4_CTRL                     (0x2B) //DC-DC4
-
-
-#define XPOWERS_AXP152_LDO_ONOFF_CTRL0                  (0x12)//
+#define XPOWERS_AXP152_LDO_ONOFF_CTRL0                  (0x12)
 #define XPOWERS_AXP152_LDO_ONOFF_CTRL1                  (0x12)
-#define XPOWERS_AXP152_LDO_VOL0_CTRL                    (0x28)
-#define XPOWERS_AXP152_LDO_VOL1_CTRL                    (0x28)
-#define XPOWERS_AXP152_LDO_VOL2_CTRL                    (0x94)
-#define XPOWERS_AXP152_LDO_VOL3_CTRL                    (0x95)
-#define XPOWERS_AXP152_LDO_VOL4_CTRL                    (0x96)
-#define XPOWERS_AXP152_LDO_VOL5_CTRL                    (0x97)
-#define XPOWERS_AXP152_LDO_VOL6_CTRL                    (0x98)
-#define XPOWERS_AXP152_LDO_VOL7_CTRL                    (0x29)
-#define XPOWERS_AXP152_LDO_VOL8_CTRL                    (0x2A)
-
 
 #define XPOWERS_AXP152_BAT_PARAME                       (0xA1)
 #define XPOWERS_AXP152_FUEL_GAUGE_CTRL                  (0xA2)
 #define XPOWERS_AXP152_BAT_PERCENT_DATA                 (0xA4)
 
-// DCDC 1~5
+// DCDC 1~4
 #define XPOWERS_AXP152_DCDC1_VOL_MIN                    (1700)
 #define XPOWERS_AXP152_DCDC1_VOL_MAX                    (3500)
 #define XPOWERS_AXP152_DCDC1_VOL_STEPS                  (100u)
@@ -185,6 +216,7 @@
 
 
 
+// DCDC5 (LDOIO0) – no DCDC5 on AXP152, kept only for API compatibility
 #define XPOWERS_AXP152_DCDC5_VOL_1200MV                 (1200)
 #define XPOWERS_AXP152_DCDC5_VOL_VAL                    (0x19)
 #define XPOWERS_AXP152_DCDC5_VOL_MIN                    (1400)
