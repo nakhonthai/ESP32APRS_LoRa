@@ -6,5 +6,6 @@
         "cstdint": "cpp",
         "cstdlib": "cpp",
         "ostream": "cpp"
-    }
+    },
+    "CodeGPT.apiKey": "CodeGPT Plus Beta"
 }

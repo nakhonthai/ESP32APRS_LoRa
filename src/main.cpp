@@ -53,6 +53,10 @@
 #include <rom/spi_flash.h>
 #include "FS.h"
 #include <LITTLEFS.h>
+#ifdef NAWS4
+#include <SPI.h>
+#include <SD.h>
+#endif
 
 #include <time.h>
 
@@ -135,6 +139,7 @@ void IRAM_ATTR doEncoder()
 // #define PPP_MODEM_FC        ESP_MODEM_FLOW_CONTROL_HW
 // #define PPP_MODEM_MODEL     PPP_MODEM_SIM7600
 
+
 #ifdef NAWS4
 #define PPP_MODEM_RST_DELAY 500
 #define PPP_MODEM_RST 39
@@ -145,6 +150,12 @@ void IRAM_ATTR doEncoder()
 #define PPP_MODEM_CTS -1
 #define PPP_MODEM_FC ESP_MODEM_FLOW_CONTROL_NONE
 #define PPP_MODEM_MODEL PPP_MODEM_SIM7000
+
+#define SD_CS 18
+// #define SD_MOSI 10
+// #define SD_MISO 15
+// #define SD_SCK 11
+#define SD_SW 48
 #else
 #ifdef PPPOS
 // SIM800 basic module with just TX,RX and RST
@@ -498,6 +509,48 @@ RTC_DATA_ATTR float VBat;
 RTC_DATA_ATTR bool VBat_Flag = false;
 RTC_DATA_ATTR float TempNTC;
 bool VbatRead = true;
+
+#ifdef SDCARD
+bool sdCardMounted = false;
+bool lastState = true; // สถานะเริ่มต้นจากขา SD_SW
+// ตรวจสอบสวิตช์ตรวจจับ SD Card (SD_SW active LOW: 0=เสียบ, 1=ถอด)
+// mount/unmount SD Card อัตโนมัติ
+void checkSDCard()
+{
+    //static bool lastState = digitalRead(SD_SW); // สถานะเริ่มต้นจากขา
+    bool current = digitalRead(SD_SW);
+    if (current == lastState)
+        return;
+    
+    if (current == LOW && lastState == HIGH) // Active 0 = มี SD Card เสียบ
+    {
+        if (!sdCardMounted)
+        {
+            SPI.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio, SD_CS);
+            if (SD.begin(SD_CS, SPI, 4000000) && (SD.cardType() != CARD_NONE))
+            {
+                sdCardMounted = true;
+                log_d("SD Card inserted, mounted. Size: %llu MB", SD.cardSize() / (1024 * 1024));
+            }
+            else
+            {
+                SD.end();
+                log_d("SD Card insert detected but mount failed");
+            }
+        }
+    }
+    else if (current == HIGH && lastState == LOW)  // Active 1 = SD Card ถูกถอดออก
+    {
+        if (sdCardMounted)
+        {
+            SD.end();
+            sdCardMounted = false;
+            log_d("SD Card removed, unmounted");
+        }
+    }
+    lastState = current;
+}
+#endif
 
 RTC_NOINIT_ATTR uint16_t TLM_SEQ;
 RTC_NOINIT_ATTR uint16_t IGATE_TLM_SEQ;
@@ -3648,7 +3701,7 @@ void defaultConfig()
     sprintf(config.ppp_apn, "internet");
     sprintf(config.ppp_pin, "0000");
     config.ppp_serial = 1;
-    config.ppp_serial_baudrate = 115200;
+    config.ppp_serial_baudrate = 921600;
     config.ppp_rx_gpio = -1;
     config.ppp_tx_gpio = -1;
     config.ppp_rst_gpio = -1;
@@ -3682,8 +3735,8 @@ void defaultConfig()
     config.ppp_enable = true;
     sprintf(config.ppp_apn, "internet");
     sprintf(config.ppp_pin, "0000");
-    config.ppp_serial = 1;
-    config.ppp_serial_baudrate = 115200;
+    config.ppp_serial = 2;
+    config.ppp_serial_baudrate = 921600;
     config.ppp_rx_gpio = 42;
     config.ppp_tx_gpio = 41;
     config.ppp_rst_gpio = 8;
@@ -4705,6 +4758,13 @@ void setup()
     setCpuFrequencyMhz(160);
 #endif
 
+#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2) || defined(NAWS4)
+    setupPower();
+#endif
+
+Sleep_Activate = config.pwr_sleep_activate;
+PowerOn();
+
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
     pinMode(1, INPUT);
@@ -4748,6 +4808,40 @@ void setup()
         log_d("Total space: %lu\n", LITTLEFS.totalBytes());
         log_d("Use space:  %lu\n\n", LITTLEFS.usedBytes());
     }
+
+#ifdef SDCARD
+    // SD Card on shared SPI bus with RF (MOSI/MISO/SCLK from config), CS=SD_CS(18), switch detect=SD_SW(48)
+    pinMode(SD_SW, INPUT_PULLUP);
+    lastState = digitalRead(SD_SW); // สถานะเริ่มต้นจากขา SD_SW
+    if(lastState == LOW)
+    {
+        log_d("SD Card Switch Detect LOW");
+        SPI.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio, SD_CS);
+        if (!SD.begin(SD_CS, SPI, 4000000))
+        {
+            log_d("SD Card Mount Failed (CS:%d SW:%d)", SD_CS, SD_SW);
+            sdCardMounted = false;
+        }
+        else
+        {
+            uint8_t sdType = SD.cardType();
+            if (sdType == CARD_NONE)
+            {
+                log_d("No SD Card attached");
+                sdCardMounted = false;
+            }
+            else
+            {   
+                sdCardMounted = true;
+                log_d("SD Card mounted, Type: %d, Size: %llu MB", sdType, SD.cardSize() / (1024 * 1024));
+            }
+        }    
+    }
+    else
+    {
+        log_d("SD Card Switch Detect HIGH");
+    }
+#endif
 
     log_d("Start ESP32APRS_LoRa V%s", VERSION);
     // log_d("Push BOOT after 3 sec for Factory Default config.");
@@ -4845,17 +4939,12 @@ void setup()
     //     }
     // }
 
-    Sleep_Activate = config.pwr_sleep_activate;
-    PowerOn();
+   
 #if SOC_I2C_NUM > 1
     if (config.i2c1_enable)
     {
         Wire1.begin(config.i2c1_sda_pin, config.i2c1_sck_pin, config.i2c1_freq);
     }
-#endif
-
-#if defined(T_BEAM_S3_SUPREME) || defined(T_BEAM_S3_BPF) || defined(TTGO_T_Beam_V1_2) || defined(NAWS4)
-    setupPower();
 #endif
 
     if (config.oled_enable)
@@ -5523,7 +5612,7 @@ void mqtt_reconnect()
         char strCID[13];
         uint64_t chipid = ESP.getEfuseMac();
         sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
-        Serial.print("Attempting MQTT connection...");
+        log_d("Attempting MQTT connection...");
         // Attempt to connect
         char idMqtt[50];
         sprintf(idMqtt, "%s", strCID);
@@ -6808,6 +6897,7 @@ void loop()
         }
     }
 
+
 #ifdef BUOY
     if (gps.location.isValid() && gps.location.isUpdated())
     {
@@ -7081,6 +7171,9 @@ void loop()
         // esp_task_wdt_reset();
         timeSleep = millis() + 1000;
 
+        #ifdef SDCARD
+        checkSDCard(); // ตรวจสอบการเสียบ/ถอด SD Card อัตโนมัติ
+        #endif
         if (config.pwr_en)
         {
             if (config.pwr_mode == MODE_A) // CPU and Radio active, power down control
@@ -10227,8 +10320,11 @@ void PPPOS_Start()
         PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
         log_d("PPP Modem Init...");
         log_d("Using UART %d as PPP interface", config.ppp_serial);
-        if (config.ppp_serial > 1)
+        if (config.ppp_serial > (SOC_UART_NUM-1))
+        {
+            log_d("Invalid UART number");
             return;
+        }
         if (PPP.begin(PPP_MODEM_MODEL, config.ppp_serial, 115200))
         {
             log_d("PPP started successfully");

@@ -43,7 +43,7 @@
 // DCDC4 output voltage control (0.7~3.5V @25mV/step)
 #define XPOWERS_AXP152_DC_VOL4_CTRL                     (0x2B) //DC-DC4
 
-// Fast power-on start sequence registers
+// Fast power-on start sequence registers (match AXP2101 map)
 #define XPOWERS_AXP152_FAST_PWRON_SET0                  (0x28) // DCDC1~DCDC4 start sequence
 #define XPOWERS_AXP152_FAST_PWRON_SET1                  (0x29) // DCDC5 / ALDO1~ALDO3 start sequence
 #define XPOWERS_AXP152_FAST_PWRON_SET2                  (0x2A) // ALDO4 / BLDO1~BLDO2 / CPULDO start sequence

@@ -1,4 +1,4 @@
-/*
+﻿/*
  Name:		ESP32C3_LoRa
  Created:	13-10-2023 14:27:23
  Author:	HS5TQA/Atten
@@ -147,7 +147,12 @@ extern float VBat;
 extern bool VBat_Flag;
 extern bool VbatRead;
 
-// ประกาศ global semaphore
+#ifdef NAWS4
+extern bool sdCardMounted;
+#include <SD.h>
+#endif
+
+// เธเธฃเธฐเธเธฒเธจ global semaphore
 static SemaphoreHandle_t cfg_mutex = NULL;
 
 // #ifdef OLED
@@ -326,7 +331,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "currentSortKey = key;\n\n");
 	strcat(webString, "clearArrows();\n\n");
 	strcat(webString, "const arrowSpan = header.querySelector(\".arrow\");\n");
-	strcat(webString, "arrowSpan.textContent = sortDirection[key] ? \"▲\" : \"▼\";\n\n");
+	strcat(webString, "arrowSpan.textContent = sortDirection[key] ? \"โ–ฒ\" : \"โ–ผ\";\n\n");
 	strcat(webString, "lastHeardSort(data);\n");
 	strcat(webString, "printLastHeard(data);\n");
 	strcat(webString, "});\n\n");
@@ -428,7 +433,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	strcat(webString, "</div>\n");
 	strcat(webString, "<br />\n");
 	strcat(webString, "<div class=\"footer\">\n");
-	strcat(webString, "ESP32APRS_LoRa Web Configuration<br />Copy right ©2024.\n");
+	strcat(webString, "ESP32APRS_LoRa Web Configuration<br />Copy right ยฉ2024.\n");
 	strcat(webString, "<br />\n");
 	strcat(webString, "</div>\n");
 	strcat(webString, "</div>\n");
@@ -1025,11 +1030,15 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	strcat(html, "<th><span>PSRAM(KByte)</span></th>\n");
 #endif
 	strcat(html, "<th><span>SPIFFS(KByte)</span></th>\n");
+	if (sdCardMounted && (SD.cardType() != CARD_NONE))
+	{
+		strcat(html, "<th><span>SD Card</span></th>\n");
+	}
 	if (VBat_Flag){
 		strcat(html, "<th><span>VBat(V)</span></th>\n");
 	}
 	strcat(html, "<th><span>CPU(Mhz)</span></th>\n");
-	strcat(html, "<th><span>CPU.Temp(°C)</span></th>\n");
+	strcat(html, "<th><span>CPU.Temp(ยฐC)</span></th>\n");
 
 	strcat(html, "</tr>\n");
 	strcat(html, "<tr>\n");
@@ -1055,6 +1064,23 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	unsigned long cardUsed = LITTLEFS.usedBytes();
 	snprintf(temp_buffer, sizeof(temp_buffer), "<td><b>%.1f/%.1f</b></td>\n", (double)cardUsed / 1024, (double)cardTotal / 1024);
 	strcat(html, temp_buffer);
+
+	if (sdCardMounted && (SD.cardType() != CARD_NONE))
+	{
+		strcat(webString, "<b>SD Card: </b>");
+		const char *sdTypeName = "UNKNOWN";
+		uint8_t sdType = SD.cardType();
+		if (sdType == CARD_MMC)
+			sdTypeName = "MMC";
+		else if (sdType == CARD_SD)
+			sdTypeName = "SDSC";
+		else if (sdType == CARD_SDHC)
+			sdTypeName = "SDHC/SDXC";
+		else if (sdType == CARD_NONE)
+			sdTypeName = "NONE";
+		snprintf(temp_buffer, sizeof(temp_buffer), "Type: %s,%.2f MByte</div>\n", sdTypeName, (double)SD.cardSize() / 1048576.0);
+		strcat(html, temp_buffer);
+	}
 
 	if (VBat_Flag)
 	{
@@ -1316,7 +1342,7 @@ void event_lastHeard(bool gethtml)
 						}
 						double dtmp = aprsParse.direction(lon, lat, aprs.lng, aprs.lat);
 						double dist = aprsParse.distance(lon, lat, aprs.lng, aprs.lat);
-						snprintf(temp_html, sizeof(temp_html), "\"dx\":\"%.1fkm/%.0f°\",", dist, dtmp);
+						snprintf(temp_html, sizeof(temp_html), "\"dx\":\"%.1fkm/%.0fยฐ\",", dist, dtmp);
 						strcat(html, temp_html);
 					}
 					else
@@ -1541,6 +1567,9 @@ void handle_storage(AsyncWebServerRequest *request)
 	unsigned long cardTotal = LITTLEFS.totalBytes();
 	unsigned long cardUsed = LITTLEFS.usedBytes();
 
+// #ifdef NAWS4
+// render:
+// #endif
 	if (request->hasArg("delete"))
 	{
 		for (uint8_t i = 0; i < request->args(); i++)
@@ -1548,6 +1577,25 @@ void handle_storage(AsyncWebServerRequest *request)
 			if (request->argName(i) == "FILE")
 			{
 				String path = request->arg(i);
+#ifdef NAWS4
+				if (request->hasArg("sddelete"))
+				{
+					if (SD.remove("/" + path))
+					{
+#ifdef DEBUG
+						Serial.println("SD File deleted: " + path);
+#endif
+					}
+#ifdef DEBUG
+					else
+					{
+						Serial.println("SD Delete failed: " + path);
+					}
+#endif
+					//goto render;
+				}
+#endif
+
 #ifdef DEBUG
 				Serial.println("Deleting file: " + path);
 #endif
@@ -1739,6 +1787,8 @@ void handle_storage(AsyncWebServerRequest *request)
 	snprintf(temp_buffer, sizeof(temp_buffer), "%.2f KByte", (double)cardUsed / 1024);
 	strcat(webString, temp_buffer);
 
+	
+
 	snprintf(temp_buffer, sizeof(temp_buffer), "</br>Listing directory: </b>%s</div>\n", dirname);
 	strcat(webString, temp_buffer);
 
@@ -1753,6 +1803,67 @@ void handle_storage(AsyncWebServerRequest *request)
 		strcat(webString, "Not a directory");
 		// return;
 	}
+
+	#ifdef SDCARD
+	// ===== SD Card Section (NAWS4) =====
+	strcat(webString,"<br><div style=\"font-size:8pt;text-align:left;\">");
+	if (sdCardMounted && (SD.cardType() != CARD_NONE))
+	{
+		strcat(webString, "<b>SD Card: </b>");
+		const char *sdTypeName = "UNKNOWN";
+		uint8_t sdType = SD.cardType();
+		if (sdType == CARD_MMC)
+			sdTypeName = "MMC";
+		else if (sdType == CARD_SD)
+			sdTypeName = "SDSC";
+		else if (sdType == CARD_SDHC)
+			sdTypeName = "SDHC/SDXC";
+		else if (sdType == CARD_NONE)
+			sdTypeName = "NONE";
+		snprintf(temp_buffer, sizeof(temp_buffer), "Type: %s, Size: %.2f MByte</div>\n", sdTypeName, (double)SD.cardSize() / 1048576.0);
+		strcat(webString, temp_buffer);
+
+		fs::File sdRoot = SD.open("/");
+		if (sdRoot)
+		{
+			fs::File sdFile = sdRoot.openNextFile();
+			strcat(webString, "<table border=\"1\"><tr align=\"center\" bgcolor=\"#0ADD9C\"><th width=\"100\"><b>SD DIRECTORY</b></th><th><b>SD FILE NAME</b></th><th width=\"100\"><b>SIZE(Byte)</b></th><th width=\"170\"><b>DATE TIME</b></th><th width=\"50\"><b>DELETE</b></th><th width=\"100\"><b>DOWNLOAD</b></th></tr>");
+			while (sdFile)
+			{
+				const char *fName = sdFile.name();
+				if (sdFile.isDirectory())
+				{
+					snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td>%s</td><td></td><td></td><td></td><td></td><td></td></tr>\n", fName);
+					strcat(webString, temp_buffer);
+				}
+				else
+				{
+					snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td>/sd</td><td align=\"left\"><a href=\"/sddownload?FILE=%s\" target=\"_blank\">%s</a></td><td align=\"right\">%d</td>", fName, fName, (int)sdFile.size());
+					strcat(webString, temp_buffer);
+					time_t t = sdFile.getLastWrite();
+					struct tm *tmstruct = localtime(&t);
+					sprintf(strTime, "<td align=\"center\">%d-%02d-%02d %02d:%02d:%02d</td>", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
+					strcat(webString, strTime);
+					snprintf(temp_buffer, sizeof(temp_buffer), "<td align=\"center\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formSDDelete\" method=\"post\"><input name=\"sddelete\" type=\"hidden\" /><input name=\"FILE\" type=\"hidden\" value=\"%s\" /><button name=\"commit\" type=\"submit\" style=\"background-color:red;color:white\">X</button></form></td>\n", fName);
+					strcat(webString, temp_buffer);
+					snprintf(temp_buffer, sizeof(temp_buffer), "<td align=\"center\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formSDDownload\" method=\"post\"><input name=\"sddownload\" type=\"hidden\" /><input name=\"FILE\" type=\"hidden\" value=\"%s\" /><button name=\"commit\" type=\"submit\" style=\"background-color:green;color:white\">DOWNLOAD</button></form></td></tr>\n", fName);
+					strcat(webString, temp_buffer);
+				}
+				sdFile = sdRoot.openNextFile();
+			}
+			strcat(webString, "</table>\n");
+			sdRoot.close();
+		}
+		else
+		{
+			strcat(webString, "Failed to open SD directory</div>\n");
+		}
+	}
+	else
+	{
+		strcat(webString, "<b>SD Card: </b>Not detected / Not mounted</div>\n");
+	}
+#endif
 
 	File file = root.openNextFile();
 	strcat(webString, "<table border=\"1\"><tr align=\"center\" bgcolor=\"#03DDFC\"><th width=\"100\"><b>DIRECTORY</b></th><th><b>FILE NAME</b></th><th width=\"100\"><b>SIZE(Byte)</b></th><th width=\"170\"><b>DATE TIME</b></th><th width=\"50\"><b>DELETE</b></th><th width=\"100\"><b>DOWNLOAD</b></th></tr>");
@@ -1795,9 +1906,6 @@ void handle_storage(AsyncWebServerRequest *request)
 		file = root.openNextFile();
 	}
 	strcat(webString, "</table>\n");
-	// strcat(webString, "<form accept-charset=\"UTF-8\" action=\"/format\" class=\"form-horizontal\" id=\"format_form\" method=\"post\">\n");
-	// strcat(webString, "<br><div><button class=\"button\" type='submit' id='format_form_sumbit'  name=\"commit\"> FORMAT </button></div>\n");
-	// strcat(webString, "</form><br/>\n");
 
 	// UPLOAD CONFIGURATION FILE
 	strcat(webString, "<br><form accept-charset=\"UTF-8\" action=\"#\" "
@@ -1833,6 +1941,23 @@ void handle_download(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
+#ifdef NAWS4
+	// Download file from SD Card: /sddownload?FILE=name
+	if (request->hasArg("sddownload"))
+	{
+		if (sdCardMounted)
+		{
+			String sdPath = "/" + request->arg("FILE");
+			if (SD.exists(sdPath))
+			{
+				request->send(SD, sdPath, String(), true);
+				return;
+			}
+		}
+		request->send_P(404, PSTR("text/plain"), PSTR("SD File Not found"));
+		return;
+	}
+#endif
 	String dataType = "";
 	String path = "";
 
@@ -3266,7 +3391,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 		// strcat(html, "       $('#wg_private_key').val(data.PrivateKey);\n");
 		// strcat(html, "    },\n");
 		// strcat(html, "    error: function(e) {\n");
-		// strcat(html, "       alert('โหลดข้อมูล VPN ไม่สำเร็จ');\n");
+		// strcat(html, "       alert('เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ VPN เนเธกเนเธชเธณเน€เธฃเนเธ');\n");
 		// strcat(html, "       console.log(e);\n");
 		// strcat(html, "    }\n");
 		// strcat(html, "  });\n");
@@ -5749,7 +5874,11 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "<td align=\"right\"><b>PORT:</b></td>\n");
 		strcat(html, "<td style=\"text-align: left;\">\n");
 		strcat(html, "<select name=\"port\" id=\"port\">\n");
+		#if SOC_UART_NUM > 2
+		for (int i = 0; i < 3; i++)
+		#else
 		for (int i = 0; i < 2; i++)
+		#endif
 		{
 			if (config.ppp_serial == i)
 				snprintf(temp_buffer, sizeof(temp_buffer), "<option value=\"%d\" selected>%s </option>\n", i, GNSS_PORT[i + 1]);
@@ -9760,19 +9889,19 @@ void handle_sensor(AsyncWebServerRequest *request)
 		strcat(html, "setElm(unit,\"ppm\");\n");
 		strcat(html, "}else if (x==2) {\n");
 		strcat(html, "setElm(parm,\"CH2O\");");
-		strcat(html, "setElm(unit,\"μg/m³\");\n");
+		strcat(html, "setElm(unit,\"ฮผg/mยณ\");\n");
 		strcat(html, "}else if (x==3) {\n");
 		strcat(html, "setElm(parm,\"TVOC\");");
-		strcat(html, "setElm(unit,\"μg/m³\");\n");
+		strcat(html, "setElm(unit,\"ฮผg/mยณ\");\n");
 		strcat(html, "}else if (x==4) {\n");
 		strcat(html, "setElm(parm,\"PM2.5\");");
-		strcat(html, "setElm(unit,\"μg/m³\");\n");
+		strcat(html, "setElm(unit,\"ฮผg/mยณ\");\n");
 		strcat(html, "}else if (x==5) {\n");
 		strcat(html, "setElm(parm,\"PM10.0\");");
-		strcat(html, "setElm(unit,\"μg/m³\");\n");
+		strcat(html, "setElm(unit,\"ฮผg/mยณ\");\n");
 		strcat(html, "}else if (x==6) {\n");
 		strcat(html, "setElm(parm,\"Temperature\");");
-		strcat(html, "setElm(unit,\"°C\");\n");
+		strcat(html, "setElm(unit,\"ยฐC\");\n");
 		strcat(html, "}else if (x==7) {\n");
 		strcat(html, "setElm(parm,\"Humidity\");");
 		strcat(html, "setElm(unit,\"%RH\");\n");
@@ -9784,22 +9913,22 @@ void handle_sensor(AsyncWebServerRequest *request)
 		strcat(html, "setElm(unit,\"kPh\");\n");
 		strcat(html, "}else if (x==10) {\n");
 		strcat(html, "setElm(parm,\"WindCourse\");");
-		strcat(html, "setElm(unit,\"°\");\n");
+		strcat(html, "setElm(unit,\"ยฐ\");\n");
 		strcat(html, "}else if (x==11) {\n");
 		strcat(html, "setElm(parm,\"Rain\");");
 		strcat(html, "setElm(unit,\"mm\");\n");
 		strcat(html, "}else if (x==12) {\n");
 		strcat(html, "setElm(parm,\"Luminosity\");");
-		strcat(html, "setElm(unit,\"W/m³\");\n");
+		strcat(html, "setElm(unit,\"W/mยณ\");\n");
 		strcat(html, "}else if (x==13) {\n");
 		strcat(html, "setElm(parm,\"SoilTemp\");");
-		strcat(html, "setElm(unit,\"°C\");\n");
+		strcat(html, "setElm(unit,\"ยฐC\");\n");
 		strcat(html, "}else if (x==14) {\n");
 		strcat(html, "setElm(parm,\"SoilMoisture\");");
 		strcat(html, "setElm(unit,\"%VWC\");\n");
 		strcat(html, "}else if (x==15) {\n");
 		strcat(html, "setElm(parm,\"WaterTemp\");");
-		strcat(html, "setElm(unit,\"°C\");\n");
+		strcat(html, "setElm(unit,\"ยฐC\");\n");
 		strcat(html, "}else if (x==16) {\n");
 		strcat(html, "setElm(parm,\"WaterTDS\");");
 		strcat(html, "setElm(unit,\" \");\n");
@@ -11466,8 +11595,8 @@ static void ota_url_task(void *pvParameters)
 		int contentLength = http.getSize();
 		WiFiClient *stream = http.getStreamPtr();
 		if (contentLength > 0 && Update.begin(contentLength)) {
-			disableLoopWDT();
-			disableCore0WDT();
+			//disableLoopWDT();
+			//disableCore0WDT();
 			Update.writeStream(*stream);
 			if (Update.end(true)) {
 				log_i("OTA URL update success, rebooting");
@@ -12264,8 +12393,8 @@ void webService()
 				}
 				else
 				{
-					disableLoopWDT();
-					disableCore0WDT();
+					//disableLoopWDT();
+					//disableCore0WDT();
 					// disableCore1WDT();
 					// esp_task_wdt_delete(taskAPRSPollHandle); // Delete watchdog task
 					// disableCore1WDT();
