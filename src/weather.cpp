@@ -19,6 +19,80 @@ extern TinyGPSPlus gps;
 
 WeatherData weather;
 
+static time_t rainIntervalResetTs = 0;
+static int rainMidnightUtcDay = -1;
+
+static const size_t RAIN_24H_HISTORY = 1440;
+struct Rain24hEntry
+{
+    time_t ts;
+    float rain;
+};
+static Rain24hEntry rain24hHistory[RAIN_24H_HISTORY];
+static uint16_t rain24hHead = 0;
+static uint16_t rain24hCount = 0;
+static float rain24hTotal = 0.0F;
+static float lastRainSnapshot = 0.0F;
+
+static void updateRainAccumulator(float currentRain, time_t now)
+{
+    if (config.wx_interval > 0)
+    {
+        if (rainIntervalResetTs == 0 || (now - rainIntervalResetTs) >= (time_t)config.wx_interval)
+        {
+            weather.rain = 0.0F;
+            lastRainSnapshot = 0.0F;
+            rainIntervalResetTs = now;
+        }
+    }
+
+    float rainDelta = currentRain - lastRainSnapshot;
+    if (rainDelta < 0.0F)
+    {
+        rainDelta = currentRain;
+    }
+
+    while (rain24hCount > 0 && (now - rain24hHistory[rain24hHead].ts) >= 86400)
+    {
+        rain24hTotal -= rain24hHistory[rain24hHead].rain;
+        rain24hHistory[rain24hHead].ts = 0;
+        rain24hHistory[rain24hHead].rain = 0.0F;
+        rain24hHead = (rain24hHead + 1) % RAIN_24H_HISTORY;
+        rain24hCount--;
+    }
+
+    if (rain24hCount >= RAIN_24H_HISTORY)
+    {
+        rain24hTotal -= rain24hHistory[rain24hHead].rain;
+        rain24hHistory[rain24hHead].ts = 0;
+        rain24hHistory[rain24hHead].rain = 0.0F;
+        rain24hHead = (rain24hHead + 1) % RAIN_24H_HISTORY;
+        rain24hCount--;
+    }
+
+    size_t idx = (rain24hHead + rain24hCount) % RAIN_24H_HISTORY;
+    rain24hHistory[idx].ts = now;
+    rain24hHistory[idx].rain = rainDelta;
+    rain24hTotal += rainDelta;
+    rain24hCount++;
+    weather.rain24hr = rain24hTotal;
+
+    struct tm *utc = gmtime(&now);
+    if (utc != nullptr)
+    {
+        int utcDayKey = (utc->tm_year + 1900) * 1000 + utc->tm_yday;
+        if (rainMidnightUtcDay < 0 || utcDayKey != rainMidnightUtcDay)
+        {
+            weather.rainmidnight = 0.0F;
+            rainMidnightUtcDay = utcDayKey;
+        }
+    }
+
+    weather.rain = currentRain;
+    weather.rainmidnight += rainDelta;
+    lastRainSnapshot = currentRain;
+}
+
 float wgArray[5];
 uint8_t wgIdx=0;
 
@@ -59,8 +133,7 @@ bool getCSV2Wx(String stream)
     {
         // String value;
         float rainSample = getValue(weatherRaw, ',', 2).toFloat();
-        weather.rain += rainSample;
-        weather.rain24hr += rainSample;
+        weather.rain = rainSample;
         weather.windspeed = getValue(weatherRaw, ',', 3).toFloat();
         weather.winddirection = getValue(weatherRaw, ',', 4).toInt();
         weather.solar = getValue(weatherRaw, ',', 5).toInt();
@@ -75,6 +148,7 @@ bool getCSV2Wx(String stream)
 
         weather.visable |= WX_RAIN;
         weather.visable |= WX_RAIN24HR;
+        weather.visable |= WX_RAIN_GMT;
         weather.visable |= WX_WIND_SPD;
         weather.visable |= WX_WIND_DIR;
         weather.visable |= WX_LUMINOSITY;
@@ -216,6 +290,9 @@ int getRawWx(char *strData)
 
     weather.visable = 0;
 
+    time_t now = time(NULL);
+    
+
     uint32_t senType = 1;
     for (i = 0; i < WX_SENSOR_NUM; i++)
     {
@@ -244,15 +321,16 @@ int getRawWx(char *strData)
         case WX_TEMP:
             getSensor(senType, &weather.temperature, i, config.wx_sensor_avg[i]);
             break;
-        case WX_RAIN:
+        case WX_RAIN:            
             getSensor(senType, &weather.rain, i, config.wx_sensor_avg[i]);
+            updateRainAccumulator(weather.rain, now);
             break;
-        case WX_RAIN24HR:
-            getSensor(senType, &weather.rain24hr, i, config.wx_sensor_avg[i]);
-            break;
-        case WX_RAIN_GMT:
-            getSensor(senType, &weather.rainmidnight, i, config.wx_sensor_avg[i]);
-            break;
+        // case WX_RAIN24HR:
+        //     getSensor(senType, &weather.rain24hr, i, config.wx_sensor_avg[i]);
+        //     break;
+        // case WX_RAIN_GMT:
+        //     getSensor(senType, &weather.rainmidnight, i, config.wx_sensor_avg[i]);
+        //     break;
         case WX_HUMIDITY:
             getSensor(senType, &weather.humidity, i, config.wx_sensor_avg[i]);
             break;
@@ -363,19 +441,6 @@ int getRawWx(char *strData)
     unsigned int rain = (unsigned int)round((weather.rain * 100.0F) / 25.6F);
     unsigned int rain24 = (unsigned int)round((weather.rain24hr * 100.0F) / 25.6F);
     unsigned int rainGMT = (unsigned int)round((weather.rainmidnight * 100.0F) / 25.6F);
-    time_t now;
-    time(&now);
-    struct tm *info = gmtime(&now);
-    if (info->tm_min == 0)
-    {
-        rain = 0;
-        weather.rain = 0;
-    }
-    if (info->tm_hour == 0 && info->tm_min == 0)
-    {
-        rain24 = 0;
-        weather.rain24hr = 0;
-    }
 
     if (config.wx_flage & WX_RAIN)
     {
@@ -647,15 +712,15 @@ int getWxJson(char *strData, bool avg)
         case WX_TEMP:
             getSensor(senType, &weather.temperature, i, avg);
             break;
-        case WX_RAIN:
-            getSensor(senType, &weather.rain, i, avg);
-            break;
-        case WX_RAIN24HR:
-            getSensor(senType, &weather.rain24hr, i, avg);
-            break;
-        case WX_RAIN_GMT:
-            getSensor(senType, &weather.rainmidnight, i, avg);
-            break;
+        // case WX_RAIN:
+        //     getSensor(senType, &weather.rain, i, avg);
+        //     break;
+        // case WX_RAIN24HR:
+        //     getSensor(senType, &weather.rain24hr, i, avg);
+        //     break;
+        // case WX_RAIN_GMT:
+        //     getSensor(senType, &weather.rainmidnight, i, avg);
+        //     break;
         case WX_HUMIDITY:
             getSensor(senType, &weather.humidity, i, avg);
             break;
@@ -753,23 +818,6 @@ int getWxJson(char *strData, bool avg)
             sprintf(strtmp, ",\"Temperature\":\"%.2f\"", weather.temperature);
             strcat(strData, strtmp);
         }
-    }
-
-    // unsigned int rain = (unsigned int)round((weather.rain * 100.0F) / 25.6F);
-    // unsigned int rain24 = (unsigned int)round((weather.rain24hr * 100.0F) / 25.6F);
-    // unsigned int rainGMT = (unsigned int)round((weather.rainmidnight * 100.0F) / 25.6F);
-    time_t now;
-    time(&now);
-    struct tm *info = gmtime(&now);
-    if (info->tm_min == 0)
-    {
-        //rain = 0;
-        weather.rain = 0;
-    }
-    if (info->tm_hour == 0 && info->tm_min == 0)
-    {
-        //rain24 = 0;
-        weather.rain24hr = 0;
     }
 
     if (config.wx_flage & WX_RAIN)
@@ -923,7 +971,7 @@ int getWxJson(char *strData, bool avg)
     //     if (weather.visable & WX_PM100)
     //     {
     //         sprintf(strtmp, "D%03u", (int)weather.pm100);
-    //         strcat(strData, strtmp);
+    //         strcat strData, strtmp;
     //     }
     // }
 

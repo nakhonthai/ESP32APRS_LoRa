@@ -147,7 +147,7 @@ extern float VBat;
 extern bool VBat_Flag;
 extern bool VbatRead;
 
-#ifdef NAWS4
+#ifdef SDCARD
 extern bool sdCardMounted;
 #include <SD.h>
 #endif
@@ -1030,10 +1030,12 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	strcat(html, "<th><span>PSRAM(KByte)</span></th>\n");
 #endif
 	strcat(html, "<th><span>SPIFFS(KByte)</span></th>\n");
+	#ifdef SDCARD
 	if (sdCardMounted && (SD.cardType() != CARD_NONE))
 	{
 		strcat(html, "<th><span>SD Card</span></th>\n");
 	}
+	#endif
 	if (VBat_Flag){
 		strcat(html, "<th><span>VBat(V)</span></th>\n");
 	}
@@ -1065,6 +1067,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	snprintf(temp_buffer, sizeof(temp_buffer), "<td><b>%.1f/%.1f</b></td>\n", (double)cardUsed / 1024, (double)cardTotal / 1024);
 	strcat(html, temp_buffer);
 
+#ifdef SDCARD
 	if (sdCardMounted && (SD.cardType() != CARD_NONE))
 	{
 		strcat(webString, "<b>SD Card: </b>");
@@ -1081,6 +1084,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 		snprintf(temp_buffer, sizeof(temp_buffer), "Type: %s,%.2f MByte</div>\n", sdTypeName, (double)SD.cardSize() / 1048576.0);
 		strcat(html, temp_buffer);
 	}
+#endif
 
 	if (VBat_Flag)
 	{
@@ -1577,7 +1581,7 @@ void handle_storage(AsyncWebServerRequest *request)
 			if (request->argName(i) == "FILE")
 			{
 				String path = request->arg(i);
-#ifdef NAWS4
+#ifdef SDCARD
 				if (request->hasArg("sddelete"))
 				{
 					if (SD.remove("/" + path))
@@ -1941,7 +1945,7 @@ void handle_download(AsyncWebServerRequest *request)
 	{
 		return request->requestAuthentication();
 	}
-#ifdef NAWS4
+#ifdef SDCARD
 	// Download file from SD Card: /sddownload?FILE=name
 	if (request->hasArg("sddownload"))
 	{

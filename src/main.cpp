@@ -518,15 +518,22 @@ bool lastState = true; // สถานะเริ่มต้นจากขา
 void checkSDCard()
 {
     //static bool lastState = digitalRead(SD_SW); // สถานะเริ่มต้นจากขา
-    bool current = digitalRead(SD_SW);
+    bool current = (bool)digitalRead(SD_SW);
     if (current == lastState)
         return;
     
     if (current == LOW && lastState == HIGH) // Active 0 = มี SD Card เสียบ
     {
+        log_d("SD Card Switch Detect LOW");
         if (!sdCardMounted)
         {
-            SPI.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio, SD_CS);
+            log_d("SD Card insert detected, mounting...");    
+            while(digitalRead(config.rf_nss_gpio) == LOW || digitalRead(config.rf1_nss_gpio) == LOW) // รอให้ขา NSS เป็น HIGH ก่อน
+            {
+                log_d("Waiting for SPI NSS pin to be HIGH...");
+                delay(100);
+            }
+            SPI.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio);
             if (SD.begin(SD_CS, SPI, 4000000) && (SD.cardType() != CARD_NONE))
             {
                 sdCardMounted = true;
@@ -541,8 +548,15 @@ void checkSDCard()
     }
     else if (current == HIGH && lastState == LOW)  // Active 1 = SD Card ถูกถอดออก
     {
+        log_d("SD Card Switch Detect HIGH");
         if (sdCardMounted)
         {
+            log_d("SD Card remove detected, unmounting...");
+            while(digitalRead(config.rf_nss_gpio) == LOW || digitalRead(config.rf1_nss_gpio) == LOW) // รอให้ขา NSS เป็น HIGH ก่อน
+            {
+                log_d("Waiting for SPI NSS pin to be HIGH...");
+                delay(100);
+            }
             SD.end();
             sdCardMounted = false;
             log_d("SD Card removed, unmounted");
@@ -4812,11 +4826,13 @@ PowerOn();
 #ifdef SDCARD
     // SD Card on shared SPI bus with RF (MOSI/MISO/SCLK from config), CS=SD_CS(18), switch detect=SD_SW(48)
     pinMode(SD_SW, INPUT_PULLUP);
-    lastState = digitalRead(SD_SW); // สถานะเริ่มต้นจากขา SD_SW
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, HIGH);
+    lastState = (bool)digitalRead(SD_SW); // สถานะเริ่มต้นจากขา SD_SW
     if(lastState == LOW)
     {
         log_d("SD Card Switch Detect LOW");
-        SPI.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio, SD_CS);
+        SPI.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio);
         if (!SD.begin(SD_CS, SPI, 4000000))
         {
             log_d("SD Card Mount Failed (CS:%d SW:%d)", SD_CS, SD_SW);
@@ -7165,15 +7181,16 @@ void loop()
     }
 #endif
 
+        #ifdef SDCARD
+        checkSDCard(); // ตรวจสอบการเสียบ/ถอด SD Card อัตโนมัติ
+        #endif
+
     // Tick one secound
     if (millis() > timeSleep)
     {
         // esp_task_wdt_reset();
         timeSleep = millis() + 1000;
 
-        #ifdef SDCARD
-        checkSDCard(); // ตรวจสอบการเสียบ/ถอด SD Card อัตโนมัติ
-        #endif
         if (config.pwr_en)
         {
             if (config.pwr_mode == MODE_A) // CPU and Radio active, power down control

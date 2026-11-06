@@ -7,5 +7,6 @@
         "cstdlib": "cpp",
         "ostream": "cpp"
     },
-    "CodeGPT.apiKey": "CodeGPT Plus Beta"
+    "CodeGPT.apiKey": "CodeGPT Plus Beta",
+    "idf.currentSetup": "C:\\Users\\user\\esp\\v5.5.2\\esp-idf"
 }
