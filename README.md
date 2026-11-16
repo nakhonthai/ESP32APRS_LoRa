@@ -69,6 +69,23 @@ ESP32APRS_LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather
 8. Click (→) to upload firmware and reboot again
 9. After reboot display monitor and reconfig
 
+## Reducing firmware size (optional)
+
+The firmware is built with `-Os`, `-ffunction-sections`, `-fdata-sections` and
+`-Wl,--gc-sections`, so unused code is already removed. If you need more free
+flash (for example on 4MB boards that keep two OTA partitions), the following
+optional build flags can be added to an environment in `platformio.ini`:
+
+| Build flag / change | Approx. saving on ESP32-C3 | What is removed |
+|---|---|---|
+| `-DNO_WIREGUARD` | 70KB+ | WireGuard VPN client (`esp_wireguard` + libsodium) and its web page |
+| remove `-DPPPOS` | 46KB | PPP over serial (GSM/4G modem) support and `esp_modem` |
+| One radio family only | up to 30KB | Unused RadioLib SX126x/SX127x/SX128x drivers |
+
+The `ht-ct62` environment already sets `-DNO_WIREGUARD`. OTA-by-URL and the
+remote version check use a small built-in HTTP GET client, therefore only
+`http://` URLs are supported (HTTPS is not available in these trimmed builds).
+
 ## APRS Server service
 
 - APRS SERVER of T2THAI at [aprs.dprns.com:14580](http://aprs.dprns.com:14501), CBAPRS at [aprs.dprns.com:24580](http://aprs.dprns.com:24501)

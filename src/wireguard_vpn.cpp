@@ -7,8 +7,26 @@
 //==============================================================================
 #include <Arduino.h>
 #include "main.h"
-#include <esp_wireguard.h>
 #include <WiFi.h>
+
+#ifdef NO_WIREGUARD
+
+// WireGuard disabled for this build: keep the public API as no-ops so the rest
+// of the firmware does not need to care, and so esp_wireguard/libsodium are
+// not pulled into the image (saves ~60KB of flash on 4MB boards).
+#include "wireguard_vpn.h"
+extern "C"
+{
+	bool wireguard_active() { return false; }
+	void wireguard_remove() {}
+	void wireguard_setup(netif *ppp_netif) { (void)ppp_netif; }
+	bool wireguard_up() { return false; }
+	void wireguard_change_device() {}
+}
+
+#else // !NO_WIREGUARD
+
+#include <esp_wireguard.h>
 
 
 //ใช้ตัวแปรโกลบอลในไฟล์ main.cpp
@@ -205,3 +223,5 @@ void wireguard_setup(netif *ppp_netif)
 #ifdef __cplusplus
 }
 #endif // __cplusplus
+
+#endif // !NO_WIREGUARD
