@@ -7470,14 +7470,15 @@ String sendIsAckMsg(String toCallSign, int msgId)
     char call[11];
     int i;
     memset(&call[0], 0, 11);
-    sprintf(call, "%s-%d", config.igate_mycall, config.igate_ssid);
-    strcpy(&call[0], toCallSign.c_str());
+    snprintf(call, sizeof(call), "%s-%d", config.igate_mycall, config.igate_ssid);
+    // APRS addressee field is 9 characters, never copy an unbounded callsign
+    strlcpy(&call[0], toCallSign.c_str(), 10);
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
     memset(&str[0], 0, 250);
 
-    sprintf(str, "%s-%d>APE32L%s::%s:ack%d", config.igate_mycall, config.igate_ssid, VERSION, call, msgId);
+    snprintf(str, sizeof(str), "%s-%d>APE32L%s::%s:ack%d", config.igate_mycall, config.igate_ssid, VERSION, call, msgId);
     //	client.println(str);
     return String(str);
 }
@@ -7485,7 +7486,7 @@ String sendIsAckMsg(String toCallSign, int msgId)
 void sendIsPkg(char *raw)
 {
     char str[300];
-    sprintf(str, "%s-%d>APE32L%s:%s", config.igate_mycall, config.igate_ssid, VERSION, raw);
+    snprintf(str, sizeof(str), "%s-%d>APE32L%s:%s", config.igate_mycall, config.igate_ssid, VERSION, raw);
     // client.println(str);
     String tnc2Raw = String(str);
     if (aprsClient.connected())
@@ -7501,17 +7502,17 @@ void sendIsPkgMsg(char *raw)
     int i;
     memset(&call[0], 0, 11);
     if (config.igate_ssid == 0)
-        sprintf(call, "%s", config.igate_mycall);
+        snprintf(call, sizeof(call), "%s", config.igate_mycall);
     else
-        sprintf(call, "%s-%d", config.igate_mycall, config.igate_ssid);
+        snprintf(call, sizeof(call), "%s-%d", config.igate_mycall, config.igate_ssid);
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
 
     if (config.igate_ssid == 0)
-        sprintf(str, "%s>APE32L::%s:%s", config.igate_mycall, call, raw);
+        snprintf(str, sizeof(str), "%s>APE32L::%s:%s", config.igate_mycall, call, raw);
     else
-        sprintf(str, "%s-%d>APE32L::%s:%s", config.igate_mycall, config.igate_ssid, call, raw);
+        snprintf(str, sizeof(str), "%s-%d>APE32L::%s:%s", config.igate_mycall, config.igate_ssid, call, raw);
 
     String tnc2Raw = String(str);
     if (aprsClient.connected())
@@ -7528,9 +7529,9 @@ void sendTelemetry_0(char *raw, bool header)
     int i;
     memset(&call[0], 0, 11);
     if (config.tlm0_ssid == 0)
-        sprintf(call, "%s", config.tlm0_mycall);
+        snprintf(call, sizeof(call), "%s", config.tlm0_mycall);
     else
-        sprintf(call, "%s-%d", config.tlm0_mycall, config.tlm0_ssid);
+        snprintf(call, sizeof(call), "%s-%d", config.tlm0_mycall, config.tlm0_ssid);
 
     i = strlen(call);
     for (; i < 9; i++)
@@ -7543,13 +7544,13 @@ void sendTelemetry_0(char *raw, bool header)
             if (config.tlm0_path < 5)
             {
                 if (config.tlm0_path > 0)
-                    sprintf(str, "%s>APE32L-%d::%s:%s ", config.tlm0_mycall, config.tlm0_path, call, raw);
+                    snprintf(str, sizeof(str), "%s>APE32L-%d::%s:%s ", config.tlm0_mycall, config.tlm0_path, call, raw);
                 else
-                    sprintf(str, "%s>APE32L::%s:%s ", config.tlm0_mycall, call, raw);
+                    snprintf(str, sizeof(str), "%s>APE32L::%s:%s ", config.tlm0_mycall, call, raw);
             }
             else
             {
-                sprintf(str, "%s>APE32L,%s::%s:%s ", config.tlm0_mycall, getPath(config.tlm0_path).c_str(), call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L,%s::%s:%s ", config.tlm0_mycall, getPath(config.tlm0_path).c_str(), call, raw);
             }
         }
         else
@@ -7557,13 +7558,13 @@ void sendTelemetry_0(char *raw, bool header)
             if (config.tlm0_path < 5)
             {
                 if (config.tlm0_path > 0)
-                    sprintf(str, "%s-%d>APE32L-%d::%s:%s ", config.tlm0_mycall, config.tlm0_ssid, config.tlm0_path, call, raw);
+                    snprintf(str, sizeof(str), "%s-%d>APE32L-%d::%s:%s ", config.tlm0_mycall, config.tlm0_ssid, config.tlm0_path, call, raw);
                 else
-                    sprintf(str, "%s-%d>APE32L::%s:%s ", config.tlm0_mycall, config.tlm0_ssid, call, raw);
+                    snprintf(str, sizeof(str), "%s-%d>APE32L::%s:%s ", config.tlm0_mycall, config.tlm0_ssid, call, raw);
             }
             else
             {
-                sprintf(str, "%s-%d>APE32L,%s::%s:%s ", config.tlm0_mycall, config.tlm0_ssid, getPath(config.tlm0_path).c_str(), call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L,%s::%s:%s ", config.tlm0_mycall, config.tlm0_ssid, getPath(config.tlm0_path).c_str(), call, raw);
             }
         }
     }
@@ -7574,13 +7575,13 @@ void sendTelemetry_0(char *raw, bool header)
             if (config.tlm0_path < 5)
             {
                 if (config.tlm0_path > 0)
-                    sprintf(str, "%s>APE32L-%d:%s", config.tlm0_mycall, config.tlm0_path, raw);
+                    snprintf(str, sizeof(str), "%s>APE32L-%d:%s", config.tlm0_mycall, config.tlm0_path, raw);
                 else
-                    sprintf(str, "%s>APE32L:%s", config.tlm0_mycall, raw);
+                    snprintf(str, sizeof(str), "%s>APE32L:%s", config.tlm0_mycall, raw);
             }
             else
             {
-                sprintf(str, "%s>APE32L,%s:%s", config.tlm0_mycall, getPath(config.tlm0_path).c_str(), raw);
+                snprintf(str, sizeof(str), "%s>APE32L,%s:%s", config.tlm0_mycall, getPath(config.tlm0_path).c_str(), raw);
             }
         }
         else
@@ -7588,13 +7589,13 @@ void sendTelemetry_0(char *raw, bool header)
             if (config.tlm0_path < 5)
             {
                 if (config.tlm0_path > 0)
-                    sprintf(str, "%s-%d>APE32L-%d:%s", config.tlm0_mycall, config.tlm0_ssid, config.tlm0_path, raw);
+                    snprintf(str, sizeof(str), "%s-%d>APE32L-%d:%s", config.tlm0_mycall, config.tlm0_ssid, config.tlm0_path, raw);
                 else
-                    sprintf(str, "%s-%d>APE32L:%s", config.tlm0_mycall, config.tlm0_ssid, raw);
+                    snprintf(str, sizeof(str), "%s-%d>APE32L:%s", config.tlm0_mycall, config.tlm0_ssid, raw);
             }
             else
             {
-                sprintf(str, "%s-%d>APE32L,%s:%s", config.tlm0_mycall, config.tlm0_ssid, getPath(config.tlm0_path).c_str(), raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L,%s:%s", config.tlm0_mycall, config.tlm0_ssid, getPath(config.tlm0_path).c_str(), raw);
             }
         }
     }
@@ -7638,14 +7639,14 @@ void sendTelemetry_trk(char *raw, int dly_ms)
     memset(&call[0], 0, 11);
     if (strlen(config.trk_item) > 3)
     {
-        sprintf(call, "%s", config.trk_item);
+        snprintf(call, sizeof(call), "%s", config.trk_item);
     }
     else
     {
         if (config.trk_ssid == 0)
-            sprintf(call, "%s", config.trk_mycall);
+            snprintf(call, sizeof(call), "%s", config.trk_mycall);
         else
-            sprintf(call, "%s-%d", config.trk_mycall, config.trk_ssid);
+            snprintf(call, sizeof(call), "%s-%d", config.trk_mycall, config.trk_ssid);
     }
     i = strlen(call);
     for (; i < 9; i++)
@@ -7656,13 +7657,13 @@ void sendTelemetry_trk(char *raw, int dly_ms)
         if (config.trk_path < 5)
         {
             if (config.trk_path > 0)
-                sprintf(str, "%s>APE32L-%d::%s:%s ", config.trk_mycall, config.trk_path, call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L-%d::%s:%s ", config.trk_mycall, config.trk_path, call, raw);
             else
-                sprintf(str, "%s>APE32L::%s:%s ", config.trk_mycall, call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L::%s:%s ", config.trk_mycall, call, raw);
         }
         else
         {
-            sprintf(str, "%s>APE32L,%s::%s:%s ", config.trk_mycall, getPath(config.trk_path).c_str(), call, raw);
+            snprintf(str, sizeof(str), "%s>APE32L,%s::%s:%s ", config.trk_mycall, getPath(config.trk_path).c_str(), call, raw);
         }
     }
     else
@@ -7670,13 +7671,13 @@ void sendTelemetry_trk(char *raw, int dly_ms)
         if (config.trk_path < 5)
         {
             if (config.trk_path > 0)
-                sprintf(str, "%s-%d>APE32L-%d::%s:%s ", config.trk_mycall, config.trk_ssid, config.trk_path, call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L-%d::%s:%s ", config.trk_mycall, config.trk_ssid, config.trk_path, call, raw);
             else
-                sprintf(str, "%s-%d>APE32L::%s:%s ", config.trk_mycall, config.trk_ssid, call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L::%s:%s ", config.trk_mycall, config.trk_ssid, call, raw);
         }
         else
         {
-            sprintf(str, "%s-%d>APE32L,%s::%s:%s ", config.trk_mycall, config.trk_ssid, getPath(config.trk_path).c_str(), call, raw);
+            snprintf(str, sizeof(str), "%s-%d>APE32L,%s::%s:%s ", config.trk_mycall, config.trk_ssid, getPath(config.trk_path).c_str(), call, raw);
         }
     }
 
@@ -7710,14 +7711,14 @@ void sendTelemetry_igate(char *raw, int dly_ms)
     memset(&call[0], 0, 11);
     if (strlen(config.igate_object) > 3)
     {
-        sprintf(call, "%s", config.igate_object);
+        snprintf(call, sizeof(call), "%s", config.igate_object);
     }
     else
     {
         if (config.igate_ssid == 0)
-            sprintf(call, "%s", config.igate_mycall);
+            snprintf(call, sizeof(call), "%s", config.igate_mycall);
         else
-            sprintf(call, "%s-%d", config.igate_mycall, config.igate_ssid);
+            snprintf(call, sizeof(call), "%s-%d", config.igate_mycall, config.igate_ssid);
     }
     i = strlen(call);
     for (; i < 9; i++)
@@ -7728,13 +7729,13 @@ void sendTelemetry_igate(char *raw, int dly_ms)
         if (config.igate_path < 5)
         {
             if (config.igate_path > 0)
-                sprintf(str, "%s>APE32L-%d::%s:%s ", config.igate_mycall, config.igate_path, call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L-%d::%s:%s ", config.igate_mycall, config.igate_path, call, raw);
             else
-                sprintf(str, "%s>APE32L::%s:%s ", config.igate_mycall, call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L::%s:%s ", config.igate_mycall, call, raw);
         }
         else
         {
-            sprintf(str, "%s>APE32L,%s::%s:%s ", config.igate_mycall, getPath(config.igate_path).c_str(), call, raw);
+            snprintf(str, sizeof(str), "%s>APE32L,%s::%s:%s ", config.igate_mycall, getPath(config.igate_path).c_str(), call, raw);
         }
     }
     else
@@ -7742,13 +7743,13 @@ void sendTelemetry_igate(char *raw, int dly_ms)
         if (config.igate_path < 5)
         {
             if (config.igate_path > 0)
-                sprintf(str, "%s-%d>APE32L-%d::%s:%s ", config.igate_mycall, config.igate_ssid, config.igate_path, call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L-%d::%s:%s ", config.igate_mycall, config.igate_ssid, config.igate_path, call, raw);
             else
-                sprintf(str, "%s-%d>APE32L::%s:%s ", config.igate_mycall, config.igate_ssid, call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L::%s:%s ", config.igate_mycall, config.igate_ssid, call, raw);
         }
         else
         {
-            sprintf(str, "%s-%d>APE32L,%s::%s:%s ", config.igate_mycall, config.igate_ssid, getPath(config.igate_path).c_str(), call, raw);
+            snprintf(str, sizeof(str), "%s-%d>APE32L,%s::%s:%s ", config.igate_mycall, config.igate_ssid, getPath(config.igate_path).c_str(), call, raw);
         }
     }
 
@@ -7781,9 +7782,9 @@ void sendTelemetry_digi(char *raw, int dly_ms)
     memset(&call[0], 0, 11);
 
     if (config.digi_ssid == 0)
-        sprintf(call, "%s", config.digi_mycall);
+        snprintf(call, sizeof(call), "%s", config.digi_mycall);
     else
-        sprintf(call, "%s-%d", config.digi_mycall, config.digi_ssid);
+        snprintf(call, sizeof(call), "%s-%d", config.digi_mycall, config.digi_ssid);
     i = strlen(call);
     for (; i < 9; i++)
         call[i] = 0x20;
@@ -7793,13 +7794,13 @@ void sendTelemetry_digi(char *raw, int dly_ms)
         if (config.digi_path < 5)
         {
             if (config.digi_path > 0)
-                sprintf(str, "%s>APE32L-%d::%s:%s ", config.digi_mycall, config.digi_path, call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L-%d::%s:%s ", config.digi_mycall, config.digi_path, call, raw);
             else
-                sprintf(str, "%s>APE32L::%s:%s ", config.digi_mycall, call, raw);
+                snprintf(str, sizeof(str), "%s>APE32L::%s:%s ", config.digi_mycall, call, raw);
         }
         else
         {
-            sprintf(str, "%s>APE32L,%s::%s:%s ", config.digi_mycall, getPath(config.digi_path).c_str(), call, raw);
+            snprintf(str, sizeof(str), "%s>APE32L,%s::%s:%s ", config.digi_mycall, getPath(config.digi_path).c_str(), call, raw);
         }
     }
     else
@@ -7807,13 +7808,13 @@ void sendTelemetry_digi(char *raw, int dly_ms)
         if (config.digi_path < 5)
         {
             if (config.digi_path > 0)
-                sprintf(str, "%s-%d>APE32L-%d::%s:%s ", config.digi_mycall, config.digi_ssid, config.digi_path, call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L-%d::%s:%s ", config.digi_mycall, config.digi_ssid, config.digi_path, call, raw);
             else
-                sprintf(str, "%s-%d>APE32L::%s:%s ", config.digi_mycall, config.digi_ssid, call, raw);
+                snprintf(str, sizeof(str), "%s-%d>APE32L::%s:%s ", config.digi_mycall, config.digi_ssid, call, raw);
         }
         else
         {
-            sprintf(str, "%s-%d>APE32L,%s::%s:%s ", config.digi_mycall, config.digi_ssid, getPath(config.digi_path).c_str(), call, raw);
+            snprintf(str, sizeof(str), "%s-%d>APE32L,%s::%s:%s ", config.digi_mycall, config.digi_ssid, getPath(config.digi_path).c_str(), call, raw);
         }
     }
 
@@ -9312,9 +9313,9 @@ void taskAPRS(void *pvParameters)
             {
                 char call[11];
                 if (incomingPacket.src.ssid > 0)
-                    sprintf(call, "%s-%d", incomingPacket.src.call, incomingPacket.src.ssid);
+                    snprintf(call, sizeof(call), "%s-%d", incomingPacket.src.call, incomingPacket.src.ssid);
                 else
-                    sprintf(call, "%s", incomingPacket.src.call);
+                    snprintf(call, sizeof(call), "%s", incomingPacket.src.call);
 
                 char *rawP = (char *)calloc(tnc2.length() + 1, sizeof(char));
                 if (rawP)
@@ -11245,16 +11246,27 @@ void dispWindow(String line, uint8_t mode, bool filter)
         // powerWakeup();
         String src_call = line.substring(0, start_val);
         memset(&aprs, 0, sizeof(pbuf_t));
-        aprs.buf_len = 300;
-        aprs.packet_len = line.length();
-        memcpy(aprs.data, line.c_str(), line.length());
+        aprs.buf_len = sizeof(aprs.data);
+        size_t copy_len = line.length();
+        if (copy_len > sizeof(aprs.data) - 1)
+            copy_len = sizeof(aprs.data) - 1;
+        aprs.packet_len = (int)copy_len;
+        memcpy(aprs.data, line.c_str(), copy_len);
+        aprs.data[copy_len] = '\0';
         // line.toCharArray(&aprs.data[0], aprs.packet_len);
         int start_info = line.indexOf(":", 0);
         int end_ssid = line.indexOf(",", start_val);
         int start_dst = line.indexOf(">", 2);
         int start_dstssid = line.indexOf("-", start_dst);
-        if ((end_ssid < 0) || (end_ssid > start_info))
+        // Keep every parse offset inside aprs.data even for malformed input
+        if (start_info < 0 || start_info >= (int)copy_len)
+            start_info = (int)copy_len - 1;
+        if (start_dst < 0 || start_dst >= start_info)
+            start_dst = 0;
+        if ((end_ssid < 0) || (end_ssid > start_info) || (end_ssid >= (int)copy_len))
             end_ssid = start_info;
+        if (start_dstssid >= (int)copy_len)
+            start_dstssid = -1;
         if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
         {
             aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
@@ -11265,7 +11277,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
         }
         aprs.info_start = &aprs.data[start_info + 1];
         aprs.dstname = &aprs.data[start_dst + 1];
-        aprs.dstname_len = end_ssid - start_dst;
+        aprs.dstname_len = (end_ssid > start_dst) ? (end_ssid - start_dst) : 0;
         aprs.dstcall_end = &aprs.data[end_ssid];
         aprs.srccall_end = &aprs.data[start_dst];
 
@@ -11479,7 +11491,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 if (idx > -1)
                 {
                     Telemetry[idx].time = now();
-                    strcpy(Telemetry[idx].callsign, (char *)src_call.c_str());
+                    strlcpy(Telemetry[idx].callsign, src_call.c_str(), sizeof(Telemetry[idx].callsign));
 
                     // for (int i = 0; i < 3; i++) Telemetry[idx].UNIT[i][5] = 0;
                     if (aprs.flags & F_UNIT)
@@ -12037,7 +12049,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 if (idx > -1)
                 {
                     Telemetry[idx].time = now();
-                    strcpy(Telemetry[idx].callsign, (char *)src_call.c_str());
+                    strlcpy(Telemetry[idx].callsign, src_call.c_str(), sizeof(Telemetry[idx].callsign));
 
                     // for (int i = 0; i < 3; i++) Telemetry[idx].UNIT[i][5] = 0;
                     if (aprs.flags & F_UNIT)
@@ -12618,7 +12630,7 @@ void dispWindow(String line, uint8_t mode, bool filter)
                 if (idx > -1)
                 {
                     Telemetry[idx].time = now();
-                    strcpy(Telemetry[idx].callsign, (char *)src_call.c_str());
+                    strlcpy(Telemetry[idx].callsign, src_call.c_str(), sizeof(Telemetry[idx].callsign));
 
                     // for (int i = 0; i < 3; i++) Telemetry[idx].UNIT[i][5] = 0;
                     if (aprs.flags & F_UNIT)

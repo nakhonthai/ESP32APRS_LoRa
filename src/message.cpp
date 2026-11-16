@@ -385,9 +385,12 @@ void sendAPRSMessage(const String &toCall, const String &message, bool encrypt)
         return;
     // ฟอร์แมต: FROM>APRS,TCPIP*::TOCALL   :MESSAGE
     char toCallFixed[10];
-    memset(toCallFixed, 0x20, 10);
-    memcpy(toCallFixed, toCall.c_str(), toCall.length());
-    toCallFixed[9] = 0;
+    memset(toCallFixed, 0x20, sizeof(toCallFixed));
+    size_t toCallLen = toCall.length();
+    if (toCallLen > sizeof(toCallFixed) - 1)
+        toCallLen = sizeof(toCallFixed) - 1;
+    memcpy(toCallFixed, toCall.c_str(), toCallLen);
+    toCallFixed[sizeof(toCallFixed) - 1] = 0;
     // snprintf(toCallFixed, sizeof(toCallFixed), "%-9s", toCall.c_str()); // 9 char padded
 
     String encrypted = "";
@@ -485,9 +488,12 @@ void sendAPRSAck(const String &toCall, const String &msgNo)
 {
     // ฟอร์แมต ACK: :TOCALL   :ackNN
     char toCallFixed[10];
-    memset(toCallFixed, 0x20, 10);
-    memcpy(toCallFixed, toCall.c_str(), toCall.length());
-    toCallFixed[9] = 0;
+    memset(toCallFixed, 0x20, sizeof(toCallFixed));
+    size_t toCallLen = toCall.length();
+    if (toCallLen > sizeof(toCallFixed) - 1)
+        toCallLen = sizeof(toCallFixed) - 1;
+    memcpy(toCallFixed, toCall.c_str(), toCallLen);
+    toCallFixed[sizeof(toCallFixed) - 1] = 0;
     // snprintf(toCallFixed, sizeof(toCallFixed), "%-9s", toCall.c_str());
     String path = "";
     if (config.msg_path < 5)

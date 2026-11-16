@@ -203,7 +203,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	}
 
 	// Using dynamic memory allocation instead of String
-	char *webString = allocateStringMemory(12000); // Initial buffer size, adjust as needed
+	char *webString = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
 		return; // Memory allocation failed
@@ -513,7 +513,7 @@ void handle_dashboard(AsyncWebServerRequest *request)
 
 	char temp_buffer[200];
 	// Using dynamic memory allocation instead of String
-	char *webString = allocateStringMemory(4096); // Initial buffer size, adjust as needed
+	char *webString = allocateStringMemory(12288); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
 		return; // Memory allocation failed
@@ -835,7 +835,7 @@ void handle_sidebar(AsyncWebServerRequest *request)
 	}
 
 	// Using dynamic memory allocation instead of String
-	char *html = allocateStringMemory(4096); // Initial buffer size, adjust as needed
+	char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
 	if (!html)
 	{
 		return; // Memory allocation failed
@@ -1089,7 +1089,7 @@ void handle_symbol(AsyncWebServerRequest *request)
 void handle_sysinfo(AsyncWebServerRequest *request)
 {
 	// Using dynamic memory allocation instead of String
-	char *html = allocateStringMemory(1024); // Initial buffer size, adjust as needed
+	char *html = allocateStringMemory(4096); // Initial buffer size, adjust as needed
 	if (!html)
 	{
 		return; // Memory allocation failed
@@ -1239,19 +1239,25 @@ void event_lastHeard(bool gethtml)
 			// 	continue;
 
 			int packet = pkg.pkg;
+			if (pkg.raw == NULL || pkg.length == 0)
+				continue;
 			char *pos_gt = strchr(pkg.raw, '>'); // Find first position of '>'
 			int start_val = pos_gt ? (pos_gt - pkg.raw) : -1;
-			if (start_val > 3)
+			char src_call[11] = "";
+			if (start_val > 3 && start_val < (int)sizeof(src_call) - 1)
 			{
 				// Extract src_call substring
-				char src_call[11];
-				strncpy(src_call, pkg.raw, start_val);
+				memcpy(src_call, pkg.raw, start_val);
 				src_call[start_val] = '\0';
 
 				memset(&aprs, 0, sizeof(pbuf_t));
-				aprs.buf_len = 300;
-				aprs.packet_len = pkg.length;
-				strncpy((char *)aprs.data, pkg.raw, aprs.packet_len < sizeof(aprs.data) ? aprs.packet_len : sizeof(aprs.data) - 1);
+				aprs.buf_len = sizeof(aprs.data);
+				size_t copy_len = pkg.length;
+				if (copy_len > sizeof(aprs.data) - 1)
+					copy_len = sizeof(aprs.data) - 1;
+				aprs.packet_len = (int)copy_len;
+				memcpy(aprs.data, pkg.raw, copy_len);
+				aprs.data[copy_len] = '\0';
 
 				char *pos_colon = strchr(pkg.raw, ':');
 				char *pos_comma = strchr(pkg.raw, ',');
@@ -1263,16 +1269,26 @@ void event_lastHeard(bool gethtml)
 				int start_dst = pos_gt2 ? (pos_gt2 - pkg.raw) : -1;
 				int start_dstssid = pos_dash ? (pos_dash - pkg.raw) : -1;
 
+				// Reject malformed packets instead of indexing outside aprs.data
+				if (start_dst <= 0 || start_info <= start_dst || start_info >= (int)copy_len ||
+					(end_ssid > 0 && end_ssid >= (int)copy_len) ||
+					(start_dstssid >= (int)copy_len))
+					continue;
+
 				char path[256] = "";
 
-				if ((end_ssid > start_dst) && (end_ssid < start_info) && (end_ssid < (int)strlen(pkg.raw)))
+				if ((end_ssid > start_dst) && (end_ssid < start_info))
 				{
 					int path_len = start_info - end_ssid - 1;
-					strncpy(path, pkg.raw + end_ssid + 1, path_len);
+					if (path_len > (int)sizeof(path) - 1)
+						path_len = (int)sizeof(path) - 1;
+					memcpy(path, pkg.raw + end_ssid + 1, path_len);
 					path[path_len] = '\0';
 				}
 				if (end_ssid < 5)
 					end_ssid = start_info;
+				if (end_ssid < start_dst)
+					continue;
 				if ((start_dstssid > start_dst) && (start_dstssid < start_dst + 10))
 				{
 					aprs.dstcall_end_or_ssid = &aprs.data[start_dstssid];
@@ -1499,7 +1515,7 @@ String event_chatMessage(bool gethtml)
 	struct tm tmstruct, tmNow;
 
 	// Using dynamic memory allocation instead of String
-	char *html = allocateStringMemory(4096); // Initial buffer size, adjust as needed
+	char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
 	if (!html)
 	{
 		return String(""); // Memory allocation failed
@@ -1547,7 +1563,7 @@ String event_chatMessage(bool gethtml)
 		{
 			// String line = String(pkg.text); // Not needed anymore
 
-			pkg.callsign[10] = 0;
+			pkg.callsign[sizeof(pkg.callsign) - 1] = 0;
 			// time_t tm = pkg.time;
 			localtime_r(&pkg.time, &tmstruct);
 			char strTime[10];
@@ -1787,7 +1803,7 @@ void handle_storage(AsyncWebServerRequest *request)
 	}
 
 	// Using dynamic memory allocation instead of String
-	char *webString = allocateStringMemory(8192); // Initial buffer size, adjust as needed
+	char *webString = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
 		return; // Memory allocation failed
@@ -1914,6 +1930,8 @@ void handle_storage(AsyncWebServerRequest *request)
 			strcat(webString, "<table border=\"1\"><tr align=\"center\" bgcolor=\"#0ADD9C\"><th width=\"100\"><b>SD DIRECTORY</b></th><th><b>SD FILE NAME</b></th><th width=\"100\"><b>SIZE(Byte)</b></th><th width=\"170\"><b>DATE TIME</b></th><th width=\"50\"><b>DELETE</b></th><th width=\"100\"><b>DOWNLOAD</b></th></tr>");
 			while (sdFile)
 			{
+				if (strlen(webString) > 15000)
+					break;
 				const char *fName = sdFile.name();
 				if (sdFile.isDirectory())
 				{
@@ -1953,6 +1971,8 @@ void handle_storage(AsyncWebServerRequest *request)
 	strcat(webString, "<table border=\"1\"><tr align=\"center\" bgcolor=\"#03DDFC\"><th width=\"100\"><b>DIRECTORY</b></th><th><b>FILE NAME</b></th><th width=\"100\"><b>SIZE(Byte)</b></th><th width=\"170\"><b>DATE TIME</b></th><th width=\"50\"><b>DELETE</b></th><th width=\"100\"><b>DOWNLOAD</b></th></tr>");
 	while (file)
 	{
+		if (strlen(webString) > 15000)
+			break;
 		if (file.isDirectory())
 		{
 			// webString += "<tr><td>DIR : ");
@@ -2235,15 +2255,6 @@ void handle_radio(AsyncWebServerRequest *request)
 					if (String(request->arg(i)) == "OK")
 					{
 						rxBoost = true;
-					}
-				}
-			}
-			{
-				if (request->arg(i) != "")
-				{
-					if (String(request->arg(i)) == "OK")
-					{
-						radioEnable = true;
 					}
 				}
 			}
@@ -3413,7 +3424,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_public_key, request->arg(i).c_str());
+					strlcpy(config.wg_public_key, request->arg(i).c_str(), sizeof(config.wg_public_key));
 					config.wg_public_key[44] = 0;
 				}
 			}
@@ -3422,7 +3433,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_private_key, request->arg(i).c_str());
+					strlcpy(config.wg_private_key, request->arg(i).c_str(), sizeof(config.wg_private_key));
 					config.wg_private_key[44] = 0;
 				}
 			}
@@ -3431,7 +3442,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_peer_address, request->arg(i).c_str());
+					strlcpy(config.wg_peer_address, request->arg(i).c_str(), sizeof(config.wg_peer_address));
 				}
 			}
 
@@ -3439,7 +3450,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_local_address, request->arg(i).c_str());
+					strlcpy(config.wg_local_address, request->arg(i).c_str(), sizeof(config.wg_local_address));
 				}
 			}
 
@@ -3447,7 +3458,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_netmask_address, request->arg(i).c_str());
+					strlcpy(config.wg_netmask_address, request->arg(i).c_str(), sizeof(config.wg_netmask_address));
 				}
 			}
 
@@ -3455,7 +3466,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wg_gw_address, request->arg(i).c_str());
+					strlcpy(config.wg_gw_address, request->arg(i).c_str(), sizeof(config.wg_gw_address));
 				}
 			}
 		}
@@ -3466,7 +3477,7 @@ void handle_vpn(AsyncWebServerRequest *request)
 	else
 	{
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 		if (!html)
 		{
 			return; // Memory allocation failed
@@ -3691,7 +3702,7 @@ void handle_mqtt(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.mqtt_host, request->arg(i).c_str());
+					strlcpy(config.mqtt_host, request->arg(i).c_str(), sizeof(config.mqtt_host));
 				}
 			}
 			if (request->argName(i) == "port")
@@ -3705,28 +3716,28 @@ void handle_mqtt(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.mqtt_user, request->arg(i).c_str());
+					strlcpy(config.mqtt_user, request->arg(i).c_str(), sizeof(config.mqtt_user));
 				}
 			}
 			if (request->argName(i) == "pass")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.mqtt_pass, request->arg(i).c_str());
+					strlcpy(config.mqtt_pass, request->arg(i).c_str(), sizeof(config.mqtt_pass));
 				}
 			}
 			if (request->argName(i) == "topic")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.mqtt_topic, request->arg(i).c_str());
+					strlcpy(config.mqtt_topic, request->arg(i).c_str(), sizeof(config.mqtt_topic));
 				}
 			}
 			if (request->argName(i) == "subscribe")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.mqtt_subscribe, request->arg(i).c_str());
+					strlcpy(config.mqtt_subscribe, request->arg(i).c_str(), sizeof(config.mqtt_subscribe));
 				}
 			}
 
@@ -3819,7 +3830,7 @@ void handle_mqtt(AsyncWebServerRequest *request)
 	else
 	{
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 		if (!html)
 		{
 			return; // Memory allocation failed
@@ -4122,7 +4133,7 @@ void handle_msg(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.msg_mycall, request->arg(i).c_str());
+					strlcpy(config.msg_mycall, request->arg(i).c_str(), sizeof(config.msg_mycall));
 					config.msg_mycall[9] = 0;
 				}
 			}
@@ -4131,7 +4142,7 @@ void handle_msg(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.msg_key, request->arg(i).c_str());
+					strlcpy(config.msg_key, request->arg(i).c_str(), sizeof(config.msg_key));
 					config.msg_key[32] = 0;
 				}
 			}
@@ -4184,7 +4195,7 @@ void handle_msg(AsyncWebServerRequest *request)
 	else
 	{
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 		if (!html)
 		{
 			return; // Memory allocation failed
@@ -4411,7 +4422,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.gnss_at_command, request->arg(i).c_str());
+					strlcpy(config.gnss_at_command, request->arg(i).c_str(), sizeof(config.gnss_at_command));
 				}
 				else
 				{
@@ -4423,7 +4434,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.gnss_tcp_host, request->arg(i).c_str());
+					strlcpy(config.gnss_tcp_host, request->arg(i).c_str(), sizeof(config.gnss_tcp_host));
 				}
 			}
 
@@ -5071,7 +5082,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.ppp_apn, request->arg(i).c_str());
+					strlcpy(config.ppp_apn, request->arg(i).c_str(), sizeof(config.ppp_apn));
 				}
 			}
 
@@ -5079,7 +5090,7 @@ void handle_mod(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.ppp_pin, request->arg(i).c_str());
+					strlcpy(config.ppp_pin, request->arg(i).c_str(), sizeof(config.ppp_pin));
 				}
 			}
 
@@ -5170,7 +5181,7 @@ void handle_mod(AsyncWebServerRequest *request)
 	{
 		// Allocate memory for the HTML string
 		char temp_buffer[300];
-		char *html = allocateStringMemory(22000); // Start with 8KB, adjust as needed
+		char *html = allocateStringMemory(32768); // Start with 8KB, adjust as needed
 		if (html == NULL)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -6258,7 +6269,7 @@ void handle_system(AsyncWebServerRequest *request)
 				if (request->arg(i) != "")
 				{
 					// Serial.println("WEB Config NTP");
-					strcpy(config.ntp_host, request->arg(i).c_str());
+					strlcpy(config.ntp_host, request->arg(i).c_str(), sizeof(config.ntp_host));
 					configTime(3600 * config.timeZone, 0, config.ntp_host);
 				}
 				break;
@@ -6365,14 +6376,14 @@ void handle_system(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.http_username, request->arg(i).c_str());
+					strlcpy(config.http_username, request->arg(i).c_str(), sizeof(config.http_username));
 				}
 			}
 			if (request->argName(i) == "webauth_pass")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.http_password, request->arg(i).c_str());
+					strlcpy(config.http_password, request->arg(i).c_str(), sizeof(config.http_password));
 				}
 			}
 		}
@@ -6386,28 +6397,28 @@ void handle_system(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.path[0], request->arg(i).c_str());
+					strlcpy(config.path[0], request->arg(i).c_str(), sizeof(config.path[0]));
 				}
 			}
 			if (request->argName(i) == "path2")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.path[1], request->arg(i).c_str());
+					strlcpy(config.path[1], request->arg(i).c_str(), sizeof(config.path[1]));
 				}
 			}
 			if (request->argName(i) == "path3")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.path[2], request->arg(i).c_str());
+					strlcpy(config.path[2], request->arg(i).c_str(), sizeof(config.path[2]));
 				}
 			}
 			if (request->argName(i) == "path4")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.path[3], request->arg(i).c_str());
+					strlcpy(config.path[3], request->arg(i).c_str(), sizeof(config.path[3]));
 				}
 			}
 		}
@@ -6828,7 +6839,7 @@ void handle_system(AsyncWebServerRequest *request)
 		sprintf(strTime, "%d-%02d-%02d %02d:%02d:%02d", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
 
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(20000); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(32768); // Initial buffer size, adjust as needed
 		if (!html)
 		{
 			return; // Memory allocation failed
@@ -7587,7 +7598,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_host, request->arg(i).c_str());
+					strlcpy(config.igate_host, request->arg(i).c_str(), sizeof(config.igate_host));
 				}
 			}
 			if (request->argName(i) == "aprsPort")
@@ -7602,7 +7613,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_filter, request->arg(i).c_str());
+					strlcpy(config.igate_filter, request->arg(i).c_str(), sizeof(config.igate_filter));
 				}
 			}
 			if (request->argName(i) == "igatePath")
@@ -7617,7 +7628,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_comment, request->arg(i).c_str());
+					strlcpy(config.igate_comment, request->arg(i).c_str(), sizeof(config.igate_comment));
 				}
 				else
 				{
@@ -7628,7 +7639,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_status, request->arg(i).c_str());
+					strlcpy(config.igate_status, request->arg(i).c_str(), sizeof(config.igate_status));
 				}
 				else
 				{
@@ -7639,7 +7650,7 @@ void handle_igate(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.igate_phg, request->arg(i).c_str());
+					strlcpy(config.igate_phg, request->arg(i).c_str(), sizeof(config.igate_phg));
 				}
 			}
 
@@ -7714,7 +7725,7 @@ void handle_igate(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.igate_tlm_PARM[x], request->arg(i).c_str());
+						strlcpy(config.igate_tlm_PARM[x], request->arg(i).c_str(), sizeof(config.igate_tlm_PARM[x]));
 					}
 				}
 				arg = "unit" + String(x);
@@ -7722,7 +7733,7 @@ void handle_igate(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.igate_tlm_UNIT[x], request->arg(i).c_str());
+						strlcpy(config.igate_tlm_UNIT[x], request->arg(i).c_str(), sizeof(config.igate_tlm_UNIT[x]));
 					}
 				}
 				arg = "precision" + String(x);
@@ -7963,7 +7974,7 @@ void handle_igate(AsyncWebServerRequest *request)
 	{
 		// Allocate initial memory for HTML content
 		char tempHtml[500];						  // Temporary buffer for small HTML snippets
-		char *html = allocateStringMemory(25000); // Start with 8KB buffer
+		char *html = allocateStringMemory(32768); // Start with 8KB buffer
 		if (!html)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -8631,7 +8642,7 @@ void handle_digi(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_comment, request->arg(i).c_str());
+					strlcpy(config.digi_comment, request->arg(i).c_str(), sizeof(config.digi_comment));
 				}
 				else
 				{
@@ -8642,14 +8653,14 @@ void handle_digi(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_phg, request->arg(i).c_str());
+					strlcpy(config.digi_phg, request->arg(i).c_str(), sizeof(config.digi_phg));
 				}
 			}
 			if (request->argName(i) == "digiStatus")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.digi_status, request->arg(i).c_str());
+					strlcpy(config.digi_status, request->arg(i).c_str(), sizeof(config.digi_status));
 				}
 			}
 			if (request->argName(i) == "digiPos2RF")
@@ -8796,7 +8807,7 @@ void handle_digi(AsyncWebServerRequest *request)
 						{
 							if (request->arg(i) != "")
 							{
-								strcpy(config.digi_tlm_PARM[x], request->arg(i).c_str());
+								strlcpy(config.digi_tlm_PARM[x], request->arg(i).c_str(), sizeof(config.digi_tlm_PARM[x]));
 							}
 						}
 						free(arg);
@@ -8811,7 +8822,7 @@ void handle_digi(AsyncWebServerRequest *request)
 						{
 							if (request->arg(i) != "")
 							{
-								strcpy(config.digi_tlm_UNIT[x], request->arg(i).c_str());
+								strlcpy(config.digi_tlm_UNIT[x], request->arg(i).c_str(), sizeof(config.digi_tlm_UNIT[x]));
 							}
 						}
 						free(arg);
@@ -8875,7 +8886,7 @@ void handle_digi(AsyncWebServerRequest *request)
 	else
 	{
 		// Allocate initial memory for HTML content
-		char *html = allocateStringMemory(20000); // Start with 12KB buffer
+		char *html = allocateStringMemory(32768); // Start with 12KB buffer
 		if (!html)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -9414,7 +9425,7 @@ void handle_wx(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wx_comment, request->arg(i).c_str());
+					strlcpy(config.wx_comment, request->arg(i).c_str(), sizeof(config.wx_comment));
 				}
 				else
 				{
@@ -9499,7 +9510,7 @@ void handle_wx(AsyncWebServerRequest *request)
 	{
 		// Allocate initial memory for HTML content
 		char tempHtml[300];
-		char *html = allocateStringMemory(26000); // Start with 8KB buffer
+		char *html = allocateStringMemory(32768); // Start with 8KB buffer
 		if (!html)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -9821,7 +9832,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.tlm0_comment, request->arg(i).c_str());
+					strlcpy(config.tlm0_comment, request->arg(i).c_str(), sizeof(config.tlm0_comment));
 				}
 				else
 				{
@@ -9857,7 +9868,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.tlm0_PARM[x], request->arg(i).c_str());
+						strlcpy(config.tlm0_PARM[x], request->arg(i).c_str(), sizeof(config.tlm0_PARM[x]));
 					}
 				}
 				arg = "unit" + String(x);
@@ -9865,7 +9876,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.tlm0_UNIT[x], request->arg(i).c_str());
+						strlcpy(config.tlm0_UNIT[x], request->arg(i).c_str(), sizeof(config.tlm0_UNIT[x]));
 					}
 				}
 				if (x < 5)
@@ -9923,7 +9934,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 	{
 		char temp_buf[512];
 		// Allocate initial memory for HTML content
-		char *html = allocateStringMemory(18000); // Start with 8KB buffer
+		char *html = allocateStringMemory(24576); // Start with 8KB buffer
 		if (!html)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -10222,7 +10233,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.sensor[x].parm, request->arg(i).c_str());
+						strlcpy(config.sensor[x].parm, request->arg(i).c_str(), sizeof(config.sensor[x].parm));
 					}
 				}
 				arg = "unit" + String(x);
@@ -10230,7 +10241,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.sensor[x].unit, request->arg(i).c_str());
+						strlcpy(config.sensor[x].unit, request->arg(i).c_str(), sizeof(config.sensor[x].unit));
 					}
 				}
 				for (int y = 0; y < 3; y++)
@@ -10265,7 +10276,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 	{
 		// Allocate initial memory for HTML content
 		char temp_buffer[512];
-		char *html = allocateStringMemory(25000); // Start with 8KB buffer
+		char *html = allocateStringMemory(32768); // Start with 8KB buffer
 		if (!html)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -10884,7 +10895,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.trk_comment, request->arg(i).c_str());
+					strlcpy(config.trk_comment, request->arg(i).c_str(), sizeof(config.trk_comment));
 				}
 				else
 				{
@@ -10895,7 +10906,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.trk_status, request->arg(i).c_str());
+					strlcpy(config.trk_status, request->arg(i).c_str(), sizeof(config.trk_status));
 				}
 				else
 				{
@@ -10949,7 +10960,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.trk_tlm_PARM[x], request->arg(i).c_str());
+						strlcpy(config.trk_tlm_PARM[x], request->arg(i).c_str(), sizeof(config.trk_tlm_PARM[x]));
 					}
 				}
 				arg = "unit" + String(x);
@@ -10957,7 +10968,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.trk_tlm_UNIT[x], request->arg(i).c_str());
+						strlcpy(config.trk_tlm_UNIT[x], request->arg(i).c_str(), sizeof(config.trk_tlm_UNIT[x]));
 					}
 				}
 				arg = "precision" + String(x);
@@ -11005,7 +11016,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 
 	// Allocate initial memory for HTML content
 	char tempHtml[500];
-	char *html = allocateStringMemory(22000); // Start with 8KB buffer
+	char *html = allocateStringMemory(32768); // Start with 8KB buffer
 	if (!html)
 	{
 		request->send(500, "text/html", "Memory allocation failed");
@@ -11450,14 +11461,14 @@ void handle_wireless(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wifi_ap_ssid, request->arg(i).c_str());
+					strlcpy(config.wifi_ap_ssid, request->arg(i).c_str(), sizeof(config.wifi_ap_ssid));
 				}
 			}
 			if (request->argName(i) == "wifi_passAP")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.wifi_ap_pass, request->arg(i).c_str());
+					strlcpy(config.wifi_ap_pass, request->arg(i).c_str(), sizeof(config.wifi_ap_pass));
 				}
 			}
 		}
@@ -11507,7 +11518,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.wifi_sta[n].wifi_ssid, request->arg(i).c_str());
+						strlcpy(config.wifi_sta[n].wifi_ssid, request->arg(i).c_str(), sizeof(config.wifi_sta[n].wifi_ssid));
 					}
 				}
 				String namePASS = "wifi_pass" + String(n);
@@ -11515,7 +11526,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 				{
 					if (request->arg(i) != "")
 					{
-						strcpy(config.wifi_sta[n].wifi_pass, request->arg(i).c_str());
+						strlcpy(config.wifi_sta[n].wifi_pass, request->arg(i).c_str(), sizeof(config.wifi_sta[n].wifi_pass));
 					}
 				}
 			}
@@ -11563,7 +11574,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.bt_name, request->arg(i).c_str());
+					strlcpy(config.bt_name, request->arg(i).c_str(), sizeof(config.bt_name));
 				}
 			}
 			#if !defined(CONFIG_IDF_TARGET_ESP32)
@@ -11571,21 +11582,21 @@ void handle_wireless(AsyncWebServerRequest *request)
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.bt_uuid, request->arg(i).c_str());
+					strlcpy(config.bt_uuid, request->arg(i).c_str(), sizeof(config.bt_uuid));
 				}
 			}
 			if (request->argName(i) == "bt_uuid_rx")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.bt_uuid_rx, request->arg(i).c_str());
+					strlcpy(config.bt_uuid_rx, request->arg(i).c_str(), sizeof(config.bt_uuid_rx));
 				}
 			}
 			if (request->argName(i) == "bt_uuid_tx")
 			{
 				if (request->arg(i) != "")
 				{
-					strcpy(config.bt_uuid_tx, request->arg(i).c_str());
+					strlcpy(config.bt_uuid_tx, request->arg(i).c_str(), sizeof(config.bt_uuid_tx));
 				}
 			}
 			#endif
@@ -11614,7 +11625,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 	{
 		// Allocate initial memory for HTML content
 		char tempHtml[256];
-		char *html = allocateStringMemory(12000); // Start with 12KB buffer
+		char *html = allocateStringMemory(16384); // Start with 12KB buffer
 		if (!html)
 		{
 			request->send(500, "text/html", "Memory allocation failed");
@@ -11877,7 +11888,7 @@ void handle_realtime(AsyncWebServerRequest *request)
 		jsonMsg = (char *)calloc((input_length * 2) + 100, sizeof(char));
 		char *input_buffer = (char *)calloc(input_length + 2, sizeof(char));
 		char *output_buffer = (char *)calloc(input_length * 2, sizeof(char));
-		if (output_buffer)
+		if (jsonMsg && input_buffer && output_buffer)
 		{
 			// lastPkgRaw.toCharArray(input_buffer, lastPkgRaw.length(), 0);
 			memcpy(input_buffer, lastPkgRaw.c_str(), lastPkgRaw.length());
@@ -11886,19 +11897,27 @@ void handle_realtime(AsyncWebServerRequest *request)
 			// Serial.println(output_buffer);
 			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, output_buffer, timeStamp);
 			// Serial.println(jsonMsg);
-			free(input_buffer);
-			free(output_buffer);
 		}
+		free(input_buffer);
+		free(output_buffer);
 	}
 	else
 	{
 		jsonMsg = (char *)calloc(200, sizeof(char));
-		if (afskSync)
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
-		else
-			sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+		if (jsonMsg)
+		{
+			if (afskSync)
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
+			else
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+		}
 	}
 	afskSync = false;
+	if (jsonMsg == NULL)
+	{
+		request->send(500, "text/plain", "Out of memory");
+		return;
+	}
 	request->send(200, "text/html", String(jsonMsg));
 
 	delay(100);
@@ -11918,7 +11937,7 @@ void handle_ws()
 		jsonMsg = (char *)calloc((input_length * 2) + 100, sizeof(char));
 		char *input_buffer = (char *)calloc(input_length + 2, sizeof(char));
 		char *output_buffer = (char *)calloc(input_length * 2, sizeof(char));
-		if (output_buffer)
+		if (jsonMsg && input_buffer && output_buffer)
 		{
 			memset(input_buffer, 0, (input_length + 2));
 			memset(output_buffer, 0, (input_length * 2));
@@ -11929,21 +11948,27 @@ void handle_ws()
 			// Serial.println(output_buffer);
 			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, output_buffer, timeStamp);
 			// Serial.println(jsonMsg);
-			free(input_buffer);
-			free(output_buffer);
 		}
+		free(input_buffer);
+		free(output_buffer);
 	}
 	else
 	{
 		jsonMsg = (char *)calloc(200, sizeof(char));
-		if (afskSync)
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
-		else
-			sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+		if (jsonMsg)
+		{
+			if (afskSync)
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
+			else
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+		}
 	}
 	afskSync = false;
-	ws.textAll(jsonMsg);
-	free(jsonMsg);
+	if (jsonMsg != NULL)
+	{
+		ws.textAll(jsonMsg);
+		free(jsonMsg);
+	}
 }
 
 void handle_ws_gnss(char *nmea, size_t size)
@@ -11955,15 +11980,11 @@ void handle_ws_gnss(char *nmea, size_t size)
 	time(&timeStamp);
 
 	unsigned int output_length = encode_base64_length(size);
-	unsigned char nmea_enc[output_length];
-	// char jsonMsg[output_length + 200];
-	// encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
-	// sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), gps.time.value(), timeStamp, nmea_enc);
-	char jsonMsg[output_length + 100];
-	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
-	sprintf(jsonMsg, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), gps.time.value(), timeStamp);
-	strncat(jsonMsg, (const char *)nmea_enc, output_length);
-	strcat(jsonMsg, "\"}");
+	// encode_base64() always appends a NUL terminator
+	unsigned char nmea_enc[output_length + 1];
+	char jsonMsg[output_length + 256];
+	encode_base64((unsigned char *)nmea, size, nmea_enc);
+	snprintf(jsonMsg, sizeof(jsonMsg), "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), gps.time.value(), timeStamp, (const char *)nmea_enc);
 	ws_gnss.textAll(jsonMsg);
 }
 
@@ -12327,7 +12348,7 @@ void handle_about(AsyncWebServerRequest *request)
 	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
 	// Allocate memory for HTML content
-	char *webString = allocateStringMemory(16384); // Start with 16KB buffer
+	char *webString = allocateStringMemory(24576); // Start with 16KB buffer
 	if (!webString)
 	{
 		request->send(500, "text/html", "Memory allocation failed");
@@ -12793,7 +12814,7 @@ void handle_about(AsyncWebServerRequest *request)
 void handle_gnss(AsyncWebServerRequest *request)
 {
 	// Allocate initial memory for HTML content
-	char *webString = allocateStringMemory(8192); // Start with 8KB buffer
+	char *webString = allocateStringMemory(12288); // Start with 8KB buffer
 	if (!webString)
 	{
 		request->send(500, "text/html", "Memory allocation failed");

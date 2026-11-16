@@ -768,7 +768,8 @@ int ParseAPRS::parse_aprs_telem(struct pbuf_t *pb, const char *body, const char 
 		while (token != NULL)
 		{
 			// printf(" %s\n", token);
-			strcpy(pb->tlm_unit.val[i++], token);
+			strlcpy(pb->tlm_unit.val[i], token, sizeof(pb->tlm_unit.val[i]));
+			i++;
 			if (i >= 5)
 				break;
 			token = strtok(NULL, ",");
@@ -785,7 +786,8 @@ int ParseAPRS::parse_aprs_telem(struct pbuf_t *pb, const char *body, const char 
 		while (token != NULL)
 		{
 			// printf(" %s\n", token);
-			strcpy(pb->tlm_parm.val[i++], token);
+			strlcpy(pb->tlm_parm.val[i], token, sizeof(pb->tlm_parm.val[i]));
+			i++;
 			if (i >= 5)
 				break;
 			token = strtok(NULL, ",");
