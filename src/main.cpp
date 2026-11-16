@@ -5971,7 +5971,7 @@ String trk_gps_postion(String comment)
 
             // String compPosition = compress_position(nowLat, nowLng, gps.altitude.feet(), course, spdKnot, aprs_table, aprs_symbol, (gps.satellites.value() > 3));
             //  ESP_LOGE("GPS", "Compress=%s", aprs_position);
-            if ((strlen(config.trk_item) >= 3) || (config.trk_timestamp))
+            if ((strlen(config.trk_item) >= 3) || (config.trk_timestamp) || (config.trk_mice_type == 8))
             {
                 String compPosition = compress_position(nowLat, nowLng, gps.altitude.feet(), course, spdKnot, aprs_table, aprs_symbol, (gps.satellites.value() > 3));
                 char object[10];
@@ -5981,11 +5981,14 @@ String trk_gps_postion(String comment)
                 if (config.trk_timestamp)
                 {
                     String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, ";%s*%s%s", object, timeStamp.c_str(), compPosition.c_str());
+                    sprintf(rawTNC, ";%s*%s%s", object, timeStamp, compPosition.c_str());
                 }
-                else
+                else if(strlen(config.trk_item) >= 3)
                 {
                     sprintf(rawTNC, ")%s!%s", config.trk_item, compPosition.c_str());
+                }else
+                {
+                    sprintf(rawTNC, "!%s", compPosition.c_str());
                 }
             }
             else
@@ -6043,7 +6046,7 @@ String trk_gps_postion(String comment)
                 if (config.trk_timestamp)
                 {
                     String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
+                    sprintf(rawTNC, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", object, timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
                 }
                 else
                 {
@@ -6055,7 +6058,7 @@ String trk_gps_postion(String comment)
                 if (config.trk_timestamp)
                 {
                     String timeStamp = getTimeStamp();
-                    sprintf(rawTNC, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
+                    sprintf(rawTNC, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c%s", timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, aprs_table, lon_dd, lon_mm, lon_ss, lon_ew, aprs_symbol, csd_spd);
                 }
                 else
                 {
@@ -6086,9 +6089,9 @@ String trk_gps_postion(String comment)
     {
         memset(strtmp, 0, 300);
         if (config.trk_ssid == 0)
-            sprintf(strtmp, "%s>APE32L", config.trk_mycall);
+            sprintf(strtmp, "%s>APE32A", config.trk_mycall);
         else
-            sprintf(strtmp, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
+            sprintf(strtmp, "%s-%d>APE32A", config.trk_mycall, config.trk_ssid);
         tnc2Raw = String(strtmp);
         free(strtmp);
     }
@@ -6116,36 +6119,59 @@ String trk_fix_position(String comment)
     if (config.trk_compress)
     { // Compress DATA
 
-        String compPosition = compress_position(config.trk_lat, config.trk_lon, (int)(config.trk_alt * 3.28F), 0, 0, config.trk_symbol[0], config.trk_symbol[1], true);
+        //String compPosition = compress_position(config.trk_lat, config.trk_lon, (int)(config.trk_alt * 3.28F), 0, 0, config.trk_symbol[0], config.trk_symbol[1], true);
         // ESP_LOGE("GPS", "Compress=%s", aprs_position);
-        if (strlen(config.trk_item) >= 3)
-        {
-            char object[10];
-            memset(object, 0x20, 10);
-            memcpy(object, config.trk_item, strlen(config.trk_item));
-            object[9] = 0;
-            if (config.trk_timestamp)
+        if ((strlen(config.trk_item) >= 3) || (config.trk_timestamp) || (config.trk_mice_type == 8))
             {
-                String timeStamp = getTimeStamp();
-                sprintf(loc, ";%s*%s%s", object, timeStamp.c_str(), compPosition.c_str());
+                String compPosition = compress_position(config.trk_lat, config.trk_lon, (int)(config.trk_alt * 3.28F), 0, 0, config.trk_symbol[0], config.trk_symbol[1], true);
+                char object[10];
+                memset(object, 0x20, 10);
+                memcpy(object, config.trk_item, strlen(config.trk_item));
+                object[9] = 0;
+                if (config.trk_timestamp)
+                {
+                    String timeStamp = getTimeStamp();
+                    sprintf(loc, ";%s*%s%s", object, timeStamp, compPosition.c_str());
+                }
+                else if(strlen(config.trk_item) >= 3)
+                {
+                    sprintf(loc, ")%s!%s", config.trk_item, compPosition.c_str());
+                }else
+                {
+                    sprintf(loc, "!%s", compPosition.c_str());
+                }
             }
             else
             {
-                sprintf(loc, ")%s!%s", config.trk_item, compPosition.c_str());
+                char destCallsign[8];
+                String compPosition = compressMicE(destCallsign, config.trk_lat, config.trk_lon, 0, 0, config.trk_mice_type, NULL, 0, NULL, NULL, (int32_t)gps.altitude.meters(), config.trk_symbol[0], config.trk_symbol[1]);
+                String tnc2Raw = "";
+                char *strtmp = (char *)calloc(300, sizeof(char));
+                if (strtmp)
+                {
+                    memset(strtmp, 0, 300);
+                    if (config.trk_ssid == 0)
+                        sprintf(strtmp, "%s>%s", config.trk_mycall, destCallsign);
+                    else
+                        sprintf(strtmp, "%s-%d>%s", config.trk_mycall, config.trk_ssid, destCallsign);
+                    tnc2Raw = String(strtmp);
+                    free(strtmp);
+                }
+                if (config.trk_path < 5)
+                {
+                    if (config.trk_path > 0)
+                        tnc2Raw += "-" + String(config.trk_path);
+                }
+                else
+                {
+                    tnc2Raw += ",";
+                    tnc2Raw += getPath(config.trk_path);
+                }
+                tnc2Raw += ":";
+                tnc2Raw += String(compPosition);
+                tnc2Raw += comment + String(config.trk_comment);
+                return tnc2Raw;
             }
-        }
-        else
-        {
-            if (config.trk_timestamp)
-            {
-                String timeStamp = getTimeStamp();
-                sprintf(loc, "/%s%s", timeStamp.c_str(), compPosition.c_str());
-            }
-            else
-            {
-                sprintf(loc, "!%s", compPosition.c_str());
-            }
-        }
     }
     else
     {
@@ -6170,7 +6196,7 @@ String trk_fix_position(String comment)
             if (config.trk_timestamp)
             {
                 String timeStamp = getTimeStamp();
-                sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
+                sprintf(loc, ";%s*%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", object, timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
             }
             else
             {
@@ -6182,7 +6208,7 @@ String trk_fix_position(String comment)
             if (config.trk_timestamp)
             {
                 String timeStamp = getTimeStamp();
-                sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp.c_str(), lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
+                sprintf(loc, "/%s%02d%02d.%02d%c%c%03d%02d.%02d%c%c", timeStamp, lat_dd, lat_mm, lat_ss, lat_ns, config.trk_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.trk_symbol[1]);
             }
             else
             {
@@ -6204,9 +6230,9 @@ String trk_fix_position(String comment)
     {
         memset(strtmp, 0, 300);
         if (config.trk_ssid == 0)
-            sprintf(strtmp, "%s>APE32L", config.trk_mycall);
+            snprintf(strtmp, 300, "%s>APE32A", config.trk_mycall);
         else
-            sprintf(strtmp, "%s-%d>APE32L", config.trk_mycall, config.trk_ssid);
+            snprintf(strtmp, 300, "%s-%d>APE32A", config.trk_mycall, config.trk_ssid);
         tnc2Raw = String(strtmp);
         free(strtmp);
     }

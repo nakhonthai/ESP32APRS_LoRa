@@ -10762,7 +10762,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 	strcat(html, "<td align=\"right\"><b>Mic-E Type:</b></td>\n");
 	strcat(html, "<td style=\"text-align: left;\">\n");
 	strcat(html, "<select name=\"trkMicEType\" id=\"trkMicEType\">\n");
-	for (uint8_t micEIdx = 0; micEIdx < 8; micEIdx++)
+	for (uint8_t micEIdx = 0; micEIdx < 9; micEIdx++)
 	{
 		if (config.trk_mice_type == micEIdx)
 		{
