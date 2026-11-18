@@ -25,14 +25,33 @@ static int rainMidnightUtcDay = -1;
 static const size_t RAIN_24H_HISTORY = 1440;
 struct Rain24hEntry
 {
-    time_t ts;
+    uint32_t ts; // epoch seconds (32-bit is enough until 2106)
     float rain;
 };
-static Rain24hEntry rain24hHistory[RAIN_24H_HISTORY];
+// Kept out of .bss and allocated on demand so that, on boards with PSRAM, the
+// 24h rain history lives in external memory instead of eating internal RAM
+// (was 23KB of .bss = 1440 * (8-byte time_t + float)).
+static Rain24hEntry *rain24hHistory = nullptr;
 static uint16_t rain24hHead = 0;
 static uint16_t rain24hCount = 0;
 static float rain24hTotal = 0.0F;
 static float lastRainSnapshot = 0.0F;
+
+static bool rainHistoryEnsure()
+{
+    if (rain24hHistory != nullptr)
+        return true;
+#ifdef BOARD_HAS_PSRAM
+    rain24hHistory = (Rain24hEntry *)ps_calloc(RAIN_24H_HISTORY, sizeof(Rain24hEntry));
+#endif
+    if (rain24hHistory == nullptr)
+    {
+        rain24hHistory = (Rain24hEntry *)calloc(RAIN_24H_HISTORY, sizeof(Rain24hEntry));
+        if (rain24hHistory == nullptr)
+            return false;
+    }
+    return true;
+}
 
 static void updateRainAccumulator(float currentRain, time_t now)
 {
@@ -52,7 +71,17 @@ static void updateRainAccumulator(float currentRain, time_t now)
         rainDelta = currentRain;
     }
 
-    while (rain24hCount > 0 && (now - rain24hHistory[rain24hHead].ts) >= 86400)
+    if (!rainHistoryEnsure())
+    {
+        // Out of memory: keep the running totals but skip the 24h window.
+        weather.rain = currentRain;
+        lastRainSnapshot = currentRain;
+        return;
+    }
+
+    const uint32_t nowTs = (uint32_t)now;
+
+    while (rain24hCount > 0 && (uint32_t)(nowTs - rain24hHistory[rain24hHead].ts) >= 86400u)
     {
         rain24hTotal -= rain24hHistory[rain24hHead].rain;
         rain24hHistory[rain24hHead].ts = 0;
@@ -71,7 +100,7 @@ static void updateRainAccumulator(float currentRain, time_t now)
     }
 
     size_t idx = (rain24hHead + rain24hCount) % RAIN_24H_HISTORY;
-    rain24hHistory[idx].ts = now;
+    rain24hHistory[idx].ts = nowTs;
     rain24hHistory[idx].rain = rainDelta;
     rain24hTotal += rainDelta;
     rain24hCount++;

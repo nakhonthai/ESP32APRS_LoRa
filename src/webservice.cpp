@@ -25,46 +25,35 @@ extern bool psramBusy;
 // Helper function to allocate memory with PSRAM support
 char *allocateStringMemory(size_t size)
 {
-	char *ptr = NULL;
+	if (size == 0)
+		return NULL;
 #ifdef BOARD_HAS_PSRAM
-    while (psramBusy)
-        delay(1);
-    psramBusy = true;
-	// Try to allocate in PSRAM first
-	size *= 2; // overallocation to reduce fragmentation
-	// char *ptr = (char *)ps_calloc(size, sizeof(char));
-
-	// Retry loop for PSRAM allocation with backoff
-	
-	int retry_count = 3;
-	int delay_ms = 10;
-
-	// while (retry_count > 0 && ptr == NULL)
-	// {
-		ptr = (char *)ps_malloc(size);
-	// 	if (ptr == NULL)
-	// 	{
-	// 		retry_count--;
-	// 		if (retry_count > 0)
-	// 		{
-	// 			vTaskDelay(pdMS_TO_TICKS(delay_ms));
-	// 			delay_ms *= 2; // Exponential backoff
-	// 		}
-	// 	}
-	// }
+	// Overallocate a little in PSRAM to absorb HTML growth while building the
+	// page. The internal-RAM fallback keeps the exact size because internal
+	// heap is far more limited (and the doubling used to make the fallback
+	// twice as expensive as the page really needs).
+	size_t psramSize = size * 2;
+	uint32_t waited = 0;
+	while (psramBusy && waited < 1000) // never block a web handler forever
+	{
+		delay(1);
+		waited++;
+	}
+	psramBusy = true;
+	char *ptr = (char *)ps_malloc(psramSize);
 	psramBusy = false;
-
 	if (ptr != NULL)
 	{
-		memset(ptr, 0, size); // Initialize memory to zero
+		memset(ptr, 0, psramSize); // Initialize memory to zero
 		return ptr;
 	}
 	// If PSRAM allocation fails, fall back to regular heap
 #endif
 	// Regular heap allocation
-	ptr = (char *)calloc(size, sizeof(char));
-	memset(ptr, 0, size); // Initialize memory to zero
-	return ptr;
+	char *fallback = (char *)calloc(size, sizeof(char));
+	if (fallback != NULL)
+		memset(fallback, 0, size); // Initialize memory to zero
+	return fallback;
 }
 
 // Helper function to format integers to string using allocateStringMemory

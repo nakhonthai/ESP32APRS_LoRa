@@ -69,6 +69,25 @@ ESP32APRS_LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather
 8. Click (→) to upload firmware and reboot again
 9. After reboot display monitor and reconfig
 
+## RAM usage (internal memory / heap)
+
+Boards built with `-DBOARD_HAS_PSRAM` keep large runtime buffers in PSRAM so
+that the internal RAM stays available for the network stack, WiFi/LWIP and TLS:
+
+* packet queues (`pkgList`, `Telemetry`, `txQueue`, `msgQueue`) are allocated
+  with `ps_malloc()` at boot,
+* every generated web page uses `allocateStringMemory()`, which allocates from
+  PSRAM and only falls back to the internal heap when PSRAM is exhausted,
+* the 24-hour rain history (`weather.cpp`, 1440 entries) is allocated on demand
+  in PSRAM instead of living in `.bss`.
+
+If a PSRAM allocation fails, all of the above fall back to the internal heap
+instead of dereferencing a NULL pointer.
+
+Note: task stacks stay in internal RAM on purpose. A task whose stack lives in
+PSRAM may not run while the flash cache is disabled (config/LittleFS/OTA
+writes), which would make those operations unsafe.
+
 ## Reducing firmware size (optional)
 
 The firmware is built with `-Os`, `-ffunction-sections`, `-fdata-sections` and

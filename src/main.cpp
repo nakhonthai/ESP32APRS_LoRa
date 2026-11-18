@@ -4714,6 +4714,22 @@ void bluetooth_init()
 // 3 seconds WDT
 #define WDT_TIMEOUT 30
 
+// Allocate a zeroed buffer, preferring PSRAM when the board has it so the
+// internal heap stays available for the network stack and TLS. Falls back to
+// internal RAM (and returns NULL only when both are exhausted).
+static void *allocPreferPsram(size_t size)
+{
+    void *ptr = NULL;
+#ifdef BOARD_HAS_PSRAM
+    ptr = ps_malloc(size);
+#endif
+    if (ptr == NULL)
+        ptr = malloc(size);
+    if (ptr != NULL)
+        memset(ptr, 0, size);
+    return ptr;
+}
+
 bool AFSKInitAct = false;
 unsigned long timeTask;
 void setup()
@@ -4725,38 +4741,14 @@ void setup()
     //  byte *ptr;
     int BootReason = esp_reset_reason();
 #ifdef BOARD_HAS_PSRAM
-    // if (psramInit())
-    // {
     psramAddToHeap();
-    pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
-    Telemetry = (TelemetryType *)ps_malloc(sizeof(TelemetryType) * TLMLISTSIZE);
-    txQueue = (txQueueType *)ps_malloc(sizeof(txQueueType) * PKGTXSIZE);
-    msgQueue = (msgType *)ps_malloc(sizeof(msgType) * PKGLISTSIZE);
-    // TNC2Raw = (int *)ps_malloc(sizeof(int) * PKGTXSIZE);
-    // for(int i=0;i<PKGLISTSIZE;i++)
-    // {
-    //     pkgList[i].raw = (char *)ps_malloc(300);
-    // }
-    // }
-    // else
-    // {
-    //     pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
-    //     Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
-    //     txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
-    //     msgQueue = (msgType *)malloc(sizeof(msgType) * PKGLISTSIZE);
-    // }
-#else
-    pkgList = (pkgListType *)malloc(sizeof(pkgListType) * PKGLISTSIZE);
-    Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
-    txQueue = (txQueueType *)malloc(sizeof(txQueueType) * PKGTXSIZE);
-    msgQueue = (msgType *)malloc(sizeof(msgType) * PKGLISTSIZE);
-    // TNC2Raw = (int *)malloc(sizeof(int) * PKGTXSIZE);
 #endif
-
-    memset(pkgList, 0, sizeof(pkgListType) * PKGLISTSIZE);
-    memset(Telemetry, 0, sizeof(TelemetryType) * TLMLISTSIZE);
-    memset(txQueue, 0, sizeof(txQueueType) * PKGTXSIZE);
-    memset(msgQueue, 0, sizeof(msgType) * PKGLISTSIZE);
+    pkgList = (pkgListType *)allocPreferPsram(sizeof(pkgListType) * PKGLISTSIZE);
+    Telemetry = (TelemetryType *)allocPreferPsram(sizeof(TelemetryType) * TLMLISTSIZE);
+    txQueue = (txQueueType *)allocPreferPsram(sizeof(txQueueType) * PKGTXSIZE);
+    msgQueue = (msgType *)allocPreferPsram(sizeof(msgType) * PKGLISTSIZE);
+    if (pkgList == NULL || Telemetry == NULL || txQueue == NULL || msgQueue == NULL)
+        log_e("Packet buffers allocation failed");
 
     // pinMode(9, INPUT_PULLUP); // BOOT Button
     if (LED_RX > -1)
