@@ -9,6 +9,7 @@
 */
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <memory>
 #include "webservice.h"
 #include "base64.hpp"
 #include "wireguard_vpn.h"
@@ -27,33 +28,60 @@ char *allocateStringMemory(size_t size)
 {
 	if (size == 0)
 		return NULL;
-#ifdef BOARD_HAS_PSRAM
-	// Overallocate a little in PSRAM to absorb HTML growth while building the
-	// page. The internal-RAM fallback keeps the exact size because internal
-	// heap is far more limited (and the doubling used to make the fallback
-	// twice as expensive as the page really needs).
-	size_t psramSize = size * 2;
-	uint32_t waited = 0;
-	while (psramBusy && waited < 1000) // never block a web handler forever
+	static int8_t psramState = -1;
+	if (psramState < 0)
+		psramState = psramFound() ? 1 : 0;
+	if (psramState == 1)
 	{
-		delay(1);
-		waited++;
+		// Overallocate a little in PSRAM to absorb HTML growth while building the
+		// page. The internal-RAM fallback keeps the exact size because internal
+		// heap is far more limited.
+		size_t psramSize = size * 2;
+		uint32_t waited = 0;
+		while (psramBusy && waited < 1000) // never block a web handler forever
+		{
+			delay(1);
+			waited++;
+		}
+		psramBusy = true;
+		char *ptr = (char *)ps_malloc(psramSize);
+		psramBusy = false;
+		if (ptr != NULL)
+		{
+			memset(ptr, 0, psramSize); // Initialize memory to zero
+			return ptr;
+		}
 	}
-	psramBusy = true;
-	char *ptr = (char *)ps_malloc(psramSize);
-	psramBusy = false;
-	if (ptr != NULL)
-	{
-		memset(ptr, 0, psramSize); // Initialize memory to zero
-		return ptr;
-	}
-	// If PSRAM allocation fails, fall back to regular heap
-#endif
 	// Regular heap allocation
 	char *fallback = (char *)calloc(size, sizeof(char));
 	if (fallback != NULL)
 		memset(fallback, 0, size); // Initialize memory to zero
 	return fallback;
+}
+
+// Send an HTML page that was built in a heap buffer without asking
+// AsyncWebServer to make yet another copy of it. AsyncWebServerResponse keeps
+// the page alive until the last byte is sent and then releases it, so peak heap
+// usage for a page drops from (buffer + copy) to just the buffer.
+AsyncWebServerResponse *beginHtmlResponse(AsyncWebServerRequest *request, char *html, size_t len)
+{
+	if (html == NULL)
+		return NULL;
+	std::shared_ptr<char> holder(html, [](char *p)
+								 { free(p); });
+	AsyncWebServerResponse *response = request->beginResponse(
+		"text/html", len,
+		[holder, len](uint8_t *buffer, size_t maxLen, size_t index) -> size_t
+		{
+			if (index >= len)
+				return 0;
+			size_t count = len - index;
+			if (count > maxLen)
+				count = maxLen;
+			memcpy(buffer, holder.get() + index, count);
+			return count;
+		});
+	return response;
 }
 
 // Helper function to format integers to string using allocateStringMemory
@@ -192,9 +220,10 @@ void setMainPage(AsyncWebServerRequest *request)
 	}
 
 	// Using dynamic memory allocation instead of String
-	char *webString = allocateStringMemory(16384); // Initial buffer size, adjust as needed
+	char *webString = allocateStringMemory(12288); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return; // Memory allocation failed
 	}
 
@@ -228,6 +257,16 @@ void setMainPage(AsyncWebServerRequest *request)
 		"<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\" />\n"
 		"<script src=\"/jquery-3.7.1.js\"></script>\n"
 		"<script type=\"text/javascript\">\n"
+		// Load a tab; the device can be momentarily out of memory while
+		// streaming another page, so retry instead of leaving the tab blank.
+		"function loadTab(url, tries) {\n"
+		"tries = tries || 0;\n"
+		"$('#contentmain').load(url, function (resp, status) {\n"
+		"if (status === 'error' && tries < 3) {\n"
+		"setTimeout(function () { loadTab(url, tries + 1); }, 400 + tries * 400);\n"
+		"}\n"
+		"});\n"
+		"}\n"
 		"function selectTab(evt, tabName) {\n"
 		"var i, tabcontent, tablinks;\n"
 		"tablinks = document.getElementsByClassName(\"nav-tabs\");\n"
@@ -237,44 +276,44 @@ void setMainPage(AsyncWebServerRequest *request)
 		"\n"
 		"//document.getElementById(tabName).style.display = \"block\";\n"
 		"if (tabName == 'DashBoard') {\n"
-		"$(\"#contentmain\").load(\"/dashboard\");\n"
+		"loadTab(\"/dashboard\");\n"
 		"} else if (tabName == 'Radio') {\n"
-		"$(\"#contentmain\").load(\"/radio\");\n"
+		"loadTab(\"/radio\");\n"
 		"} else if (tabName == 'IGATE') {\n"
-		"$(\"#contentmain\").load(\"/igate\");\n"
+		"loadTab(\"/igate\");\n"
 		"} else if (tabName == 'DIGI') {\n"
-		"$(\"#contentmain\").load(\"/digi\");\n"
+		"loadTab(\"/digi\");\n"
 		"} else if (tabName == 'TRACKER') {\n"
-		"$(\"#contentmain\").load(\"/tracker\");\n"
+		"loadTab(\"/tracker\");\n"
 		"} else if (tabName == 'WX') {\n"
-		"$(\"#contentmain\").load(\"/wx\");\n"
+		"loadTab(\"/wx\");\n"
 		"} else if (tabName == 'TLM') {\n"
-		"$(\"#contentmain\").load(\"/tlm\");\n"
+		"loadTab(\"/tlm\");\n"
 		"} else if (tabName == 'SENSOR') {\n"
-		"$(\"#contentmain\").load(\"/sensor\");\n");
+		"loadTab(\"/sensor\");\n");
 #ifndef NO_WIREGUARD
 	strcat(webString,
 		"} else if (tabName == 'VPN') {\n"
-		"$(\"#contentmain\").load(\"/vpn\");\n");
+		"loadTab(\"/vpn\");\n");
 #endif
 #ifdef MQTT
 	strcat(webString,
 		"} else if (tabName == 'MQTT') {\n"
-		"$(\"#contentmain\").load(\"/mqtt\");\n");
+		"loadTab(\"/mqtt\");\n");
 #endif
 	strcat(webString,
 		"} else if (tabName == 'MSG') {\n"
-		"$(\"#contentmain\").load(\"/msg\");\n"
+		"loadTab(\"/msg\");\n"
 		"} else if (tabName == 'WiFi') {\n"
-		"$(\"#contentmain\").load(\"/wireless\");\n"
+		"loadTab(\"/wireless\");\n"
 		"} else if (tabName == 'MOD') {\n"
-		"$(\"#contentmain\").load(\"/mod\");\n"
+		"loadTab(\"/mod\");\n"
 		"} else if (tabName == 'System') {\n"
-		"$(\"#contentmain\").load(\"/system\");\n"
+		"loadTab(\"/system\");\n"
 		"} else if (tabName == 'File') {\n"
-		"$(\"#contentmain\").load(\"/storage\");\n"
+		"loadTab(\"/storage\");\n"
 		"} else if (tabName == 'About') {\n"
-		"$(\"#contentmain\").load(\"/about\");\n"
+		"loadTab(\"/about\");\n"
 		"}\n"
 		"\n"
 		"if (evt != null) evt.currentTarget.className += \" active\";\n"
@@ -466,11 +505,10 @@ void setMainPage(AsyncWebServerRequest *request)
 		"</body>\n"
 		"</html>");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, webString, strlen(webString));
 	response->addHeader("Sensor", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(webString);
 	lastHeardTimeout = 0;
 	lastHeard_Flag = true;
 }
@@ -502,9 +540,10 @@ void handle_dashboard(AsyncWebServerRequest *request)
 
 	char temp_buffer[200];
 	// Using dynamic memory allocation instead of String
-	char *webString = allocateStringMemory(12288); // Initial buffer size, adjust as needed
+	char *webString = allocateStringMemory(8192); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return; // Memory allocation failed
 	}
 
@@ -807,11 +846,10 @@ void handle_dashboard(AsyncWebServerRequest *request)
 		"</table>\n"
 		"</div>\n");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, webString, strlen(webString));
 	response->addHeader("dashboard", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(webString);
 	lastHeardTimeout = millis() + 500;
 	lastHeard_Flag = true;
 }
@@ -824,9 +862,10 @@ void handle_sidebar(AsyncWebServerRequest *request)
 	}
 
 	// Using dynamic memory allocation instead of String
-	char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
+	char *html = allocateStringMemory(6144); // Initial buffer size, adjust as needed
 	if (!html)
 	{
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return; // Memory allocation failed
 	}
 
@@ -1003,11 +1042,10 @@ void handle_sidebar(AsyncWebServerRequest *request)
 		"$(window).trigger('resize');\n"
 		"</script>\n");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 	response->addHeader("Sidebar", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(html); // Free the allocated memory
 }
 
 void handle_symbol(AsyncWebServerRequest *request)
@@ -1081,6 +1119,7 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 	char *html = allocateStringMemory(4096); // Initial buffer size, adjust as needed
 	if (!html)
 	{
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return; // Memory allocation failed
 	}
 
@@ -1176,11 +1215,10 @@ void handle_sysinfo(AsyncWebServerRequest *request)
 		"</table>\n");
 
 	// request->send(200, "text/html", html); // send to someones browser when asked
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 	response->addHeader("Sysinfo", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(html); // Free the allocated memory
 }
 
 void event_lastHeard(bool gethtml)
@@ -1795,6 +1833,7 @@ void handle_storage(AsyncWebServerRequest *request)
 	char *webString = allocateStringMemory(16384); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return; // Memory allocation failed
 	}
 
@@ -1831,7 +1870,7 @@ void handle_storage(AsyncWebServerRequest *request)
 					  "},"
 					  "success:function(d, s) {"
 					  "alert('Upload Success');"
-					  "$(\"#contentmain\").load(\"/storage\");\n"
+					  "loadTab(\"/storage\");\n"
 					  "},"
 					  "error: function (a, b, c) {"
 					  "}"
@@ -1846,7 +1885,7 @@ void handle_storage(AsyncWebServerRequest *request)
 					  "processData:false,"
 					  "success:function(d, s) {"
 					  //"alert('Upload Success');"
-					  "if(e.currentTarget.id===\"formDelete\") $(\"#contentmain\").load(\"/storage\");\n"
+					  "if(e.currentTarget.id===\"formDelete\") loadTab(\"/storage\");\n"
 					  "},"
 					  "error: function (a, b, c) {"
 					  "}"
@@ -2022,11 +2061,10 @@ void handle_storage(AsyncWebServerRequest *request)
 
 	strcat(webString, "</body>\n</html>\n");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, webString, strlen(webString));
 	response->addHeader("Sensor", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(webString); // Free the allocated memory
 }
 
 void handle_download(AsyncWebServerRequest *request)
@@ -3466,9 +3504,10 @@ void handle_vpn(AsyncWebServerRequest *request)
 	else
 	{
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
 		if (!html)
 		{
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return; // Memory allocation failed
 		}
 
@@ -3653,11 +3692,10 @@ void handle_vpn(AsyncWebServerRequest *request)
 		"</form>");
 
 		// request->send(200, "text/html", html); // send to someones browser when asked
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("VPN", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 #endif // !NO_WIREGUARD
@@ -3819,9 +3857,10 @@ void handle_mqtt(AsyncWebServerRequest *request)
 	else
 	{
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
 		if (!html)
 		{
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return; // Memory allocation failed
 		}
 
@@ -4023,11 +4062,10 @@ void handle_mqtt(AsyncWebServerRequest *request)
 		"</form>\n");
 
 		// request->send(200, "text/html", html); // send to someones browser when asked
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("MQTT", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 #endif
@@ -4184,9 +4222,10 @@ void handle_msg(AsyncWebServerRequest *request)
 	else
 	{
 		// Using dynamic memory allocation instead of String
-		char *html = allocateStringMemory(16384); // Initial buffer size, adjust as needed
+		char *html = allocateStringMemory(8192); // Initial buffer size, adjust as needed
 		if (!html)
 		{
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return; // Memory allocation failed
 		}
 
@@ -4371,11 +4410,10 @@ void handle_msg(AsyncWebServerRequest *request)
 		strcat(html, "</td></tr></table>");
 
 		// request->send(200, "text/html", html); // send to someones browser when asked
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("MSG", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -5173,7 +5211,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(32768); // Start with 8KB, adjust as needed
 		if (html == NULL)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 
@@ -6199,11 +6237,10 @@ void handle_mod(AsyncWebServerRequest *request)
 		strcat(html, "</td></tr></table>\n");
 #endif
 		const char *dataType = "text/html";
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("MOD", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -6831,6 +6868,7 @@ void handle_system(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(32768); // Initial buffer size, adjust as needed
 		if (!html)
 		{
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return; // Memory allocation failed
 		}
 
@@ -7448,11 +7486,10 @@ void handle_system(AsyncWebServerRequest *request)
 		"</form><br />");
 #endif
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("System", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html);
 	}
 }
 
@@ -7966,7 +8003,7 @@ void handle_igate(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(32768); // Start with 8KB buffer
 		if (!html)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 		strcpy(html,
@@ -8482,11 +8519,10 @@ void handle_igate(AsyncWebServerRequest *request)
 		"</td></tr></table><br />\n"
 		"</form><br />");
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("IGATE", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -8878,7 +8914,7 @@ void handle_digi(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(32768); // Start with 12KB buffer
 		if (!html)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 		char tempHtml[512];
@@ -9281,11 +9317,10 @@ void handle_digi(AsyncWebServerRequest *request)
 		"</td></tr></table><br />\n"
 		"</form><br />");
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("digi", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -9502,7 +9537,7 @@ void handle_wx(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(32768); // Start with 8KB buffer
 		if (!html)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 		strcpy(html,
@@ -9739,11 +9774,10 @@ void handle_wx(AsyncWebServerRequest *request)
 		"</td></tr></table><br />\n"
 		"</form><br />");
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("Weather", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -9926,7 +9960,7 @@ void handle_tlm(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(24576); // Start with 8KB buffer
 		if (!html)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 		strcpy(html,
@@ -10146,11 +10180,10 @@ void handle_tlm(AsyncWebServerRequest *request)
 		"</td></tr></table><br />\n"
 		"</form><br />");
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("Telemetry", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -10268,7 +10301,7 @@ void handle_sensor(AsyncWebServerRequest *request)
 		char *html = allocateStringMemory(32768); // Start with 8KB buffer
 		if (!html)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 		strcpy(html,
@@ -10582,11 +10615,10 @@ void handle_sensor(AsyncWebServerRequest *request)
 
 		strcat(html, "</script>\n");
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("Sensor", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -11008,7 +11040,7 @@ void handle_tracker(AsyncWebServerRequest *request)
 	char *html = allocateStringMemory(32768); // Start with 8KB buffer
 	if (!html)
 	{
-		request->send(500, "text/html", "Memory allocation failed");
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return;
 	}
 	strcpy(html,
@@ -11415,11 +11447,10 @@ void handle_tracker(AsyncWebServerRequest *request)
 		"</td></tr></table><br />\n"
 		"</form><br />");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 	response->addHeader("Tracker", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(html); // Free the allocated memory
 }
 
 void handle_wireless(AsyncWebServerRequest *request)
@@ -11614,10 +11645,10 @@ void handle_wireless(AsyncWebServerRequest *request)
 	{
 		// Allocate initial memory for HTML content
 		char tempHtml[256];
-		char *html = allocateStringMemory(16384); // Start with 12KB buffer
+		char *html = allocateStringMemory(12288); // Start with 12KB buffer
 		if (!html)
 		{
-			request->send(500, "text/html", "Memory allocation failed");
+			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 			return;
 		}
 		strcpy(html,
@@ -11850,11 +11881,10 @@ void handle_wireless(AsyncWebServerRequest *request)
 		"</form>");
 #endif
 
-		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)html);
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
 		response->addHeader("wifi", "content");
 		response->addHeader("Cache-Control", "no-cache");
 		request->send(response);
-		free(html); // Free the allocated memory
 	}
 }
 
@@ -12337,10 +12367,10 @@ void handle_about(AsyncWebServerRequest *request)
 	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
 	// Allocate memory for HTML content
-	char *webString = allocateStringMemory(24576); // Start with 16KB buffer
+	char *webString = allocateStringMemory(16384); // Start with 16KB buffer
 	if (!webString)
 	{
-		request->send(500, "text/html", "Memory allocation failed");
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return;
 	}
 	strcpy(webString, "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;\"><td width=\"49%\" style=\"border:unset;\">");
@@ -12793,20 +12823,19 @@ void handle_about(AsyncWebServerRequest *request)
 #endif
 	strcat(webString, "</body></html>\n");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, webString, strlen(webString));
 	response->addHeader("About", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(webString);
 }
 
 void handle_gnss(AsyncWebServerRequest *request)
 {
 	// Allocate initial memory for HTML content
-	char *webString = allocateStringMemory(12288); // Start with 8KB buffer
+	char *webString = allocateStringMemory(8192); // Start with 8KB buffer
 	if (!webString)
 	{
-		request->send(500, "text/html", "Memory allocation failed");
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return;
 	}
 	strcpy(webString,
@@ -12883,11 +12912,10 @@ void handle_gnss(AsyncWebServerRequest *request)
 
 	strcat(webString, "</body></html>\n");
 
-	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", (const char *)webString);
+	AsyncWebServerResponse *response = beginHtmlResponse(request, webString, strlen(webString));
 	response->addHeader("GNSS", "content");
 	response->addHeader("Cache-Control", "no-cache");
 	request->send(response);
-	free(webString);
 }
 
 void handle_default()
