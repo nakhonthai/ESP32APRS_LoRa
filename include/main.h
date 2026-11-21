@@ -247,6 +247,7 @@ typedef struct
 	float rssi;
 	float snr;
 	float freqErr;
+	uint8_t rfch;
 	char *raw;
 	size_t length;
 	// char raw[256];

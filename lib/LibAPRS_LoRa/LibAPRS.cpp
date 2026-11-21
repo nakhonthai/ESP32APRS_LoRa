@@ -11,6 +11,7 @@ ICACHE_RAM_ATTR IRadioHal *radioHal;
 ICACHE_RAM_ATTR IRadioHal *radioHal1;
 #endif
 
+extern uint8_t rfch;
 extern float rssi;
 extern float snr;
 extern float freqErr;
@@ -329,6 +330,7 @@ void radioRecvStatus()
         // log_d("[GFSK] RSSI:%.0f dBm", rssi);
     }
     afskSync = true;
+    rfch = 1;
 }
 
 #ifdef RF2
@@ -440,6 +442,7 @@ void radioRecvStatus1()
         // log_d("[GFSK] RSSI:%.0f dBm", rssi);
     }
     afskSync = true;
+    rfch = 2;
 }
 
 void taskADDFifo1(void *pvParameters)

@@ -1409,9 +1409,12 @@ void event_lastHeard(bool gethtml)
 						strcat(html, temp_html);
 					}
 					// strcat(html, "</td>");
+					// rfch: 1 = received on RF1, 2 = received on RF2
+					const char *rfSrc = (pkg.rfch == 2) ? "RF2" : "RF1";
 					if (strlen(path) == 0)
 					{
-						strcat(html, "\"path\":\"RF: DIRECT\",");
+						snprintf(temp_html, sizeof(temp_html), "\"path\":\"%s: DIRECT\",", rfSrc);
+						strcat(html, temp_html);
 					}
 					else
 					{
@@ -1440,12 +1443,12 @@ void event_lastHeard(bool gethtml)
 						{
 							if (strchr(path, '*') != NULL)
 							{
-								snprintf(temp_html, sizeof(temp_html), "\"path\":\"DIGI: %s\",", path);
+								snprintf(temp_html, sizeof(temp_html), "\"path\":\"DIGI(%s): %s\",", rfSrc, path);
 								strcat(html, temp_html);
 							}
 							else
 							{
-								snprintf(temp_html, sizeof(temp_html), "\"path\":\"RF: %s\",", path);
+								snprintf(temp_html, sizeof(temp_html), "\"path\":\"%s: %s\",", rfSrc, path);
 								strcat(html, temp_html);
 							}
 						}
@@ -4876,6 +4879,117 @@ void handle_mod(AsyncWebServerRequest *request)
 			request->send(501, "text/html", html); // Not Implemented
 		}
 	}
+#ifdef RF2
+	else if (request->hasArg("commitRF2"))
+	{
+		for (uint8_t i = 0; i < request->args(); i++)
+		{
+			if (request->argName(i) == "rx1_active")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_rx_active = (bool)request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "tx1_active")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_tx_active = (bool)request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rst1_active")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_reset_active = (bool)request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "nss1_active")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_nss_active = (bool)request->arg(i).toInt();
+				}
+			}
+
+			if (request->argName(i) == "rf1_rx_gpio")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_rx_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_tx_gpio")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_tx_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_dio1")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_dio1_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_reset")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_reset_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_dio0")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_dio0_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_nss")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_nss_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_sclk")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_sclk_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_miso")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_miso_gpio = request->arg(i).toInt();
+				}
+			}
+			if (request->argName(i) == "rf1_mosi")
+			{
+				if (request->arg(i) != "")
+				{
+					config.rf1_mosi_gpio = request->arg(i).toInt();
+				}
+			}
+		}
+		String html;
+		if (saveConfiguration("/default.cfg", config))
+		{
+			html = "Setup completed successfully";
+			request->send(200, "text/html", html); // send to someones browser when asked
+		}
+		else
+		{
+			html = "Save config failed.";
+			request->send(501, "text/html", html); // Not Implemented
+		}
+	}
+#endif
 	else if (request->hasArg("commitI2C0"))
 	{
 		bool En = false;
@@ -5230,7 +5344,7 @@ void handle_mod(AsyncWebServerRequest *request)
 	{
 		// Allocate memory for the HTML string
 		char temp_buffer[300];
-		char *html = allocateStringMemory(32768); // Start with 8KB, adjust as needed
+		char *html = allocateStringMemory(40960); // Start with 8KB, adjust as needed
 		if (html == NULL)
 		{
 			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
@@ -5252,6 +5366,7 @@ void handle_mod(AsyncWebServerRequest *request)
 		// strcat(html, "if(e.currentTarget.id===\"formONEWIRE\") document.getElementById(\"submitONEWIRE\").disabled=true;\n");
 		strcat(html,
 		"if(e.currentTarget.id===\"formRF\") document.getElementById(\"submitRF\").disabled=true;\n"
+		"if(e.currentTarget.id===\"formRF2\") document.getElementById(\"submitRF2\").disabled=true;\n"
 		"if(e.currentTarget.id===\"formI2C0\") document.getElementById(\"submitI2C0\").disabled=true;\n"
 		"if(e.currentTarget.id===\"formI2C1\") document.getElementById(\"submitI2C1\").disabled=true;\n"
 		"if(e.currentTarget.id===\"formCOUNT0\") document.getElementById(\"submitCOUNT0\").disabled=true;\n"
@@ -5678,6 +5793,109 @@ void handle_mod(AsyncWebServerRequest *request)
 		"<input type=\"hidden\" name=\"commitRF\"/>\n"
 		"</td></tr></table>\n"
 		"</form>\n");
+
+#ifdef RF2
+		/**************RF2 GPIO******************/
+		strcat(html,
+		"<form accept-charset=\"UTF-8\" action=\"#\" class=\"form-horizontal\" id=\"formRF2\" method=\"post\">\n"
+		"<table>\n"
+		"<th colspan=\"2\"><span><b>RF2 GPIO Modify</b></span></th>\n"
+		"<tr>");
+
+		strcpy(LowFlag, "");
+		strcpy(HighFlag, "");
+		if (config.rf1_rx_active)
+			strcpy(HighFlag, "checked=\"checked\"");
+		else
+			strcpy(LowFlag, "checked=\"checked\"");
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>RX ANTENNA:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_rx_gpio\" type=\"number\" value=\"%d\" /> Active:<input type=\"radio\" name=\"rx1_active\" value=\"0\" %s/>LOW <input type=\"radio\" name=\"rx1_active\" value=\"1\" %s/>HIGH </td>\n", config.rf1_rx_gpio, LowFlag, HighFlag);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcpy(LowFlag, "");
+		strcpy(HighFlag, "");
+		if (config.rf1_tx_active)
+			strcpy(HighFlag, "checked=\"checked\"");
+		else
+			strcpy(LowFlag, "checked=\"checked\"");
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>TX ANTENNA:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_tx_gpio\" type=\"number\" value=\"%d\" /> Active:<input type=\"radio\" name=\"tx1_active\" value=\"0\" %s/>LOW <input type=\"radio\" name=\"tx1_active\" value=\"1\" %s/>HIGH </td>\n", config.rf1_tx_gpio, LowFlag, HighFlag);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcpy(LowFlag, "");
+		strcpy(HighFlag, "");
+		if (config.rf1_reset_active)
+			strcpy(HighFlag, "checked=\"checked\"");
+		else
+			strcpy(LowFlag, "checked=\"checked\"");
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>RESET GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_reset\" type=\"number\" value=\"%d\" /> Active:<input type=\"radio\" name=\"rst1_active\" value=\"0\" %s/>LOW <input type=\"radio\" name=\"rst1_active\" value=\"1\" %s/>HIGH </td>\n", config.rf1_reset_gpio, LowFlag, HighFlag);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcpy(LowFlag, "");
+		strcpy(HighFlag, "");
+		if (config.rf1_nss_active)
+			strcpy(HighFlag, "checked=\"checked\"");
+		else
+			strcpy(LowFlag, "checked=\"checked\"");
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>NSS/CS GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_nss\" type=\"number\" value=\"%d\" /> Active:<input type=\"radio\" name=\"nss1_active\" value=\"0\" %s/>LOW <input type=\"radio\" name=\"nss1_active\" value=\"1\" %s/>HIGH </td>\n", config.rf1_nss_gpio, LowFlag, HighFlag);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>IRQ/DIO1 GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_dio1\" type=\"number\" value=\"%d\" /></td>\n", config.rf1_dio1_gpio);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>BUSY/DIO0 GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_dio0\" type=\"number\" value=\"%d\" /></td>\n", config.rf1_dio0_gpio);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>SCLK GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_sclk\" type=\"number\" value=\"%d\" /></td>\n", config.rf1_sclk_gpio);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>MISO GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_miso\" type=\"number\" value=\"%d\" /></td>\n", config.rf1_miso_gpio);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcat(html,
+		"<tr>\n"
+		"<td align=\"right\"><b>MOSI GPIO:</b></td>\n");
+		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input min=\"-1\" max=\"50\"  name=\"rf1_mosi\" type=\"number\" value=\"%d\" /></td>\n", config.rf1_mosi_gpio);
+		strcat(html, temp_buffer);
+		strcat(html, "</tr>\n");
+
+		strcat(html,
+		"<tr><td colspan=\"2\" align=\"right\">\n"
+		"<input class=\"button\" id=\"submitRF2\" name=\"commitRF2\" type=\"submit\" value=\"Apply\" maxlength=\"80\"/>\n"
+		"<input type=\"hidden\" name=\"commitRF2\"/>\n"
+		"</td></tr></table>\n"
+		"</form>\n");
+#endif
 
 		strcat(html, "</td><td width=\"23%\" style=\"border:unset;\">");
 
@@ -12022,6 +12240,7 @@ extern String lastPkgRaw;
 extern float rssi;
 extern float snr;
 extern float freqErr;
+extern uint8_t rfch;
 
 void handle_realtime(AsyncWebServerRequest *request)
 {
@@ -12043,7 +12262,7 @@ void handle_realtime(AsyncWebServerRequest *request)
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, output_buffer, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, output_buffer, timeStamp);
 			// Serial.println(jsonMsg);
 		}
 		free(input_buffer);
@@ -12055,9 +12274,9 @@ void handle_realtime(AsyncWebServerRequest *request)
 		if (jsonMsg)
 		{
 			if (afskSync)
-				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, timeStamp);
 			else
-				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"rfch\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
 		}
 	}
 	afskSync = false;
@@ -12094,7 +12313,7 @@ void handle_ws()
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, output_buffer, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, output_buffer, timeStamp);
 			// Serial.println(jsonMsg);
 		}
 		free(input_buffer);
@@ -12106,9 +12325,9 @@ void handle_ws()
 		if (jsonMsg)
 		{
 			if (afskSync)
-				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, timeStamp);
 			else
-				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"rfch\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
 		}
 	}
 	afskSync = false;
@@ -12186,7 +12405,7 @@ void handle_test(AsyncWebServerRequest *request)
 	// Add some life
 	webString +=
 		"var chartFunction = function (chart) { \n"
-		"var rssi=-140;\nvar snr=0;\nvar freqErr=0;\nvar active=0;var raw=\"\";var timeStamp;\n"
+		"var rssi=-140;\nvar snr=0;\nvar freqErr=0;\nvar rfch=0;\nvar active=0;var raw=\"\";var timeStamp;\n"
 		"if (chart.series) {\n"
 		"var left = chart.series[0].points[0];\n"
 		"var host='ws://'+location.hostname+':81/ws'\n"
@@ -12198,12 +12417,15 @@ void handle_test(AsyncWebServerRequest *request)
 		"rssi=parseFloat(jsonR.rssi);\n"
 		"snr=parseFloat(jsonR.snr);\n"
 		"freqErr=parseFloat(jsonR.freqErr);\n"
+		"rfch=parseInt(jsonR.rfch);\n"
+		"if(isNaN(rfch)) rfch=0;\n"
 		"if(rssi<-140) rssi=-140;\n"
 		"raw=jsonR.RAW;\n"
 		"timeStamp=Number(jsonR.timeStamp);\n"
 		"if(active==1){\nleft.update(rssi,false);\nchart.redraw();\n"
 		"var d=new Date(timeStamp * 1000);\n"
-		"var head=d.getFullYear()+\"-\"+(d.getMonth()+1)+\"-\"+d.getDate()+\",\"+d.getHours()+\":\"+d.getMinutes()+\":\"+d.getSeconds()+\" [RSSI:\"+rssi.toFixed(0)+\"dBm,SNR:\"+snr.toFixed(0)+\"dB,FreqErr:\"+freqErr.toFixed(0)+\"Hz]\\n\";\n";
+		"var rfName=(rfch==2)?\"RF2\":((rfch==1)?\"RF1\":\"RF?\");\n"
+		"var head=d.getFullYear()+\"-\"+(d.getMonth()+1)+\"-\"+d.getDate()+\",\"+d.getHours()+\":\"+d.getMinutes()+\":\"+d.getSeconds()+\" [\"+rfName+\" RSSI:\"+rssi.toFixed(0)+\"dBm,SNR:\"+snr.toFixed(0)+\"dB,FreqErr:\"+freqErr.toFixed(0)+\"Hz]\\n\";\n";
 	// webString += "document.getElementById(\"raw_txt\").value+=head+atob(raw)+\"\\n\";\n";
 	webString +=
 		"var textArea=document.getElementById(\"raw_txt\");\n"

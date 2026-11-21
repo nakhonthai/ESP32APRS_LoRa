@@ -458,6 +458,7 @@ String lastPkgRaw = "";
 float rssi = 0;
 float snr = 0;
 float freqErr = 0;
+uint8_t rfch = 1;
 
 long timeNetwork, timeAprs, timeGui;
 
@@ -4255,7 +4256,8 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             {
                 pkgList[i].rssi = rssi;
                 pkgList[i].snr = snr;
-                pkgList[i].freqErr = freqErr;
+                pkgList[i].freqErr = freqErr;    
+                pkgList[i].rfch = rfch;            
             }
             else
             {
@@ -4312,12 +4314,14 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
             pkgList[i].rssi = rssi;
             pkgList[i].snr = snr;
             pkgList[i].freqErr = freqErr;
+            pkgList[i].rfch = rfch;
         }
         else
         {
             pkgList[i].rssi = -140;
             pkgList[i].snr = 0;
             pkgList[i].freqErr = 0;
+            pkgList[i].rfch = 0;
         }
         // strcpy(pkgList[i].calsign, callsign);
         memset(pkgList[i].calsign, 0, sizeof(pkgList[i].calsign));
