@@ -29,6 +29,7 @@ ESP32APRS_LoRa is a Internet Gateway(IGate)/Dital Repeater(DiGi)/Tracker/Weather
 * support filter packet rx/tx on igate,digi,display
 * support VPN wireguard
 * support global time zone
+* support PCF85063 RTC on the PMU I2C bus (NAWS4) to keep time between power cycles; the RTC is loaded at boot and updated from NTP/GPS
 * support web service auth login
 * support BLUETOOTH SPP/BLE
 * support PPPoS (PPP Over Serial GSM network)

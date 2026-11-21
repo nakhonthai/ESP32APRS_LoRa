@@ -413,6 +413,7 @@ void taskAPRS(void *pvParameters);
 void taskAPRSPoll(void *pvParameters);
 void taskNetwork(void *pvParameters);
 //void taskTNC(void *pvParameters);
+void wifiConfigApplyRequest();
 void sort(pkgListType a[], int size);
 void sortPkgDesc(pkgListType a[], int size);
 //int processPacket(String &tnc2);

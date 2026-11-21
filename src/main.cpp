@@ -50,6 +50,10 @@
 
 #include "sensor.h"
 
+#ifdef PCF85063
+#include "pcf85063.h"
+#endif
+
 #include <rom/spi_flash.h>
 #include "FS.h"
 #include <LITTLEFS.h>
@@ -1847,6 +1851,9 @@ void logTracker(double lat, double lon, double speed, double course)
             timeval tv = {rtc, 0};
             timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
+#ifdef PCF85063
+            pcf85063SaveSystemTime();
+#endif
         }
     }
     else
@@ -1988,6 +1995,9 @@ void logIGate(double lat, double lon, double speed, double course)
             timeval tv = {rtc, 0};
             timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
+#ifdef PCF85063
+            pcf85063SaveSystemTime();
+#endif
         }
     }
     else
@@ -2120,6 +2130,9 @@ void logDigi(double lat, double lon, double speed, double course)
             timeval tv = {rtc, 0};
             timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
+#ifdef PCF85063
+            pcf85063SaveSystemTime();
+#endif
         }
     }
     else
@@ -2252,6 +2265,9 @@ void logWeather(double lat, double lon, double speed, double course)
             timeval tv = {rtc, 0};
             timezone tz = {(int)(config.timeZone * (float)SECS_PER_HOUR), 0};
             settimeofday(&tv, &tz);
+#ifdef PCF85063
+            pcf85063SaveSystemTime();
+#endif
         }
     }
     else
@@ -4465,9 +4481,18 @@ bool pkgTxSend()
                                     // String packet = "user APRSCB pass 9123\n" + String(txQueue[i].Info)+ "\r\n"; // Send packet to APRS-IS (tcp)
                                     uint8_t packet[400];
                                     sprintf((char *)packet, "user APRSCB pass 9123\n%s\r\n", txQueue[i].Info);
-                                    aprsUDP.beginPacket("aprs.nakhonthai.net", 8081);               // Send packet to APRS-IS (udp)
-                                    aprsUDP.write((const uint8_t *)packet, strlen((char *)packet)); // Send binary frame packet to APRS-IS (udp)
-                                    aprsUDP.endPacket();
+                                    // NetworkUDP::write() dereferences an unallocated tx_buffer
+                                    // when beginPacket() could not resolve the host, so only
+                                    // send when the packet was opened successfully.
+                                    if (aprsUDP.beginPacket("aprs.nakhonthai.net", 8081)) // Send packet to APRS-IS (udp)
+                                    {
+                                        aprsUDP.write((const uint8_t *)packet, strlen((char *)packet)); // Send binary frame packet to APRS-IS (udp)
+                                        aprsUDP.endPacket();
+                                    }
+                                    else
+                                    {
+                                        log_d("APRS-CB UDP send failed (DNS)");
+                                    }
                                 }
                                 else
                                 {
@@ -4885,6 +4910,29 @@ PowerOn();
         if (!loadConfiguration("/default.cfg", config))
             defaultConfig();
     }
+
+#ifdef PCF85063
+    // PCF85063 RTC shares the PMU I2C bus (Wire) and restores the clock at boot
+    if (pcf85063Begin(Wire))
+    {
+        if (pcf85063LoadSystemTime())
+        {
+            // now() is valid from boot, so start the uptime reference here
+            if (systemUptime == 0)
+                systemUptime = time(NULL);
+            struct tm tmstruct;
+            getLocalTime(&tmstruct, 100);
+            log_d("PCF85063 RTC time loaded: %04d-%02d-%02d %02d:%02d:%02d UTC",
+                  tmstruct.tm_year + 1900, tmstruct.tm_mon + 1, tmstruct.tm_mday,
+                  tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+        }
+        else
+        {
+            log_d("PCF85063 RTC has no valid time");
+        }
+    }
+#endif
+
     pinMode(BOOT_PIN, INPUT_PULLUP);
 
 #ifdef PPPOS
@@ -8331,7 +8379,7 @@ void taskGPS(void *pvParameters)
             {
                 if (gps.time.isUpdated())
                 {
-                    if (gnssTimeInterval > millis())
+                    if (millis() > gnssTimeInterval)
                     {
                         gnssTimeInterval = millis() + 10000;
                         time_t nowTime;
@@ -8345,6 +8393,9 @@ void taskGPS(void *pvParameters)
                             timeval tv = {rtc, 0};
                             timezone tz = {static_cast<int>(config.timeZone * SECS_PER_HOUR), 0};
                             settimeofday(&tv, &tz);
+#ifdef PCF85063
+                            pcf85063SaveSystemTime();
+#endif
                             log_d("\nSET GPS Timestamp = %u Year=%d\n", timeGps, year());
                             // firstGpsTime = false;
                             firstGpsTime = false;
@@ -10110,9 +10161,111 @@ unsigned long mitiWifiTimeout = 0;
 
 // WiFi current AP tracking for stable reconnection
 String currentAPSSID = "";
+String currentAPPass = "";
 int8_t currentAPIndex = -1;
 unsigned long lastReconnectAttempt = 0;
 unsigned long lastAPCheck = 0;
+
+// Set when the web UI saves new WiFi station settings, applied by taskNetwork
+volatile bool wifiConfigChanged = false;
+volatile unsigned long wifiConfigChangedTime = 0;
+
+// Rebuild the WiFiMulti AP list from the current configuration
+void wifiReloadAPList()
+{
+    wifiMulti.APlistClean();
+    wifiMulti.setStrictMode(false);  // do not drop an AP that is not in the list
+    wifiMulti.setAllowOpenAP(true);  // allow open networks from the list
+    for (int i = 0; i < 5; i++)
+    {
+        if (config.wifi_sta[i].enable && config.wifi_sta[i].wifi_ssid[0] != 0)
+        {
+            wifiMulti.addAP(config.wifi_sta[i].wifi_ssid, config.wifi_sta[i].wifi_pass);
+        }
+    }
+}
+
+// Remember which configured station the current connection belongs to
+void wifiTrackCurrentAP()
+{
+    currentAPSSID = "";
+    currentAPPass = "";
+    currentAPIndex = -1;
+    if (!WiFi.isConnected())
+        return;
+
+    currentAPSSID = WiFi.SSID();
+    for (int i = 0; i < 5; i++)
+    {
+        if (config.wifi_sta[i].enable &&
+            strcmp(config.wifi_sta[i].wifi_ssid, currentAPSSID.c_str()) == 0)
+        {
+            currentAPIndex = i;
+            currentAPPass = config.wifi_sta[i].wifi_pass;
+            log_d("Connected to AP[%d]: %s", i, currentAPSSID.c_str());
+            break;
+        }
+    }
+}
+
+// Request applying the saved WiFi settings at runtime (called from the web UI)
+void wifiConfigApplyRequest()
+{
+    wifiConfigChangedTime = millis();
+    wifiConfigChanged = true;
+}
+
+// Apply WiFi station/AP mode changes without rebooting
+void wifiApplyConfig()
+{
+    log_d("Applying WiFi configuration");
+    wifiReloadAPList();
+    wifiDisCount = 0;
+    wifiDisconnecting = false;
+    lastReconnectAttempt = 0;
+    mitiWifiTimeout = 0;
+
+    if (config.wifi_mode & WIFI_STA_FIX)
+    {
+        // Keep a working connection only if it still matches the saved settings
+        bool keep = WiFi.isConnected() && currentAPIndex >= 0 &&
+                    config.wifi_sta[currentAPIndex].enable &&
+                    currentAPSSID == config.wifi_sta[currentAPIndex].wifi_ssid &&
+                    currentAPPass == config.wifi_sta[currentAPIndex].wifi_pass;
+
+        currentAPSSID = "";
+        currentAPPass = "";
+        currentAPIndex = -1;
+
+        wifi_mode_t mode = (config.wifi_mode & WIFI_AP_FIX) ? WIFI_MODE_APSTA : WIFI_MODE_STA;
+        if (WiFi.getMode() != mode)
+        {
+            log_d("WiFi mode change %d -> %d", WiFi.getMode(), mode);
+            WiFi.mode(mode);
+        }
+
+        if (WiFi.isConnected() && !keep)
+        {
+            log_d("WiFi station settings changed, reconnecting");
+            WiFi.disconnect(false, false); // keep the radio (and soft-AP) up
+        }
+    }
+    else
+    {
+        currentAPSSID = "";
+        currentAPPass = "";
+        currentAPIndex = -1;
+
+        if (WiFi.isConnected())
+        {
+            log_d("WiFi station disabled, disconnecting");
+            WiFi.disconnect(false, false); // keep the radio (and soft-AP) up
+        }
+        wifi_mode_t mode = (config.wifi_mode & WIFI_AP_FIX) ? WIFI_MODE_AP : WIFI_MODE_NULL;
+        if (WiFi.getMode() != mode)
+            WiFi.mode(mode);
+    }
+}
 
 void wifiConnection()
 {
@@ -10141,34 +10294,14 @@ void wifiConnection()
     {
         WiFi.mode(WIFI_MODE_NULL);
     }
-    wifiMulti.APlistClean(); // Clean AP list
-    for (int i = 0; i < 5; i++)
-    {
-        if (config.wifi_sta[i].enable)
-        {
-            wifiMulti.addAP(config.wifi_sta[i].wifi_ssid, config.wifi_sta[i].wifi_pass);
-        }
-    }
+    wifiReloadAPList();
     WiFi.setHostname(config.host_name);
     if (wifiMulti.run() == WL_CONNECTED)
     {
         wifiDisCount = 0;
         pingTimeout = millis() + 60000;
         NTP_Timeout = millis() + 2000;
-
-        // Track current AP for stable reconnection
-        currentAPSSID = WiFi.SSID();
-        currentAPIndex = -1;
-        for (int i = 0; i < 5; i++)
-        {
-            if (config.wifi_sta[i].enable &&
-                strcmp(config.wifi_sta[i].wifi_ssid, currentAPSSID.c_str()) == 0)
-            {
-                currentAPIndex = i;
-                log_d("Connected to AP[%d]: %s", i, currentAPSSID.c_str());
-                break;
-            }
-        }
+        wifiTrackCurrentAP();
     }
 }
 
@@ -10288,7 +10421,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         if(millis() > lastReconnectAttempt + 5000) { // 5 seconds between attempts
             lastReconnectAttempt = millis();
 
-            if(currentAPIndex >= 0 && config.wifi_sta[currentAPIndex].enable) {
+            if((config.wifi_mode & WIFI_STA_FIX) && currentAPIndex >= 0 && config.wifi_sta[currentAPIndex].enable) {
                 log_d("Immediate reconnect attempt to AP[%d]: %s",
                     currentAPIndex, config.wifi_sta[currentAPIndex].wifi_ssid);
                 WiFi.begin(
@@ -10396,8 +10529,7 @@ void PPPOS_Start()
             Serial.println(PPP.cmd("AT+QGPS=1", 10000));
         }
 
-        PPP.cmd("AT+CTZU=1", 1000); // Enable automatic time zone update
-        PPP.cmd("AT+QCFG=\"ledmode\",0", 1000);
+        
         // PPP.setUser(ppp_user);
         // PPP.setPass(ppp_pass);
         // PPP.setApn(config.ppp_apn);
@@ -10406,6 +10538,8 @@ void PPPOS_Start()
         // PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio, config.ppp_rts_gpio, config.ppp_cts_gpio, PPP_MODEM_FC);
 
         PPP.setBaudrate(config.ppp_serial_baudrate); // Set the baud rate for the modem
+        PPP.cmd("AT+CTZU=1", 10000); // Enable automatic time zone update
+        PPP.cmd("AT+QCFG=\"ledmode\",0", 10000);
         sprintf(pppStatus.manufacturer, "%s", PPP.cmd("AT+CGMI", 10000).c_str());
         sprintf(pppStatus.model, "%s", PPP.moduleName().c_str());
         sprintf(pppStatus.imei, "%s", PPP.IMEI().c_str());
@@ -10593,6 +10727,14 @@ void taskNetwork(void *pvParameters)
         vTaskDelay(10 / portTICK_PERIOD_MS);
         timerNetwork_old = micros();
 
+        // Apply WiFi settings saved from the web UI. A short delay lets the
+        // HTTP response reach the browser before a possible reconnect.
+        if (wifiConfigChanged && (millis() - wifiConfigChangedTime > 1500))
+        {
+            wifiConfigChanged = false;
+            wifiApplyConfig();
+        }
+
 #ifdef PPPOS
         if (config.ppp_enable)
         {
@@ -10665,6 +10807,11 @@ void taskNetwork(void *pvParameters)
             else
             {
                 wifiStatus = WL_CONNECTED;
+                if (currentAPIndex < 0 && (millis() - lastAPCheck > 5000))
+                {
+                    lastAPCheck = millis();
+                    wifiTrackCurrentAP();
+                }
             }
         }
 #ifdef PPPOS
@@ -10689,6 +10836,9 @@ void taskNetwork(void *pvParameters)
                     time_t systemTime;
                     time(&systemTime);
                     setTime(systemTime);
+#ifdef PCF85063
+                    pcf85063SaveSystemTime();
+#endif
                     if (systemUptime == 0)
                     {
                         systemUptime = time(NULL);

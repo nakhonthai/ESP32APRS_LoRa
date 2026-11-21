@@ -11571,6 +11571,7 @@ void handle_wireless(AsyncWebServerRequest *request)
 		{
 			config.wifi_mode &= ~WIFI_STA_FIX;
 		}
+		wifiConfigApplyRequest(); // apply the new station list without a reboot
 		saveConfig(request);
 	}
 	#ifdef BLUETOOTH
