@@ -8911,7 +8911,7 @@ void handle_digi(AsyncWebServerRequest *request)
 	else
 	{
 		// Allocate initial memory for HTML content
-		char *html = allocateStringMemory(32768); // Start with 12KB buffer
+		char *html = allocateStringMemory(24576); // ~19KB page + headroom
 		if (!html)
 		{
 			request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
