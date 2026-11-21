@@ -18,6 +18,89 @@ extern fs::LITTLEFSFS LITTLEFS;
 // ประกาศ global semaphore
 static SemaphoreHandle_t cfg_mutex = NULL;
 
+// New settings are always staged here first. /default.cfg is only rewritten
+// once the staged file has been written and verified, so a failed write can
+// never leave the device without a usable configuration.
+#define CFG_BACKUP_FILE "/last.cfg"
+
+// A configuration file is only accepted when it is complete: exact size, an
+// opening brace and a closing brace. This catches the truncated / 0 byte files
+// that a low-flash or interrupted write used to leave behind.
+static bool verifyConfigFile(const char *filename, size_t expectedSize)
+{
+    File f = LITTLEFS.open(filename, FILE_READ);
+    if (!f)
+        return false;
+
+    size_t size = f.size();
+    if (size == 0 || size != expectedSize)
+    {
+        f.close();
+        return false;
+    }
+
+    char first = 0;
+    char last = 0;
+    f.seek(0);
+    bool firstOk = (f.read((uint8_t *)&first, 1) == 1);
+    f.seek(size - 1);
+    bool lastOk = (f.read((uint8_t *)&last, 1) == 1);
+    f.close();
+
+    return firstOk && lastOk && first == '{' && last == '}';
+}
+
+// Copies src over dst and verifies the result. last.cfg is kept intact so it
+// can still be restored on the next boot if the copy fails.
+static bool copyConfigFile(const char *src, const char *dst, size_t expectedSize)
+{
+    if (strcmp(src, dst) == 0)
+        return verifyConfigFile(dst, expectedSize);
+
+    File in = LITTLEFS.open(src, FILE_READ);
+    if (!in)
+        return false;
+
+    if (LITTLEFS.exists(dst))
+        LITTLEFS.remove(dst);
+
+    File out = LITTLEFS.open(dst, FILE_WRITE);
+    if (!out)
+    {
+        in.close();
+        return false;
+    }
+
+    uint8_t buff[256];
+    size_t total = 0;
+    bool ok = true;
+    while (in.available() > 0)
+    {
+        size_t len = in.read(buff, sizeof(buff));
+        if (len == 0)
+        {
+            ok = false;
+            break;
+        }
+        if (out.write(buff, len) != len)
+        {
+            ok = false;
+            break;
+        }
+        total += len;
+    }
+    in.close();
+    out.flush();
+    out.close();
+
+    if (!ok || total != expectedSize)
+    {
+        log_d("Copy %s to %s failed (%u/%u byte)", src, dst, (unsigned int)total, (unsigned int)expectedSize);
+        return false;
+    }
+    return verifyConfigFile(dst, expectedSize);
+}
+
 // Saves the configuration to a file
 bool saveConfiguration(const char *filename, const Configuration &config)
 {
@@ -25,18 +108,21 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         cfg_mutex = xSemaphoreCreateMutex();
     if (xSemaphoreTake(cfg_mutex, portMAX_DELAY) == pdTRUE)
     {
+        const char *stage = CFG_BACKUP_FILE;
+        bool saved = false;
+
         // Delete existing file, otherwise the configuration is appended to the file
 
-        if (LITTLEFS.exists(filename))
+        if (LITTLEFS.exists(stage))
         {
-            LITTLEFS.remove(filename);
+            LITTLEFS.remove(stage);
         }
 
         // Open file for writing
-        File file = LITTLEFS.open(filename, FILE_WRITE);
+        File file = LITTLEFS.open(stage, FILE_WRITE);
         if (!file)
         {
-            log_d("Failed to create file");
+            log_d("Failed to create file %s", stage);
             xSemaphoreGive(cfg_mutex);
             return false;
         }
@@ -567,20 +653,34 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["msgInterval"] = config.msg_interval;
 
         // Serialize JSON to file
-        if (serializeJson(doc, file) == 0)
-        {
-            log_d("Failed to write to file");
-        }
+        size_t expected = measureJson(doc);
+        size_t written = serializeJson(doc, file);
+        file.flush();
 
         // Close the file
         file.close();
+
+        if (written != expected || !verifyConfigFile(stage, expected))
+        {
+            log_d("Failed to write to file %s (%u/%u byte)", stage, (unsigned int)written, (unsigned int)expected);
+        }
+        else if (copyConfigFile(stage, filename, expected))
+        {
+            saved = true;
+        }
+        else
+        {
+            log_d("Failed to update %s, %s kept for recovery", filename, stage);
+        }
+
         xSemaphoreGive(cfg_mutex);
+        return saved;
     }
-    return true;
+    return false;
 }
 
 // Loads the configuration from a file
-bool loadConfiguration(const char *filename, Configuration &config)
+static bool loadConfigFile(const char *filename, Configuration &config)
 {
 
     if (!LITTLEFS.exists(filename))
@@ -1124,6 +1224,27 @@ bool loadConfiguration(const char *filename, Configuration &config)
     else
     {
         log_d("Can't load %s file.", filename);
+    }
+    return false;
+}
+
+// Loads the configuration, falling back to the staged copy when the main file
+// is missing, empty or corrupt.
+bool loadConfiguration(const char *filename, Configuration &config)
+{
+    if (loadConfigFile(filename, config))
+        return true;
+
+    if (strcmp(filename, CFG_BACKUP_FILE) != 0 && LITTLEFS.exists(CFG_BACKUP_FILE))
+    {
+        log_d("%s unusable, trying %s", filename, CFG_BACKUP_FILE);
+        if (loadConfigFile(CFG_BACKUP_FILE, config))
+        {
+            log_d("Configuration recovered from %s", CFG_BACKUP_FILE);
+            // Repair the main file so the next boot starts clean again
+            saveConfiguration(filename, config);
+            return true;
+        }
     }
     return false;
 }

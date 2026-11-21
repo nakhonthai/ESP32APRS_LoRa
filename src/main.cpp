@@ -4928,16 +4928,11 @@ PowerOn();
     LED_Status(200, 200, 200);
 #endif
 
-    if (!LITTLEFS.exists("/default.cfg"))
+    if (!loadConfiguration("/default.cfg", config))
     {
         log_d("Factory Default");
         defaultConfig();
         saveConfiguration("/default.cfg", config);
-    }
-    else
-    {
-        if (!loadConfiguration("/default.cfg", config))
-            defaultConfig();
     }
 
 #ifdef PCF85063
