@@ -10338,8 +10338,19 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 
 void PPPOS_Start()
 {
+    static unsigned long lastStartMs = 0;
     if (config.ppp_enable)
     {
+        // Never restart faster than every 30s: the modem needs time to settle
+        // and hammering PPP.end()/begin() keeps the event task racing with the
+        // netif teardown (which used to assert in on_ppp_notify_phase()).
+        if (lastStartMs != 0 && (millis() - lastStartMs) < 30000)
+        {
+            log_d("PPP restart skipped, cooldown %lus left", (30000 - (millis() - lastStartMs)) / 1000);
+            pppTimeout = millis() + (30 * 1000);
+            return;
+        }
+        lastStartMs = millis();
         pppTimeout = millis() + (600 * 1000);
         log_d("Starting the modem. It might take a while!");
         PPP.end();
@@ -10386,6 +10397,7 @@ void PPPOS_Start()
         }
 
         PPP.cmd("AT+CTZU=1", 1000); // Enable automatic time zone update
+        PPP.cmd("AT+QCFG=\"ledmode\",0", 1000);
         // PPP.setUser(ppp_user);
         // PPP.setPass(ppp_pass);
         // PPP.setApn(config.ppp_apn);

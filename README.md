@@ -88,6 +88,26 @@ Note: task stacks stay in internal RAM on purpose. A task whose stack lives in
 PSRAM may not run while the flash cache is disabled (config/LittleFS/OTA
 writes), which would make those operations unsafe.
 
+## PPP (4G/LTE modem) teardown fix
+
+`lib/PPP` is a local copy of the Arduino core `PPP` library. In the Arduino
+core 3.1.x release `PPPClass::end()` destroys the `esp_netif` **before**
+calling `esp_modem_destroy()`. When PPP is restarted at runtime (for example
+after `taskNetwork()` reports `PPP Ping Fail!`), a `NETIF_PPP_STATUS` event
+posted from the modem task can arrive with the already freed netif and the
+firmware aborts with:
+
+```
+assert failed: on_ppp_notify_phase esp_netif_lwip_ppp.c:158
+(obj->base.netif_type == PPP_LWIP_NETIF)
+```
+
+The local copy keeps the upstream order (`esp_modem_destroy()` first), so a
+PPP restart no longer crashes. `PPPOS_Start()` additionally enforces a 30
+second minimum interval between restarts so the modem and the event task have
+time to settle. Keep `lib/PPP` until the core version you build against ships
+the fixed ordering.
+
 ## Reducing firmware size (optional)
 
 The firmware is built with `-Os`, `-ffunction-sections`, `-fdata-sections` and
