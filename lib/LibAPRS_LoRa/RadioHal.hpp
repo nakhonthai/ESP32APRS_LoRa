@@ -16,6 +16,8 @@ public:
   virtual void setDio0Action(void (*func)(void)) = 0;
   virtual int16_t startReceive(uint8_t len = 0, uint8_t mode = RADIOLIB_SX127X_RXCONTINUOUS) = 0;
   virtual int16_t transmit(uint8_t* data, size_t len, uint8_t addr = 0) = 0;
+  virtual int16_t startTransmit(uint8_t* data, size_t len, uint8_t addr = 0) = 0;
+  virtual int16_t finishTransmit() = 0;
   virtual int16_t sleep() = 0;
   virtual size_t getPacketLength(bool update = true) = 0;
   virtual int16_t readData(uint8_t* data, size_t len) = 0;
@@ -67,6 +69,16 @@ public:
   int16_t transmit(uint8_t* data, size_t len, uint8_t addr = 0)
   {    
     return radio->transmit(data, len, addr);
+  }
+
+  int16_t startTransmit(uint8_t* data, size_t len, uint8_t addr = 0)
+  {
+    return radio->startTransmit(data, len, addr);
+  }
+
+  int16_t finishTransmit()
+  {
+    return radio->finishTransmit();
   }
 
   bool fifoAdd(uint8_t* data, int totalLen, int* remLen);

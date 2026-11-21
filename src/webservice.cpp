@@ -4130,6 +4130,9 @@ void handle_msg(AsyncWebServerRequest *request)
 		bool msgEn = false;
 		bool msgRf = false;
 		bool msgInet = false;
+#ifdef RF2
+		bool msgRf2 = false;
+#endif
 		bool msgEncrypt = false;
 
 		for (uint8_t i = 0; i < request->args(); i++)
@@ -4158,6 +4161,16 @@ void handle_msg(AsyncWebServerRequest *request)
 						msgInet = true;
 				}
 			}
+#ifdef RF2
+			if (request->argName(i) == "msgRf2")
+			{
+				if (request->arg(i) != "")
+				{
+					if (strcmp(request->arg(i).c_str(), "OK") == 0)
+						msgRf2 = true;
+				}
+			}
+#endif
 			if (request->argName(i) == "encrypt")
 			{
 				if (request->arg(i) != "")
@@ -4211,6 +4224,9 @@ void handle_msg(AsyncWebServerRequest *request)
 		config.msg_enable = msgEn;
 		config.msg_rf = msgRf;
 		config.msg_inet = msgInet;
+#ifdef RF2
+		config.msg_rf2 = msgRf2;
+#endif
 		config.msg_encrypt = msgEncrypt;
 
 		// Using dynamic memory allocation instead of String
@@ -4310,22 +4326,17 @@ void handle_msg(AsyncWebServerRequest *request)
 		strcat(html, temp_buffer);
 		strcat(html, "</tr>\n");
 
-		// Handle RF and Internet flags
-		if (config.msg_rf && config.msg_inet)
+		// Handle RF, RF2 and Internet flags
 		{
-			strcat(html, "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"msgRf\" value=\"OK\" checked/>RF <input type=\"checkbox\" name=\"msgInet\" value=\"OK\" checked/>Internet </td></tr>\n");
-		}
-		else if (config.msg_rf)
-		{
-			strcat(html, "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"msgRf\" value=\"OK\" checked/>RF <input type=\"checkbox\" name=\"msgInet\" value=\"OK\" />Internet </td></tr>\n");
-		}
-		else if (config.msg_inet)
-		{
-			strcat(html, "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"msgRf\" value=\"OK\" />RF <input type=\"checkbox\" name=\"msgInet\" value=\"OK\" checked/>Internet </td></tr>\n");
-		}
-		else
-		{
-			strcat(html, "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"msgRf\" value=\"OK\" />RF <input type=\"checkbox\" name=\"msgInet\" value=\"OK\" />Internet </td></tr>\n");
+			const char *msgRfFlag = config.msg_rf ? "checked" : "";
+			const char *msgInetFlag = config.msg_inet ? "checked" : "";
+		#ifdef RF2
+			const char *msgRf2Flag = config.msg_rf2 ? "checked" : "";
+			snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"msgRf\" value=\"OK\" %s/>RF1 <input type=\"checkbox\" name=\"msgRf2\" value=\"OK\" %s/>RF2 <input type=\"checkbox\" name=\"msgInet\" value=\"OK\" %s/>Internet </td></tr>\n", msgRfFlag, msgRf2Flag, msgInetFlag);
+		#else
+			snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"msgRf\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"msgInet\" value=\"OK\" %s/>Internet </td></tr>\n", msgRfFlag, msgInetFlag);
+		#endif
+			strcat(html, temp_buffer);
 		}
 
 		strcat(html, "<tr>");
@@ -7519,6 +7530,9 @@ void handle_igate(AsyncWebServerRequest *request)
 	bool bcnEN = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+#ifdef RF2
+	bool pos2RF2 = false;
+#endif
 	bool timeStamp = false;
 
 	if (request->hasArg("commitIGATE"))
@@ -7723,6 +7737,16 @@ void handle_igate(AsyncWebServerRequest *request)
 						pos2INET = true;
 				}
 			}
+#ifdef RF2
+			if (request->argName(i) == "igatePos2RF2")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						pos2RF2 = true;
+				}
+			}
+#endif
 			if (request->argName(i) == "igateBcnEnable")
 			{
 				if (request->arg(i) != "")
@@ -7805,6 +7829,9 @@ void handle_igate(AsyncWebServerRequest *request)
 		config.igate_bcn = bcnEN;
 		config.igate_loc2rf = pos2RF;
 		config.igate_loc2inet = pos2INET;
+#ifdef RF2
+		config.igate_loc2rf2 = pos2RF2;
+#endif
 		config.igate_timestamp = timeStamp;
 
 		initInterval = true;
@@ -8252,7 +8279,12 @@ void handle_igate(AsyncWebServerRequest *request)
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"igatePosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"igatePosSel\" value=\"1\" %s/>GPS </td></tr>\n", igatePosFixFlag, igatePosGPSFlag);
 		strcat(html, tempHtml);
 
+#ifdef RF2
+		const char *igatePos2RF2Flag = config.igate_loc2rf2 ? "checked" : "";
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"igatePos2RF\" value=\"OK\" %s/>RF1 <input type=\"checkbox\" name=\"igatePos2RF2\" value=\"OK\" %s/>RF2 <input type=\"checkbox\" name=\"igatePos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", igatePos2RFFlag, igatePos2RF2Flag, igatePos2INETFlag);
+#else
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"igatePos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"igatePos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", igatePos2RFFlag, igatePos2INETFlag);
+#endif
 		strcat(html, tempHtml);
 
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"igatePosLat\" name=\"igatePosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.igate_lat);
@@ -8551,6 +8583,9 @@ void handle_digi(AsyncWebServerRequest *request)
 	bool bcnEN = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+#ifdef RF2
+	bool pos2RF2 = false;
+#endif
 	bool timeStamp = false;
 
 	if (request->hasArg("commitDIGI"))
@@ -8715,6 +8750,16 @@ void handle_digi(AsyncWebServerRequest *request)
 						pos2INET = true;
 				}
 			}
+#ifdef RF2
+			if (request->argName(i) == "digiPos2RF2")
+			{
+				if (request->arg(i) != "")
+				{
+					if (strcmp(request->arg(i).c_str(), "OK") == 0)
+						pos2RF2 = true;
+				}
+			}
+#endif
 			if (request->argName(i) == "digiBcnEnable")
 			{
 				if (request->arg(i) != "")
@@ -8914,6 +8959,9 @@ void handle_digi(AsyncWebServerRequest *request)
 		config.digi_bcn = bcnEN;
 		config.digi_loc2rf = pos2RF;
 		config.digi_loc2inet = pos2INET;
+#ifdef RF2
+		config.digi_loc2rf2 = pos2RF2;
+#endif
 		config.digi_timestamp = timeStamp;
 
 		initInterval = true;
@@ -9132,8 +9180,14 @@ void handle_digi(AsyncWebServerRequest *request)
 				 digiPosFixFlag.c_str(), digiPosGPSFlag.c_str());
 		strcat(html, tempHtml);
 
+		#ifdef RF2
+		String digiPos2RF2Flag = config.digi_loc2rf2 ? "checked" : "";
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"digiPos2RF\" value=\"OK\" %s/>RF1 <input type=\"checkbox\" name=\"digiPos2RF2\" value=\"OK\" %s/>RF2 <input type=\"checkbox\" name=\"digiPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n",
+				 digiPos2RFFlag.c_str(), digiPos2RF2Flag.c_str(), digiPos2INETFlag.c_str());
+		#else
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"digiPos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"digiPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n",
 				 digiPos2RFFlag.c_str(), digiPos2INETFlag.c_str());
+		#endif
 		strcat(html, tempHtml);
 
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"digiPosLat\" name=\"digiPosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.digi_lat);
@@ -9347,6 +9401,9 @@ void handle_wx(AsyncWebServerRequest *request)
 	bool posGPS = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+#ifdef RF2
+	bool pos2RF2 = false;
+#endif
 	bool timeStamp = false;
 	String arg = "";
 
@@ -9483,6 +9540,16 @@ void handle_wx(AsyncWebServerRequest *request)
 						pos2INET = true;
 				}
 			}
+#ifdef RF2
+			if (request->argName(i) == "Pos2RF2")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						pos2RF2 = true;
+				}
+			}
+#endif
 			if (request->argName(i) == "wxTimeStamp")
 			{
 				if (request->arg(i) != "")
@@ -9526,6 +9593,9 @@ void handle_wx(AsyncWebServerRequest *request)
 		config.wx_gps = posGPS;
 		config.wx_2rf = pos2RF;
 		config.wx_2inet = pos2INET;
+#ifdef RF2
+		config.wx_2rf2 = pos2RF2;
+#endif
 		config.wx_timestamp = timeStamp;
 
 		initInterval = true;
@@ -9681,7 +9751,12 @@ void handle_wx(AsyncWebServerRequest *request)
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"PosSel\" value=\"0\" %s/>Fix <input type=\"radio\" name=\"PosSel\" value=\"1\" %s/>GPS </td></tr>\n", PosFixFlag.c_str(), PosGPSFlag.c_str());
 		strcat(html, tempHtml);
 
+		#ifdef RF2
+		const char *Pos2RF2Flag = config.wx_2rf2 ? "checked" : "";
+		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF1 <input type=\"checkbox\" name=\"Pos2RF2\" value=\"OK\" %s/>RF2 <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag.c_str(), Pos2RF2Flag, Pos2INETFlag.c_str());
+		#else
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag.c_str(), Pos2INETFlag.c_str());
+		#endif
 		strcat(html, tempHtml);
 
 		snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" name=\"PosLat\" type=\"number\" value=\"%.5f\" />degrees (positive for North, negative for South)</td></tr>\n", config.wx_lat);
@@ -9803,6 +9878,9 @@ void handle_tlm(AsyncWebServerRequest *request)
 	bool En = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+#ifdef RF2
+	bool pos2RF2 = false;
+#endif
 	String arg = "";
 
 	if (request->hasArg("commitTLM"))
@@ -9889,6 +9967,16 @@ void handle_tlm(AsyncWebServerRequest *request)
 						pos2INET = true;
 				}
 			}
+#ifdef RF2
+			if (request->argName(i) == "Pos2RF2")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						pos2RF2 = true;
+				}
+			}
+#endif
 			for (int x = 0; x < 13; x++)
 			{
 				arg = "sensorCH" + String(x);
@@ -9950,6 +10038,9 @@ void handle_tlm(AsyncWebServerRequest *request)
 		config.tlm0_en = En;
 		config.tlm0_2rf = pos2RF;
 		config.tlm0_2inet = pos2INET;
+#ifdef RF2
+		config.tlm0_2rf2 = pos2RF2;
+#endif
 
 		initInterval = true;
 		String html_msg;
@@ -10076,7 +10167,12 @@ void handle_tlm(AsyncWebServerRequest *request)
 			strcpy(Pos2RFFlag, "checked");
 		if (config.tlm0_2inet)
 			strcpy(Pos2INETFlag, "checked");
+		#ifdef RF2
+		const char *Pos2RF2Flag = config.tlm0_2rf2 ? "checked" : "";
+		snprintf(temp_buf, sizeof(temp_buf), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF1 <input type=\"checkbox\" name=\"Pos2RF2\" value=\"OK\" %s/>RF2 <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag, Pos2RF2Flag, Pos2INETFlag);
+		#else
 		snprintf(temp_buf, sizeof(temp_buf), "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"Pos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"Pos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", Pos2RFFlag, Pos2INETFlag);
+		#endif
 		strcat(html, temp_buf);
 
 		// strcat(html, "<tr>\n");
@@ -10649,6 +10745,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 	bool bcnEN = false;
 	bool pos2RF = false;
 	bool pos2INET = false;
+#ifdef RF2
+	bool pos2RF2 = false;
+#endif
 	bool optCST = false;
 	bool optAlt = false;
 	bool optRSSI = false;
@@ -10962,6 +11061,16 @@ void handle_tracker(AsyncWebServerRequest *request)
 						pos2INET = true;
 				}
 			}
+#ifdef RF2
+			if (request->argName(i) == "trackerPos2RF2")
+			{
+				if (request->arg(i) != "")
+				{
+					if (String(request->arg(i)) == "OK")
+						pos2RF2 = true;
+				}
+			}
+#endif
 			if (request->argName(i) == "trackerTimeStamp")
 			{
 				if (request->arg(i) != "")
@@ -11033,6 +11142,9 @@ void handle_tracker(AsyncWebServerRequest *request)
 		config.trk_gps = posGPS;
 		config.trk_loc2rf = pos2RF;
 		config.trk_loc2inet = pos2INET;
+#ifdef RF2
+		config.trk_loc2rf2 = pos2RF2;
+#endif
 
 		config.trk_log = optCST;
 		config.trk_altitude = optAlt;
@@ -11276,7 +11388,12 @@ void handle_tracker(AsyncWebServerRequest *request)
 		strcpy(trackerPos2RFFlag, "checked");
 	if (config.trk_loc2inet)
 		strcpy(trackerPos2INETFlag, "checked");
+	#ifdef RF2
+	const char *trackerPos2RF2Flag = config.trk_loc2rf2 ? "checked" : "";
+	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" %s/>RF1 <input type=\"checkbox\" name=\"trackerPos2RF2\" value=\"OK\" %s/>RF2 <input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", trackerPos2RFFlag, trackerPos2RF2Flag, trackerPos2INETFlag);
+	#else
 	snprintf(tempHtml, sizeof(tempHtml), "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" %s/>RF <input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" %s/>Internet </td></tr>\n", trackerPos2RFFlag, trackerPos2INETFlag);
+	#endif
 	strcat(html, tempHtml);
 	char trackeroptRSSIFlag[10] = "";
 	char trackerOptSNRFlag[10] = "";

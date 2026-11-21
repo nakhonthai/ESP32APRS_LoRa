@@ -106,6 +106,9 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["inet2rf"] = config.inet2rf;
         doc["igatePos2rf"] = config.igate_loc2rf;
         doc["igatePos2inet"] = config.igate_loc2inet;
+#ifdef RF2
+        doc["igatePos2rf2"] = config.igate_loc2rf2;
+#endif
         doc["rf2inetFilter"] = config.rf2inetFilter;
         doc["inet2rfFiltger"] = config.inet2rfFilter;
 
@@ -157,6 +160,9 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["digiAuto"] = config.digi_auto;
         doc["digiPos2rf"] = config.digi_loc2rf;
         doc["digiPos2inet"] = config.digi_loc2inet;
+#ifdef RF2
+        doc["digiPos2rf2"] = config.digi_loc2rf2;
+#endif
         doc["digiTime"] = config.digi_timestamp;
         doc["digiSSID"] = config.digi_ssid;
         doc["digiMycall"] = config.digi_mycall;
@@ -203,6 +209,9 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["trkEn"] = config.trk_en;
         doc["trkPos2rf"] = config.trk_loc2rf;
         doc["trkPos2inet"] = config.trk_loc2inet;
+#ifdef RF2
+        doc["trkPos2rf2"] = config.trk_loc2rf2;
+#endif
         doc["trkTime"] = config.trk_timestamp;
         doc["trkSSID"] = config.trk_ssid;
         doc["trkMycall"] = config.trk_mycall;
@@ -260,6 +269,9 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["wxEn"] = config.wx_en;
         doc["wxTx2rf"] = config.wx_2rf;
         doc["wxTx2inet"] = config.wx_2inet;
+#ifdef RF2
+        doc["wxTx2rf2"] = config.wx_2rf2;
+#endif
         doc["wxTime"] = config.wx_timestamp;
         doc["wxSSID"] = config.wx_ssid;
         doc["wxMycall"] = config.wx_mycall;
@@ -293,6 +305,9 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["tlmEn"] = config.tlm0_en;
         doc["tlmTx2rf"] = config.tlm0_2rf;
         doc["tlmTx2inet"] = config.tlm0_2inet;
+#ifdef RF2
+        doc["tlmTx2rf2"] = config.tlm0_2rf2;
+#endif
         doc["tlmSSID"] = config.tlm0_ssid;
         doc["tlmMycall"] = config.tlm0_mycall;
         doc["tlmPath"] = config.tlm0_path;
@@ -542,6 +557,9 @@ bool saveConfiguration(const char *filename, const Configuration &config)
         doc["msgMycall"] = config.msg_mycall;
         doc["msgRf"] = config.msg_rf;
         doc["msgInet"] = config.msg_inet;
+#ifdef RF2
+        doc["msgRf2"] = config.msg_rf2;
+#endif
         doc["msgPath"] = config.msg_path;
         doc["msgEncrypt"] = config.msg_encrypt;
         doc["msgAESKey"] = config.msg_key;
@@ -656,6 +674,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.inet2rf = doc["inet2rf"];
         config.igate_loc2rf = doc["igatePos2rf"];
         config.igate_loc2inet = doc["igatePos2inet"];
+#ifdef RF2
+        config.igate_loc2rf2 = doc["igatePos2rf2"];
+#endif
         config.rf2inetFilter = doc["rf2inetFilter"];
         config.inet2rfFilter = doc["inet2rfFiltger"];
 
@@ -700,6 +721,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.digi_auto = doc["digiAuto"];
         config.digi_loc2rf = doc["digiPos2rf"];
         config.digi_loc2inet = doc["digiPos2inet"];
+#ifdef RF2
+        config.digi_loc2rf2 = doc["digiPos2rf2"];
+#endif
         config.digi_timestamp = doc["digiTime"];
         config.digi_ssid = doc["digiSSID"];
         strlcpy(config.digi_mycall, doc["digiMycall"] | "", sizeof(config.digi_mycall));
@@ -739,6 +763,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.trk_en = doc["trkEn"];
         config.trk_loc2rf = doc["trkPos2rf"];
         config.trk_loc2inet = doc["trkPos2inet"];
+#ifdef RF2
+        config.trk_loc2rf2 = doc["trkPos2rf2"];
+#endif
         config.trk_timestamp = doc["trkTime"];
         config.trk_ssid = doc["trkSSID"];
         strlcpy(config.trk_mycall, doc["trkMycall"] | "", sizeof(config.trk_mycall));
@@ -789,6 +816,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.wx_en = doc["wxEn"];
         config.wx_2rf = doc["wxTx2rf"];
         config.wx_2inet = doc["wxTx2inet"];
+#ifdef RF2
+        config.wx_2rf2 = doc["wxTx2rf2"];
+#endif
         config.wx_timestamp = doc["wxTime"];
         config.wx_ssid = doc["wxSSID"];
         strlcpy(config.wx_mycall, doc["wxMycall"] | "", sizeof(config.wx_mycall));
@@ -819,6 +849,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
         config.tlm0_en = doc["tlmEn"];
         config.tlm0_2rf = doc["tlmTx2rf"];
         config.tlm0_2inet = doc["tlmTx2inet"];
+#ifdef RF2
+        config.tlm0_2rf2 = doc["tlmTx2rf2"];
+#endif
         config.tlm0_ssid = doc["tlmSSID"];
         strlcpy(config.tlm0_mycall, doc["tlmMycall"] | "", sizeof(config.tlm0_mycall));
         config.tlm0_path = doc["tlmPath"];
@@ -1074,6 +1107,9 @@ bool loadConfiguration(const char *filename, Configuration &config)
             config.msg_path = doc["msgPath"];
             config.msg_rf = doc["msgRf"];
             config.msg_inet = doc["msgInet"];
+#ifdef RF2
+            config.msg_rf2 = doc["msgRf2"];
+#endif
             config.msg_encrypt = doc["msgEncrypt"];
             config.msg_retry = doc["msgRetry"];
             config.msg_interval = doc["msgInterval"];

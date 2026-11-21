@@ -421,6 +421,10 @@ void sendAPRSMessage(const String &toCall, const String &message, bool encrypt)
         SendMode |= RF_CHANNEL;
     if (config.msg_inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.msg_rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(packet.c_str(), packet.length(), 0, SendMode);
     log_d("Send APRS Message to %s msgID %d TNC2: %s", toCall.c_str(), msgID, packet.c_str());
     if (config.msg_retry == 0)
@@ -475,6 +479,10 @@ void sendAPRSMessageRetry()
                 SendMode |= RF_CHANNEL;
             if (config.msg_inet)
                 SendMode |= INET_CHANNEL;
+#ifdef RF2
+            if (config.msg_rf2)
+                SendMode |= RF2_CHANNEL;
+#endif
             pkgTxPush(packet.c_str(), packet.length(), 0, SendMode);
             log_d("Retry APRS Message msgQueue[%i] to %s msgID %d ack left %i TNC2: %s", i, msgQueue[i].callsign, msgQueue[i].msgID, msgQueue[i].ack, packet.c_str());
             //pkgMsgUpdate(msgQueue[i].callsign, msgQueue[i].text, msgQueue[i].msgID, msgQueue[i].ack);
@@ -513,6 +521,10 @@ void sendAPRSAck(const String &toCall, const String &msgNo)
         SendMode |= RF_CHANNEL;
     if (config.msg_inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.msg_rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(packet.c_str(), packet.length(), 0, SendMode);
     log_d("Send APRS ACK to %s msgNo %s TNC2: %s", toCall.c_str(), msgNo.c_str(), packet.c_str());
 }

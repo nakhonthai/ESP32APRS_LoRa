@@ -4546,6 +4546,31 @@ bool pkgTxSend()
                         }
                     }
                 }
+
+#ifdef RF2
+                if (txQueue[i].Channel & RF2_CHANNEL)
+                {
+                    if (config.rf1_en && (config.rf1_mode != RF_MODE_AIS))
+                    {
+                        char *info = (char *)calloc(txQueue[i].length + 1, sizeof(char));
+                        if (info)
+                        {
+                            memset(info, 0, txQueue[i].length + 1);
+                            memcpy(info, txQueue[i].Info, txQueue[i].length);
+                            psramBusy = false;
+                            status.txCount++;
+                            log_d("TX->RF2: %s", txQueue[i].Info);
+                            APRS_sendTNC2Pkt2((uint8_t *)info, txQueue[i].length);
+                            free(info);
+                            txQueue[i].Channel &= ~RF2_CHANNEL;
+                        }
+                    }
+                    else
+                    {
+                        txQueue[i].Channel &= ~RF2_CHANNEL;
+                    }
+                }
+#endif
             }
 
             if (decTime > 60000 || decTime < 0) // TX Timeout
@@ -6451,6 +6476,10 @@ void tracker_status(char *text)
         SendMode |= RF_CHANNEL;
     if (config.trk_loc2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.trk_loc2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, SendMode);
 }
 
@@ -6482,6 +6511,10 @@ void igate_status(char *text)
         SendMode |= RF_CHANNEL;
     if (config.igate_loc2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.igate_loc2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, SendMode);
 }
 
@@ -6513,6 +6546,10 @@ void digi_status(char *text)
         SendMode |= RF_CHANNEL;
     if (config.digi_loc2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.digi_loc2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(tnc2Raw.c_str(), tnc2Raw.length(), 0, SendMode);
 }
 
@@ -7645,6 +7682,10 @@ void sendTelemetry_0(char *raw, bool header)
         SendMode |= RF_CHANNEL;
     if (config.tlm0_2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.tlm0_2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(str, strlen(str), 0, SendMode);
 
 #if 1
@@ -7726,6 +7767,10 @@ void sendTelemetry_trk(char *raw, int dly_ms)
         SendMode |= RF_CHANNEL;
     if (config.trk_loc2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.trk_loc2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(str, strlen(str), dly_ms, SendMode);
 
     // if (config.trk_loc2rf)
@@ -7798,6 +7843,10 @@ void sendTelemetry_igate(char *raw, int dly_ms)
         SendMode |= RF_CHANNEL;
     if (config.igate_loc2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.igate_loc2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(str, strlen(str), dly_ms, SendMode);
     // if (config.igate_loc2rf)
     // { // TLM SEND TO RF
@@ -7863,6 +7912,10 @@ void sendTelemetry_digi(char *raw, int dly_ms)
         SendMode |= RF_CHANNEL;
     if (config.digi_loc2inet)
         SendMode |= INET_CHANNEL;
+#ifdef RF2
+    if (config.digi_loc2rf2)
+        SendMode |= RF2_CHANNEL;
+#endif
     pkgTxPush(str, strlen(str), dly_ms, SendMode);
     // if (config.digi_loc2rf)
     // { // TLM SEND TO RF
@@ -8828,6 +8881,10 @@ void taskAPRS(void *pvParameters)
                         SendMode |= RF_CHANNEL;
                     if (config.igate_loc2inet)
                         SendMode |= INET_CHANNEL;
+#ifdef RF2
+                    if (config.igate_loc2rf2)
+                        SendMode |= RF2_CHANNEL;
+#endif
                     pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
                 }
                 else if (config.bt_mode == 2)
@@ -8862,6 +8919,10 @@ void taskAPRS(void *pvParameters)
                     SendMode |= RF_CHANNEL;
                 if (config.igate_loc2inet)
                     SendMode |= INET_CHANNEL;
+#ifdef RF2
+                if (config.igate_loc2rf2)
+                    SendMode |= RF2_CHANNEL;
+#endif
                 pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
             }
             else if (config.bt_mode == 2)
@@ -9233,6 +9294,10 @@ void taskAPRS(void *pvParameters)
                     SendMode |= RF_CHANNEL;
                 if (config.trk_loc2inet)
                     SendMode |= INET_CHANNEL;
+#ifdef RF2
+                if (config.trk_loc2rf2)
+                    SendMode |= RF2_CHANNEL;
+#endif
                 pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
 
 #if defined OLED || defined ST7735_160x80
@@ -9609,6 +9674,10 @@ void taskAPRS(void *pvParameters)
                             SendMode |= RF_CHANNEL;
                         if (config.igate_loc2inet)
                             SendMode |= INET_CHANNEL;
+#ifdef RF2
+                        if (config.igate_loc2rf2)
+                            SendMode |= RF2_CHANNEL;
+#endif
                         pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_RF, "TX IGATE", sts);
@@ -9855,6 +9924,10 @@ void taskAPRS(void *pvParameters)
                             SendMode |= RF_CHANNEL;
                         if (config.digi_loc2inet)
                             SendMode |= INET_CHANNEL;
+#ifdef RF2
+                        if (config.digi_loc2rf2)
+                            SendMode |= RF2_CHANNEL;
+#endif
                         pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
 #if defined OLED || defined ST7735_160x80
                         pushTxDisp(TXCH_RF, "TX DIGI POS", sts);
@@ -9964,6 +10037,10 @@ void taskAPRS(void *pvParameters)
                         SendMode |= RF_CHANNEL;
                     if (config.wx_2inet)
                         SendMode |= INET_CHANNEL;
+#ifdef RF2
+                    if (config.wx_2rf2)
+                        SendMode |= RF2_CHANNEL;
+#endif
                     pkgTxPush(rawData.c_str(), rawData.length(), 0, SendMode);
 #ifdef OLED
                     sprintf(sts, "--src call--\n%s\nDelay: %dms.", config.wx_mycall, (config.wx_interval * 1000));

@@ -16,6 +16,7 @@
 bool APRS_init(Configuration *cfg);
 #ifdef RF2
 bool APRS_init2(Configuration *cfg);
+void APRS_sendTNC2Pkt2(uint8_t *raw, size_t length);
 #endif
 bool APRS_poll(void);
 

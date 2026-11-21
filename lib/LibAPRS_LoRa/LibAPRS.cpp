@@ -118,6 +118,61 @@ int remLength1;
 unsigned long rxTimeout1 = 0;
 bool fifoLock1 = false;
 bool fifoTxLock1 = false;
+
+// Pending frame for the second radio. It is transmitted from APRS_poll() so
+// that all radioHal1 and SPI accesses stay in the poll task.
+static SemaphoreHandle_t tx2Mutex = NULL;
+static uint8_t *tx2Pending = NULL;
+static size_t tx2PendingLen = 0;
+
+// Non-blocking RF2 transmit state; the TX is started and finished from
+// APRS_poll() so the poll task is never stuck waiting for the radio.
+volatile bool rf2TxActive = false;
+volatile bool rf2TxDone = false;
+static unsigned long rf2TxStart = 0;
+static unsigned long rf2TxTimeoutMs = 30000;
+
+static bool tx2Enqueue(uint8_t *data, size_t len)
+{
+    if (tx2Mutex == NULL)
+        tx2Mutex = xSemaphoreCreateMutex();
+    if (tx2Mutex == NULL)
+        return false;
+
+    bool queued = false;
+    if (xSemaphoreTake(tx2Mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    {
+        if (tx2Pending == NULL)
+        {
+            tx2Pending = (uint8_t *)malloc(len);
+            if (tx2Pending != NULL)
+            {
+                memcpy(tx2Pending, data, len);
+                tx2PendingLen = len;
+                queued = true;
+            }
+        }
+        xSemaphoreGive(tx2Mutex);
+    }
+    return queued;
+}
+
+static uint8_t *tx2Dequeue(size_t *len)
+{
+    uint8_t *data = NULL;
+    *len = 0;
+    if (tx2Mutex == NULL)
+        return NULL;
+    if (xSemaphoreTake(tx2Mutex, 0) == pdTRUE)
+    {
+        data = tx2Pending;
+        *len = tx2PendingLen;
+        tx2Pending = NULL;
+        tx2PendingLen = 0;
+        xSemaphoreGive(tx2Mutex);
+    }
+    return data;
+}
 #endif
 
 bool fifoLock = false;
@@ -294,6 +349,13 @@ ICACHE_RAM_ATTR void fifoGet1(void)
 
 ICACHE_RAM_ATTR void setFlag1()
 {
+    // DIO is used for both RX done and TX done on the second radio
+    if (rf2TxActive)
+    {
+        rf2TxDone = true;
+        return;
+    }
+
     log_d("RF2 Interrupt DIO0 milis=%u", millis());
     if (received1 || !eInterrupt1)
         noisyInterrupt1 = true;
@@ -473,6 +535,71 @@ void APRS_sendTNC2Pkt(uint8_t *raw, size_t length)
         }
     }
 }
+
+#ifdef RF2
+// Queue a TNC2 packet for transmission on the second radio. The frame is built
+// here but sent from APRS_poll() so radioHal1 is only touched by the poll task.
+void APRS_sendTNC2Pkt2(uint8_t *raw, size_t length)
+{
+    if (radioHal1 == NULL)
+        return;
+
+    uint8_t *frame = NULL;
+    size_t frameLen = 0;
+
+    if (config.rf1_ax25)
+    {
+        ax25frame *axm = (ax25frame *)calloc(1, sizeof(ax25frame));
+        if (axm)
+        {
+            if (ax25_encode(*axm, (char *)raw, length))
+            {
+                size_t max_len = length + 16;
+                uint8_t *hdlc = (uint8_t *)calloc(max_len, sizeof(uint8_t));
+                if (hdlc)
+                {
+                    static AX25Ctx ax25Tx2;
+                    int len = hdlcFrame(hdlc, max_len, &ax25Tx2, axm);
+                    if (len > 0)
+                    {
+                        frame = hdlc;
+                        frameLen = len;
+                    }
+                    else
+                    {
+                        free(hdlc);
+                    }
+                }
+            }
+            free(axm);
+        }
+    }
+    else if (config.rf1_mode == RF_MODE_LoRa)
+    {
+        frame = (uint8_t *)calloc(length + 3, sizeof(uint8_t));
+        if (frame)
+        {
+            frame[0] = 0x3C;
+            frame[1] = 0xff;
+            frame[2] = 0x01;
+            memcpy(&frame[3], raw, length);
+            frameLen = length + 3;
+        }
+    }
+    else
+    {
+        log_d("[RF2] TX skipped: only LoRa/AX.25 is supported");
+        return;
+    }
+
+    if (frame == NULL)
+        return;
+
+    if (!tx2Enqueue(frame, frameLen))
+        log_d("[RF2] TX busy, packet dropped");
+    free(frame);
+}
+#endif
 
 int APRS_getTNC2Pkt(uint8_t *raw, String info)
 {
@@ -1649,7 +1776,64 @@ bool APRS_poll(void)
     }
 
 #ifdef RF2
-    if (config.rf1_en)
+    // Transmit a queued frame for the second radio. The TX is started here and
+    // finished on a later poll pass, so waiting for the radio never blocks the
+    // poll task long enough to trip the task watchdog.
+    if (config.rf1_en && radioHal1 != NULL)
+    {
+        if (rf2TxActive)
+        {
+            if (rf2TxDone)
+            {
+                radioHal1->finishTransmit();
+                rf2TxActive = false;
+                log_d("[RF2] TX done in %lums", millis() - rf2TxStart);
+                startRx1();
+                ret = true;
+            }
+            else if ((millis() - rf2TxStart) > rf2TxTimeoutMs)
+            {
+                radioHal1->finishTransmit();
+                rf2TxActive = false;
+                log_d("[RF2] TX timeout, radio back to RX");
+                startRx1();
+            }
+        }
+        else
+        {
+            size_t tx2Len = 0;
+            uint8_t *tx2 = tx2Dequeue(&tx2Len);
+            if (tx2 != NULL)
+            {
+                disableInterrupt1();
+                rf2TxDone = false;
+                rf2TxActive = true;
+                rf2TxStart = millis();
+                log_d("[RF2] TX %u Byte", (unsigned int)tx2Len);
+                int state = radioHal1->startTransmit(tx2, tx2Len);
+                free(tx2);
+                if (state != RADIOLIB_ERR_NONE)
+                {
+                    rf2TxActive = false;
+                    log_d("[RF2] TX failed, code %d", state);
+                    startRx1();
+                }
+                else
+                {
+                    ret = true;
+                }
+            }
+        }
+    }
+    else
+    {
+        // RF2 disabled: drop any queued frame so it cannot block the queue
+        size_t dropLen = 0;
+        uint8_t *drop = tx2Dequeue(&dropLen);
+        if (drop != NULL)
+            free(drop);
+    }
+    if (config.rf1_en && !rf2TxActive)
     {
         if (received1)
         {

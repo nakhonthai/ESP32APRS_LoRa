@@ -147,6 +147,14 @@ typedef struct Config_Struct
 	uint8_t rf1_shaping;
 	uint8_t rf1_encoding;
 	bool rf1_rx_boost;
+
+	// TX channel selection for the second radio (RF2)
+	bool igate_loc2rf2;
+	bool digi_loc2rf2;
+	bool trk_loc2rf2;
+	bool wx_2rf2;
+	bool tlm0_2rf2;
+	bool msg_rf2;
 #endif
 
 	// IGATE

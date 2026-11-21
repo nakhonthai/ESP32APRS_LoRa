@@ -318,6 +318,7 @@ typedef struct txQueue_struct
 
 #define RF_CHANNEL (1 << 0)
 #define INET_CHANNEL (1 << 1)
+#define RF2_CHANNEL (1 << 2)
 #define TNC_CHANNEL (1 << 2)
 
 typedef struct txDispStruct

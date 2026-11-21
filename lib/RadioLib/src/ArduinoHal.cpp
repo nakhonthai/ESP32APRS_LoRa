@@ -189,7 +189,15 @@ void inline ArduinoHal::noTone(uint32_t pin) {
 
 void inline ArduinoHal::yield() {
   #if !defined(RADIOLIB_YIELD_UNSUPPORTED)
+  #if defined(ESP32)
+  // ::yield() maps to vPortYield(), which only rotates ready tasks of the same
+  // priority and never lets the IDLE task run. Long radio waits (a long LoRa
+  // transmission or a locked TX IRQ) therefore starve IDLE0 and trip the task
+  // watchdog. Bleed one tick so IDLE keeps running.
+  delay(1);
+  #else
   ::yield();
+  #endif
   #endif
 }
 
