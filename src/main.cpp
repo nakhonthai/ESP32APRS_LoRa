@@ -10170,6 +10170,12 @@ unsigned long lastAPCheck = 0;
 volatile bool wifiConfigChanged = false;
 volatile unsigned long wifiConfigChangedTime = 0;
 
+// Reconnect requests raised by the WiFi event handler and executed by
+// taskNetwork, so WiFi.begin()/wifiConnection() never run inside the event
+// callback (that races with the WiFi driver and can panic).
+volatile bool wifiReconnectRequest = false;
+volatile bool wifiFullReconnectRequest = false;
+
 // Rebuild the WiFiMulti AP list from the current configuration
 void wifiReloadAPList()
 {
@@ -10417,18 +10423,12 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         log_d("WiFi Disconnected");
         wifiDisCount++;
 
-        // Try immediate reconnect to current AP (don't wait for 30 disconnects)
-        if(millis() > lastReconnectAttempt + 5000) { // 5 seconds between attempts
+        // Only raise a request here. Calling WiFi.begin() or wifiConnection()
+        // from the WiFi event task races with the driver and can panic (seen
+        // when taskNetwork started its own reconnect at the same moment).
+        if (millis() > lastReconnectAttempt + 5000) // 5 seconds between attempts
+        {
             lastReconnectAttempt = millis();
-
-            if((config.wifi_mode & WIFI_STA_FIX) && currentAPIndex >= 0 && config.wifi_sta[currentAPIndex].enable) {
-                log_d("Immediate reconnect attempt to AP[%d]: %s",
-                    currentAPIndex, config.wifi_sta[currentAPIndex].wifi_ssid);
-                WiFi.begin(
-                    config.wifi_sta[currentAPIndex].wifi_ssid,
-                    config.wifi_sta[currentAPIndex].wifi_pass
-                );
-            }
 
             // Full reconnect only after multiple failed attempts (reduced from 30 to 10)
             if (wifiDisconnecting == false && wifiDisCount > 10)
@@ -10436,8 +10436,13 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
                 wifiDisCount = 0;
                 wifiDisconnecting = true;
                 pingTimeout = millis() + 10000;
-                log_d("Multiple disconnects - performing full WiFi reconnection");
-                wifiConnection();
+                log_d("Multiple disconnects - requesting full WiFi reconnection");
+                wifiFullReconnectRequest = true;
+            }
+            else
+            {
+                log_d("WiFi reconnect requested");
+                wifiReconnectRequest = true;
             }
 #ifdef MQTT
             if (config.en_mqtt)
@@ -10496,6 +10501,8 @@ void PPPOS_Start()
         delay(1000); // Wait for the modem to reset
 
         PPP.setApn(config.ppp_apn); // Set the APN for the modem
+        if (config.ppp_pin[0] != 0)
+            PPP.setPin(config.ppp_pin); // used by the library only if the SIM is PIN-locked
         PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
         PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio);
         log_d("PPP Modem Init...");
@@ -10533,7 +10540,6 @@ void PPPOS_Start()
         // PPP.setUser(ppp_user);
         // PPP.setPass(ppp_pass);
         // PPP.setApn(config.ppp_apn);
-        // PPP.setPin(config.ppp_pin);
         // PPP.setResetPin(config.ppp_rst_gpio, config.ppp_rst_active, config.ppp_rst_delay);
         // PPP.setPins(config.ppp_tx_gpio, config.ppp_rx_gpio, config.ppp_rts_gpio, config.ppp_cts_gpio, PPP_MODEM_FC);
 
@@ -10546,6 +10552,48 @@ void PPPOS_Start()
         log_d("Manufacturer: %s", pppStatus.manufacturer);
         log_d("Model: %s", pppStatus.model);
         log_d("IMEI: %s", pppStatus.imei);
+
+        // Verify that a usable SIM is present before bringing the PPP link up.
+        // AT+CPIN? returns READY when the SIM is inserted and unlocked; right
+        // after a modem reset it can briefly report "SIM busy", so retry for a
+        // short while before giving up.
+        String simState;
+        bool simReady = false;
+        bool pinTried = false;
+        unsigned long simStart = millis();
+        do
+        {
+            simState = PPP.cmd("AT+CPIN?", 5000);
+            simReady = (simState.indexOf("READY") >= 0);
+            if (simReady)
+                break;
+            if (!pinTried && (simState.indexOf("SIM PIN") >= 0) && config.ppp_pin[0] != 0)
+            {
+                pinTried = true;
+                log_d("SIM PIN required, unlocking with configured PIN");
+                PPP.cmd(String("AT+CPIN=\"") + String(config.ppp_pin) + "\"", 5000);
+                delay(500);
+                continue;
+            }
+            delay(1000);
+        } while ((millis() - simStart) < 15000);
+
+        log_d("SIM status: %s", simState.length() > 0 ? simState.c_str() : "no response");
+        if (!simReady)
+        {
+            const char *simError = "No SIM";
+            if (simState.indexOf("SIM PIN") >= 0)
+                simError = "SIM PIN";
+            else if (simState.indexOf("SIM PUK") >= 0)
+                simError = "SIM PUK";
+            else if (simState.length() > 0)
+                simError = "SIM error";
+            log_d("SIM not ready (%s), PPP connection skipped", simError);
+            sprintf(pppStatus.imsi, "N/A");
+            sprintf(pppStatus.oper, "%s", simError);
+            pppStatus.rssi = -127;
+            return;
+        }
 
         bool attached = PPP.attached();
         if (!attached)
@@ -10733,6 +10781,26 @@ void taskNetwork(void *pvParameters)
         {
             wifiConfigChanged = false;
             wifiApplyConfig();
+        }
+
+        // Execute WiFi reconnect requests raised by the WiFi event handler
+        if (wifiFullReconnectRequest)
+        {
+            wifiFullReconnectRequest = false;
+            wifiReconnectRequest = false;
+            if (config.wifi_mode & WIFI_STA_FIX)
+            {
+                log_d("Performing full WiFi reconnection");
+                wifiConnection();
+            }
+        }
+        else if (wifiReconnectRequest)
+        {
+            wifiReconnectRequest = false;
+            if ((config.wifi_mode & WIFI_STA_FIX) && !WiFi.isConnected())
+            {
+                mitiWifiTimeout = 0; // reconnect on this pass instead of the 30s poll
+            }
         }
 
 #ifdef PPPOS
