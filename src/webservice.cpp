@@ -6620,7 +6620,7 @@ void handle_system(AsyncWebServerRequest *request)
 		TLM_SEQ = 0;
 		IGATE_TLM_SEQ = 0;
 		DIGI_TLM_SEQ = 0;
-		esp_restart();
+		systemRestart("web reboot request");
 	}
 	else if (request->hasArg("Factory"))
 	{
@@ -12608,8 +12608,7 @@ static void ota_url_task(void *pvParameters)
 			if (Update.end(true))
 			{
 				log_i("OTA URL update success, rebooting");
-				delay(500);
-				esp_restart();
+				systemRestart("OTA URL update complete");
 			}
 			else
 			{
@@ -13417,7 +13416,19 @@ void webService()
 		{
 			if (!index)
 			{
-				log_d("Update Start: %s\n", filename.c_str());
+				String clientIP = request->client() ? request->client()->remoteIP().toString() : String("-");
+				log_d("Update Start: %s from %s\n", filename.c_str(), clientIP.c_str());
+
+				// The upload endpoint used to be open to anyone who could reach
+				// the device: refuse firmware from unauthenticated clients.
+				if (config.http_username[0] != 0 && !request->authenticate(config.http_username, config.http_password))
+				{
+					log_e("Update rejected: client %s is not authenticated", clientIP.c_str());
+					Update.abort();
+					request->requestAuthentication();
+					return;
+				}
+
 				if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
 				{
 					Update.printError(Serial);
@@ -13447,9 +13458,10 @@ void webService()
 			{
 				if (Update.end(true))
 				{
-					log_d("Update Success: %uByte\n", index + len);
+					String clientIP = request->client() ? request->client()->remoteIP().toString() : String("-");
+					log_d("Update Success: %uByte from %s\n", index + len, clientIP.c_str());
 					delay(1000);
-					esp_restart();
+					systemRestart("OTA upload complete");
 				}
 				else
 				{

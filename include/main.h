@@ -416,6 +416,9 @@ void taskAPRSPoll(void *pvParameters);
 void taskNetwork(void *pvParameters);
 //void taskTNC(void *pvParameters);
 void wifiConfigApplyRequest();
+// Central restart helper: logs the reason before calling esp_restart(), which
+// is otherwise silent at the configured log level.
+void systemRestart(const char *reason);
 void sort(pkgListType a[], int size);
 void sortPkgDesc(pkgListType a[], int size);
 //int processPacket(String &tnc2);

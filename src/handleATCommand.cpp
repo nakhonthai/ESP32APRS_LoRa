@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "handleATCommand.h"
 #include "config.h"
+#include "main.h"
 #include <WiFi.h>
 
 extern Configuration config;
@@ -17,7 +18,7 @@ String handleATCommand(String cmd)
     {
         log_d("CMD Reset System");
         delay(3000);
-        esp_restart();
+        systemRestart("AT reset command");
     }
 
     // if(cmd == "AT+VERSION?")

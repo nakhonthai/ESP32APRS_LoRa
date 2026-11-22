@@ -4906,6 +4906,42 @@ PowerOn();
 #endif
 
     log_d("Start ESP32APRS_LoRa V%s", VERSION);
+
+    // Reset diagnostics: a plain software restart (esp_restart) prints nothing,
+    // so log why the chip came back up.
+    switch (esp_reset_reason())
+    {
+    case ESP_RST_POWERON:
+        log_d("Reset reason: power-on, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_SW:
+        log_d("Reset reason: software restart, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_PANIC:
+        log_e("Reset reason: panic, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_INT_WDT:
+        log_e("Reset reason: interrupt watchdog, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_TASK_WDT:
+        log_e("Reset reason: task watchdog, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_WDT:
+        log_e("Reset reason: watchdog, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_BROWNOUT:
+        log_e("Reset reason: brownout, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    case ESP_RST_DEEPSLEEP:
+        log_d("Reset reason: deep sleep wake, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+        break;
+    default:
+        log_d("Reset reason: %d, free heap %u byte", (int)esp_reset_reason(), (unsigned int)ESP.getFreeHeap());
+        break;
+    }
+
+    log_d("PSRAM: %s, size %u byte, free %u byte", psramFound() ? "found" : "NOT FOUND",
+          (unsigned int)ESP.getPsramSize(), (unsigned int)ESP.getFreePsram());
     // log_d("Push BOOT after 3 sec for Factory Default config.");
 
     // if (!EEPROM.begin(EEPROM_SIZE))
@@ -6802,6 +6838,21 @@ bool save_act = false;
 bool manualWiFi = false;
 uint8_t heapCount = 0;
 
+// Raised just before the firmware restarts itself. WiFi events and the network
+// task stop touching the driver while the shutdown is in progress.
+volatile bool systemRebootPending = false;
+
+// Every self-initiated restart goes through here so the reason is visible in
+// the log: esp_restart() itself prints nothing at the configured log level, so
+// a bare esp_restart() looks like a random reboot.
+void systemRestart(const char *reason)
+{
+    log_e("System restart: %s", reason);
+    systemRebootPending = true;
+    delay(200); // let the UART drain before the reset
+    esp_restart();
+}
+
 void msgBox(String msg)
 {
 #ifdef OLED
@@ -6937,13 +6988,11 @@ void loop()
         if ((config.reset_timeout > 0) && (millis() > autoResetTimeout))
         {
             autoResetTimeout = millis() + (config.reset_timeout * 60000);
-            log_d("Auto Reset System");
-            vTaskSuspendAll();
-            WiFi.disconnect(true); // Disconnect from the network
-            WiFi.persistent(false);
-            WiFi.mode(WIFI_OFF); // Switch WiFi off
-            PowerOff();
-            esp_restart();
+            log_d("Auto Reset System, free heap %u byte", (unsigned int)ESP.getFreeHeap());
+            // Never stop WiFi or suspend the scheduler here: blocking WiFi calls
+            // under a suspended scheduler corrupt the task lists and turn a
+            // planned restart into a random one.
+            systemRestart("auto reset timer");
         }
 
         // Automatic Restart when heap memory not enough
@@ -6956,12 +7005,12 @@ void loop()
             if (++heapCount >= 3)
             {
                 heapCount = 0;
-                vTaskSuspendAll();
-                WiFi.disconnect(true); // Disconnect from the network
-                WiFi.persistent(false);
-                WiFi.mode(WIFI_OFF); // Switch WiFi off
-                PowerOff();
-                esp_restart();
+                log_e("Free heap %u byte", (unsigned int)ESP.getFreeHeap());
+                systemRestart("low heap");
+            }
+            else
+            {
+                log_e("Free heap %u byte (%d/3)", (unsigned int)ESP.getFreeHeap(), heapCount);
             }
         }
         else
@@ -10389,6 +10438,11 @@ void wifiConnection()
 
 void onEvent(arduino_event_id_t event, arduino_event_info_t info)
 {
+    // The firmware is restarting: ignore the disconnects caused by the shutdown
+    // so no reconnect is queued against a dying WiFi driver.
+    if (systemRebootPending)
+        return;
+
     switch (event)
     {
 #ifdef PPPOS
@@ -10463,7 +10517,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         log_d("AP Probe Request Received");
         break;
     case ARDUINO_EVENT_WIFI_AP_STOP:
-        log_d("AP Stopped");
+        log_d("AP Stopped, mode=%d", (int)WiFi.getMode());
         break;
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
         wifiDisCount = 0;
@@ -10496,7 +10550,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info)
         log_d("WiFi Connected");
         break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-        log_d("WiFi Disconnected");
+        log_d("WiFi Disconnected, reason=%d", info.wifi_sta_disconnected.reason);
         wifiDisCount++;
 
         // Only raise a request here. Calling WiFi.begin() or wifiConnection()
@@ -10873,9 +10927,12 @@ void taskNetwork(void *pvParameters)
         else if (wifiReconnectRequest)
         {
             wifiReconnectRequest = false;
-            if ((config.wifi_mode & WIFI_STA_FIX) && !WiFi.isConnected())
+            if ((config.wifi_mode & WIFI_STA_FIX) && !WiFi.isConnected() && !systemRebootPending)
             {
-                mitiWifiTimeout = 0; // reconnect on this pass instead of the 30s poll
+                // Give the driver a moment to finish tearing the old link down
+                // before WiFi.begin() is called again; reconnecting immediately
+                // from the disconnect event used to reset the chip.
+                mitiWifiTimeout = millis() + 500;
             }
         }
 
@@ -10931,16 +10988,28 @@ void taskNetwork(void *pvParameters)
                 if (millis() > mitiWifiTimeout)
                 {
                     mitiWifiTimeout = millis() + 30000;
-                    log_d("WiFi Check Connection!");
+                    log_d("WiFi Check Connection! mode=%d status=%d heap=%u",
+                          (int)WiFi.getMode(), (int)WiFi.status(), (unsigned int)ESP.getFreeHeap());
 
-                    // Try to reconnect to current AP first for stability
-                    if(currentAPIndex >= 0 && config.wifi_sta[currentAPIndex].enable) {
+                    if (!(WiFi.getMode() & WIFI_MODE_STA))
+                    {
+                        // The station interface was stopped (mode change or WiFi
+                        // switched off). Poking WiFi.begin() into a stopped driver
+                        // can reset the chip, so rebuild the interface instead.
+                        log_d("WiFi station interface is down, full reconnect");
+                        wifiConnection();
+                        wifiStatus = WiFi.isConnected() ? WL_CONNECTED : WL_DISCONNECTED;
+                    }
+                    else if (currentAPIndex >= 0 && currentAPIndex < 5 && config.wifi_sta[currentAPIndex].enable && config.wifi_sta[currentAPIndex].wifi_ssid[0] != 0)
+                    {
                         log_d("Reconnecting to current AP: %s", config.wifi_sta[currentAPIndex].wifi_ssid);
                         wifiStatus = WiFi.begin(
                             config.wifi_sta[currentAPIndex].wifi_ssid,
                             config.wifi_sta[currentAPIndex].wifi_pass
                         );
-                    } else {
+                    }
+                    else
+                    {
                         // Fallback to wifiMulti only if no current AP or current AP is disabled
                         log_d("Using wifiMulti to find available AP");
                         wifiStatus = wifiMulti.run();
