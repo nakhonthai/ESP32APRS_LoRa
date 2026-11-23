@@ -8564,7 +8564,7 @@ void taskGPS(void *pvParameters)
                 gnssFixSentences = fixSentences;
                 if (gps.location.isValid())
                 {
-                    LED_Status(0, 0, 255);
+                    LED_Status(0, 0, 155);
                     gnssLedOffAt = millis() + 100;
                 }
             }

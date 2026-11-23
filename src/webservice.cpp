@@ -12381,36 +12381,37 @@ void handle_ws_gnss(char *nmea, size_t size)
 	if (ws_gnss.count() < 1)
 		return;
 
-	// NMEA lines are shorter than 100 byte; clamp so a corrupted length can
-	// never overflow the buffers below.
-	if (size > 200)
-		size = 200;
+	ws_gnss.textAll(nmea);
+	// // NMEA lines are shorter than 100 byte; clamp so a corrupted length can
+	// // never overflow the buffers below.
+	// if (size > 200)
+	// 	size = 200;
 
-	time_t timeStamp;
-	time(&timeStamp);
+	// time_t timeStamp;
+	// time(&timeStamp);
 
-	// taskGPS runs on a few KB of stack and the %f conversions below pull in
-	// newlib's dtoa (_dtoa_r + _Balloc), which needs a lot of stack on top of
-	// the output buffer. Keep both buffers in the heap instead.
-	size_t encSize = encode_base64_length(size) + 1;
-	size_t jsonSize = encSize + 320;
-	char *nmea_enc = (char *)calloc(encSize, sizeof(char));
-	char *jsonMsg = (char *)calloc(jsonSize, sizeof(char));
-	if (nmea_enc == NULL || jsonMsg == NULL)
-	{
-		free(nmea_enc);
-		free(jsonMsg);
-		return;
-	}
+	// // taskGPS runs on a few KB of stack and the %f conversions below pull in
+	// // newlib's dtoa (_dtoa_r + _Balloc), which needs a lot of stack on top of
+	// // the output buffer. Keep both buffers in the heap instead.
+	// size_t encSize = encode_base64_length(size) + 1;
+	// size_t jsonSize = encSize + 340;
+	// char *nmea_enc = (char *)calloc(encSize, sizeof(char));
+	// char *jsonMsg = (char *)calloc(jsonSize, sizeof(char));
+	// if (nmea_enc == NULL || jsonMsg == NULL)
+	// {
+	// 	free(nmea_enc);
+	// 	free(jsonMsg);
+	// 	return;
+	// }
 
-	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
-	// time_t is 64 bit on ESP-IDF 5: %li consumed only half of it and the %s
-	// that follows then read an invalid pointer, which crashed in snprintf.
-	snprintf(jsonMsg, jsonSize, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%lli\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), (int)gps.satellites.value(), (int)gps.time.value(), (long long)timeStamp, nmea_enc);
-	ws_gnss.textAll(jsonMsg);
+	// encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
+	// // time_t is 64 bit on ESP-IDF 5: %li consumed only half of it and the %s
+	// // that follows then read an invalid pointer, which crashed in snprintf.
+	// snprintf(jsonMsg, jsonSize, "{\"en\":\"%d\",\"fix\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%lli\",\"RAW\":\"%s\"}", (int)config.gnss_enable, (int)gps.location.isValid(), gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), (int)gps.satellites.value(), (int)gps.time.value(), (long long)timeStamp, nmea_enc);
+	// ws_gnss.textAll(jsonMsg);
 
-	free(nmea_enc);
-	free(jsonMsg);
+	// free(nmea_enc);
+	// free(jsonMsg);
 }
 
 void handle_test(AsyncWebServerRequest *request)
@@ -13239,89 +13240,289 @@ void handle_about(AsyncWebServerRequest *request)
 
 void handle_gnss(AsyncWebServerRequest *request)
 {
-	// Allocate initial memory for HTML content
-	char *webString = allocateStringMemory(8192); // Start with 8KB buffer
+	// The whole page is assembled in one heap buffer. allocateStringMemory()
+	// returns exactly the requested size when PSRAM is missing (the NAWS4 board
+	// fails PSRAM init), so every append is bounds checked instead of strcat.
+	const size_t cap = 16384;
+	char *webString = allocateStringMemory(cap);
 	if (!webString)
 	{
 		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
 		return;
 	}
-	strcpy(webString,
-		"<html>\n<head>\n"
-		"<script src=\"https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js\"></script>\n");
-	//strcat(webString, "<script src=\"https://code.highcharts.com/highcharts.js\"></script>\n");
-	//strcat(webString, "<script src=\"https://code.highcharts.com/highcharts-more.js\"></script>\n");
-	strcat(webString, "<script language=\"JavaScript\">");
+	size_t len = 0;
+	auto add = [&](const char *s)
+	{
+		if (s == NULL)
+			return;
+		size_t n = strlen(s);
+		if (len + n >= cap)
+			return;
+		memcpy(webString + len, s, n);
+		len += n;
+		webString[len] = '\0';
+	};
+	auto addf = [&](const char *fmt, ...)
+	{
+		// Format straight into the page buffer: the previous 320 byte temp buffer
+		// cut longer fragments in half, which broke the HTML at the NMEA counter
+		// card ("</spa") and swallowed everything after it, including the
+		// terminal textarea.
+		if (len + 1 >= cap)
+			return;
+		size_t room = cap - len;
+		va_list ap;
+		va_start(ap, fmt);
+		int n = vsnprintf(webString + len, room, fmt, ap);
+		va_end(ap);
+		if (n < 0)
+			return;
+		len += ((size_t)n < room) ? (size_t)n : (room - 1);
+		webString[len] = '\0';
+	};
 
-	// Add some life
-	strcat(webString,
-		"function gnss() { \n"
-		"var raw=\"\";var timeStamp;\n"
-		"var host='ws://'+location.hostname+':81/ws_gnss'\n"
-		"const ws = new WebSocket(host);\n"
-		"ws.onopen = function() { document.getElementById('ws_status').innerHTML='connected'; console.log('Connection opened');};\n"
-		"ws.onclose = function() { document.getElementById('ws_status').innerHTML='disconnected - reload the page'; console.log('Connection closed');};\n"
-		"ws.onerror = function() { document.getElementById('ws_status').innerHTML='websocket error (is port 81 reachable?)';};\n"
-		"ws.onmessage = function(event) {\n"
-		"try {\n"
-		"const jsonR=JSON.parse(event.data);\n"
-		// Update the terminal first: if any label below is missing the raw NMEA
-		// still shows up instead of the handler dying before the textarea.
-		"var textArea=document.getElementById('raw_txt');\n"
-		"if(textArea && jsonR.RAW){textArea.value+=atob(jsonR.RAW);textArea.scrollTop=textArea.scrollHeight;}\n"
-		"document.getElementById(\"en\").innerHTML=parseInt(jsonR.en);\n"
-		"document.getElementById(\"lat\").innerHTML=parseFloat(jsonR.lat);\n"
-		"document.getElementById(\"lng\").innerHTML=parseFloat(jsonR.lng);\n"
-		"document.getElementById(\"alt\").innerHTML=parseFloat(jsonR.alt);\n"
-		"document.getElementById(\"spd\").innerHTML=parseFloat(jsonR.spd);\n"
-		"document.getElementById(\"csd\").innerHTML=parseFloat(jsonR.csd);\n"
-		"document.getElementById(\"hdop\").innerHTML=parseFloat(jsonR.hdop);\n"
-		"document.getElementById(\"sat\").innerHTML=parseInt(jsonR.sat);\n"
-		"document.getElementById(\"time\").innerHTML=parseInt(jsonR.time);\n"
-		"} catch(e) { console.log('GNSS ws error', e); }\n"
-		"}\n"
-		"};\n</script>\n"
-		"</head><body onload=\"gnss()\">\n");
+	add("<!DOCTYPE html><html lang='th'><head><meta charset='utf-8'>"
+		"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+		"<title>GNSS Monitor</title><style>");
+	add("*{box-sizing:border-box}"
+		"body{margin:0;font:14px/1.4 system-ui,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#e2e8f0}"
+		"header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;"
+		"background:linear-gradient(90deg,#0e7490,#155e75)}"
+		"h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.4px}.sp{flex:1}"
+		".badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;"
+		"background:rgba(2,6,23,.55);font-size:12px}"
+		".dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b}"
+		".dot.on{background:#22c55e}.dot.off{background:#ef4444}.dot.warn{background:#f59e0b}"
+		"main{display:grid;gap:12px;padding:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}"
+		".card{background:#111c33;border:1px solid #1e293b;border-radius:12px;padding:12px 14px}"
+		".k{display:block;margin-bottom:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#7c8aa5}"
+		".v{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:600;"
+		"font-variant-numeric:tabular-nums;min-height:31px}"
+		".v small{font-size:12px;font-weight:400;color:#94a3b8}"
+		".s{margin-top:5px;font-size:12px;color:#94a3b8;min-height:17px}.wide{grid-column:span 2}"
+		".wide4{grid-column:1/-1}"
+		".t{margin-top:5px;font-size:12px;color:#94a3b8}"
+		".hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}"
+		"@media(max-width:700px){.wide{grid-column:1/-1}}"
+		".arrow{display:inline-block;color:#38bdf8;transition:transform .25s}"
+		".chip{display:inline-block;margin:2px 4px 0 0;padding:2px 9px;border-radius:999px;"
+		"background:#1e293b;color:#64748b;font-size:11px}"
+		".chip.ok{background:#164e63;color:#67e8f9}"
+		".sats{display:flex;align-items:flex-end;gap:7px;overflow-x:auto;padding-bottom:2px}"
+		".sb{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:26px}"
+		".bw{display:flex;align-items:flex-end;width:15px;height:84px;border-radius:4px;"
+		"background:#1e293b;overflow:hidden}"
+		".bw i{display:block;width:100%;border-radius:3px 3px 0 0;transition:height .3s}"
+		".sv{font:10px ui-monospace,Consolas,monospace;color:#cbd5e1;margin-bottom:3px}"
+		".sn{font:10px ui-monospace,Consolas,monospace;color:#94a3b8;margin-top:4px}"
+		"details{margin:0 14px 16px;padding:10px 14px;background:#111c33;border:1px solid #1e293b;border-radius:12px}"
+		"summary{cursor:pointer;font-size:13px;color:#cbd5e1}"
+		"textarea{display:block;width:100%;max-width:100%;min-width:0;height:260px;min-height:120px;"
+		"margin-top:2px;padding:8px;border-radius:8px;border:1px solid #1e293b;box-sizing:border-box;"
+		"background:#020617;color:#86efac;font:12px ui-monospace,Consolas,monospace;resize:vertical}"
+		"button{margin-left:6px;padding:4px 10px;border:0;border-radius:7px;background:#1e293b;"
+		"color:#cbd5e1;font-size:12px;cursor:pointer}"
+		"button:hover{background:#334155}a{color:#38bdf8;text-decoration:none}"
+		"</style></head><body>");
 
-	strcat(webString,
-		"<table width=\"200\" border=\"1\">"
-		"<th colspan=\"2\" style=\"background-color: #00BCD4;\"><span><b>GNSS Information</b></span></th>\n");
-	// strcat(webString, "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>");
+	add("<header><h1>GNSS Monitor</h1><div class='sp'></div>"
+		"<span class='badge'><i class='dot' id='wsdot'></i><span id='ws_status'>connecting...</span></span>"
+		"<span class='badge'><i class='dot' id='fixdot'></i><span id='fixtxt'>NO FIX</span></span></header><main>");
 
-	char temp_buf[256];
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Enable: </b></td><td align=\"left\"> <label id=\"en\">%d</label></td></tr>", config.gnss_enable);
-	strcat(webString, temp_buf);
+	add("<div class='card wide'><span class='k'>Latitude</span><div class='v' id='lat'>--</div>"
+		"<div class='s' id='latd'>--</div></div>");
+	add("<div class='card wide'><span class='k'>Longitude</span><div class='v' id='lng'>--</div>"
+		"<div class='s' id='lngd'>--</div></div>");
+	add("<div class='card'><span class='k'>Altitude</span>"
+		"<div class='v'><span id='alt'>--</span> <small>m</small></div>"
+		"<div class='s'><span id='altft'>--</span> ft &middot; geoid <span id='geo'>--</span> m</div></div>");
+	add("<div class='card'><span class='k'>Speed</span>"
+		"<div class='v'><span id='spd'>--</span> <small>km/h</small></div>"
+		"<div class='s'><span id='kn'>--</span> kn &middot; <span id='mph'>--</span> mph</div></div>");
+	add("<div class='card'><span class='k'>Course</span>"
+		"<div class='v'><span class='arrow' id='arrow'>&#10148;</span> <span id='csd'>--</span>&deg;</div>"
+		"<div class='s' id='csdt'>--</div></div>");
+	add("<div class='card'><span class='k'>Fix quality</span><div class='v' id='fixq' style='font-size:18px'>--</div>"
+		"<div class='s' id='acc'>no GST data</div></div>");
+	add("<div class='card'><span class='k'>Satellites</span><div class='v'>"
+		"<span id='sats'>--</span> <small id='inview'></small></div><div class='s' id='snr'>no signal data</div></div>");
+	add("<div class='card'><span class='k'>DOP</span><div class='v' id='hdop'>--</div>"
+		"<div class='s'><span id='hdopp'>--</span> &middot; <span id='dop'>H - V - P -</span></div></div>");
+	add("<div class='card'><span class='k'>UTC time (NMEA)</span><div class='v' id='utc'>--:--:--</div>"
+		"<div class='s' id='date'>--</div></div>");
+	add("<div class='card'><span class='k'>Device clock</span><div class='v' id='dev'>--:--:--</div>"
+		"<div class='s' id='devd'>--</div></div>");
+	add("<div class='card'><span class='k'>Last fix</span>"
+		"<div class='v'><span id='age'>--</span> <small>s ago</small></div>"
+		"<div class='s'><a id='mapa'>no fix</a></div></div>");
+	add("<div class='card'><span class='k'>Source</span><div class='v' id='talker' style='font-size:18px'>--</div>"
+		"<div class='s'>checksum <span id='csum'>0 ok / 0 bad</span></div></div>");
+	// Satellite SNR bars: full width so the rows flow into columns on wide screens.
+	add("<div class='card wide4'><span class='k'>Satellite signal (SNR dB-Hz)</span>"
+		"<div class='sats' id='sats2'><span class='s'>waiting for GSV...</span></div></div>");
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Latitude: </b></td><td align=\"left\"> <label id=\"lat\">%.5f</label></td></tr>", gps.location.lat());
-	strcat(webString, temp_buf);
+	addf("<div class='card wide'><span class='k'>NMEA sentences received</span>"
+		"<span class='chip' id='c_GGA'>GGA 0</span><span class='chip' id='c_RMC'>RMC 0</span>"
+		"<span class='chip' id='c_GSA'>GSA 0</span><span class='chip' id='c_GSV'>GSV 0</span>"
+		"<span class='chip' id='c_GLL'>GLL 0</span><span class='chip' id='c_VTG'>VTG 0</span>"
+		"<span class='chip' id='c_ZDA'>ZDA 0</span><span class='chip' id='c_GST'>GST 0</span>"
+		"<span class='chip' id='c_TXT'>TXT 0</span>"
+		"<div class='s'>GNSS enable = <b id='en'>%d</b> &middot; <span id='txt'>-</span></div></div>",
+		 (int)config.gnss_enable);
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Longitude: </b></td><td align=\"left\"> <label id=\"lng\">%.5f</label></td></tr>", gps.location.lng());
-	strcat(webString, temp_buf);
+	// Always visible terminal. The old markup wrapped an empty <details> around a
+	// summary while the textarea sat outside it, and "grid-column:span 4" forced
+	// implicit grid columns that pushed the textarea off screen once the window
+	// was narrower than four columns.
+	add("<div class='card wide4'><div class='hd'>"
+		"<span class='k' style='margin:0'>NMEA terminal <span class='s' id='cnt'></span></span>"
+		"<span class='sp'></span>"
+		"<button id='pbtn' onclick='togglePause(event)'>pause</button>"
+		"<button onclick='clearLog(event)'>clear</button></div>"
+		"<textarea id='raw_txt' readonly></textarea></div></main>");
+	
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Altitude: </b></td><td align=\"left\"> <label id=\"alt\">%.2f</label> m.</td></tr>", gps.altitude.meters());
-	strcat(webString, temp_buf);
+	add("<script>var ws,cnt={},lines=0,paused=false,fixOK=false,lastFix=0,cOk=0,cBad=0,snr={},"
+		"satTmp={},ivw={},satT=0;"
+		"var st={lat:0,lng:0,alt:0,geoid:0,spdKn:0,spdKmh:0,csd:0,hdop:0,vdop:0,pdop:0,"
+		"satsUsed:0,inView:0,fixQ:0,utc:'',date:'',mode:'',stdLat:0,stdLon:0,talker:'--',txt:''};"
+		"var PFX={GP:'G',GL:'R',GA:'E',GB:'C',BD:'C',GQ:'J',GN:'N'};");
+	addf("var devTs=%llu,devT0=Date.now();", (unsigned long long)time(NULL));
+	addf("var en=%d;", (int)config.gnss_enable);
+	add("function $(i){return document.getElementById(i)}"
+		"function p2(n){return('0'+n).slice(-2)}"
+		"function dm2deg(v,h){if(!v)return 0;var a=parseFloat(v);if(isNaN(a))return 0;"
+		"var d=Math.floor(a/100),m=a-d*100,g=d+m/60;return(h==='S'||h==='W')?-g:g}"
+		"function dms(v,lat){var a=Math.abs(v),d=Math.floor(a),m=(a-d)*60,mi=Math.floor(m),s=(m-mi)*60;"
+		"return d+'\\u00B0'+p2(mi)+String.fromCharCode(39)+(s<10?'0':'')+s.toFixed(2)+String.fromCharCode(34)"
+		"+(lat?(v>=0?'N':'S'):(v>=0?'E':'W'))}"
+		"function cmp(d){var c=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];"
+		"return c[Math.round((((d%360)+360)%360)/22.5)%16]}"
+		"function ql(h){if(!(h>0))return['n/a','#94a3b8'];if(h<1)return['ideal','#22c55e'];"
+		"if(h<2)return['excellent','#34d399'];if(h<5)return['good','#a3e635'];"
+		"if(h<10)return['moderate','#f59e0b'];return['poor','#ef4444']}"
+		"function qname(q){var n=['no fix','GPS fix','DGPS','PPS','RTK fixed','RTK float','estimated','manual','simulation'];"
+		"return n[q]||('quality '+q)}"
+		"function fmtT(v){if(!v)return '--:--:--';var s=String(v).split('.')[0];"
+		"if(s.length<6)s=('000000'+s).slice(-6);return s.substr(0,2)+':'+s.substr(2,2)+':'+s.substr(4,2)}"
+		"function num(v,d){var n=parseFloat(v);return isNaN(n)?d:n}");
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Speed: </b></td><td align=\"left\"> <label id=\"spd\">%.2f</label> km/h</td></tr>", gps.speed.kmph());
-	strcat(webString, temp_buf);
+	add("function parseLine(raw){var line=String(raw).replace(/[\\r\\n]+$/,'');"
+		"var star=line.indexOf('*');if(line.charAt(0)!=='$'||star<0)return '';"
+		"var body=line.substring(1,star),want=parseInt(line.substr(star+1,2),16),sum=0;"
+		"for(var i=0;i<body.length;i++)sum^=body.charCodeAt(i);"
+		"if(sum===want)cOk++;else{cBad++;return ''}"
+		"var f=body.split(','),t=f[0].substr(2);st.talker=f[0].substr(0,2);"
+		"if(t==='GGA'){"
+		"st.fixQ=num(f[6],0);if(f[1])st.utc=f[1];"
+		"if(f[2]&&f[3])st.lat=dm2deg(f[2],f[3]);if(f[4]&&f[5])st.lng=dm2deg(f[4],f[5]);"
+		"if(f[7]!=='')st.satsUsed=num(f[7],st.satsUsed);"
+		"if(f[8]!=='')st.hdop=num(f[8],st.hdop);if(f[9]!=='')st.alt=num(f[9],st.alt);"
+		"if(f[11]!=='')st.geoid=num(f[11],st.geoid);"
+		"if(st.fixQ>0){fixOK=true;lastFix=Date.now()}}"
+		"else if(t==='RMC'){var act=(f[2]==='A');if(f[1])st.utc=f[1];"
+		"if(f[3]&&f[4])st.lat=dm2deg(f[3],f[4]);if(f[5]&&f[6])st.lng=dm2deg(f[5],f[6]);"
+		"if(f[7]!=='')st.spdKn=num(f[7],st.spdKn);if(f[8]!=='')st.csd=num(f[8],st.csd);"
+		"if(f[9]&&f[9].length===6){var yy=parseInt(f[9].substr(4,2),10);"
+		"st.date=(yy<80?2000+yy:1900+yy)+'-'+f[9].substr(2,2)+'-'+f[9].substr(0,2)}"
+		"if(f[12])st.mode=f[12];"
+		"if(act){fixOK=true;lastFix=Date.now()}}"
+		"else if(t==='GSA'){var used=0;for(var i=3;i<=14;i++)if(num(f[i],0))used++;"
+		"if(used)st.satsUsed=used;if(f[2])st.mode=f[2]==='3'?'3D':(f[2]==='2'?'2D':'1');"
+		"if(f[15]!=='')st.pdop=num(f[15],st.pdop);if(f[16]!=='')st.hdop=num(f[16],st.hdop);"
+		"if(f[17]!=='')st.vdop=num(f[17],st.vdop)}"
+		"else if(t==='GSV'){var tk=st.talker,m1=num(f[1],1),m2=num(f[2],1);"
+		"if(!snr[tk]||m2===1){snr[tk]=[];satTmp[tk]=[]}"
+		"ivw[tk]=num(f[3],0);st.inView=0;for(var q in ivw)st.inView+=ivw[q];"
+		"for(var j=4;j+3<f.length;j+=4){var prn=num(f[j],0),s=num(f[j+3],0);"
+		"if(prn){satTmp[tk].push([prn,s]);if(s>0)snr[tk].push(s)}}"
+		"if(m2>=m1&&Date.now()-satT>800){satT=Date.now();drawSats()}}"
+		"else if(t==='GLL'){if(f[1]&&f[2])st.lat=dm2deg(f[1],f[2]);if(f[3]&&f[4])st.lng=dm2deg(f[3],f[4]);"
+		"if(f[6]==='A'){fixOK=true;lastFix=Date.now()}}"
+		"else if(t==='VTG'){if(f[1]!=='')st.csd=num(f[1],st.csd);"
+		"if(f[5]!=='')st.spdKn=num(f[5],st.spdKn);if(f[7]!=='')st.spdKmh=num(f[7],st.spdKmh)}"
+		"else if(t==='ZDA'){if(f[1])st.utc=f[1];if(f[2]&&f[3]&&f[4])st.date=f[4]+'-'+p2(f[3])+'-'+p2(f[2])}"
+		"else if(t==='GST'){st.stdLat=num(f[5],st.stdLat);st.stdLon=num(f[6],st.stdLon)}"
+		"else if(t==='TXT'){st.txt=f.slice(4).join(' ').trim()}"
+		"return t}");
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Course: </b></td><td align=\"left\"> <label id=\"csd\">%.1f</label></td></tr>", gps.course.deg());
-	strcat(webString, temp_buf);
+	add("function drawChips(){var k=['GGA','RMC','GSA','GSV','GLL','VTG','ZDA','GST','TXT'];"
+		"for(var i=0;i<k.length;i++){var e=$('c_'+k[i]);if(!e)continue;var n=cnt[k[i]]||0;"
+		"e.textContent=k[i]+' '+n;e.className='chip'+(n?' ok':'')}"
+		"$('cnt').textContent=lines+' lines'}");
+	add("function drawSats(){var box=$('sats2'),rows=[],k,i,a,p;"
+		"for(k in satTmp){a=satTmp[k];p=PFX[k]||'N';"
+		"for(i=0;i<a.length;i++)rows.push([p+(a[i][0]<10?'0':'')+a[i][0],a[i][1]])}"
+		"rows.sort(function(x,y){return y[1]-x[1]});if(rows.length>16)rows.length=16;"
+		"box.textContent='';"
+		"for(i=0;i<rows.length;i++){var v=rows[i][1],"
+		"d=document.createElement('div');d.className='sb';"
+		"var n=document.createElement('span');n.className='sn';n.textContent=rows[i][0];"
+		"var w=document.createElement('span');w.className='bw';"
+		"var b=document.createElement('i');b.style.height=Math.min(100,Math.round(v*2))+'%';"
+		"b.style.background=v>=40?'#22c55e':v>=30?'#a3e635':v>=20?'#f59e0b':v>0?'#ef4444':'#334155';"
+		"var s=document.createElement('span');s.className='sv';s.textContent=v;"
+		"w.appendChild(b);d.appendChild(s);d.appendChild(w);d.appendChild(n);box.appendChild(d)}"
+		"if(!rows.length)box.textContent='no GSV data'}");
+	add("function render(){"
+		"$('lat').textContent=fixOK?st.lat.toFixed(5):'--';$('latd').textContent=fixOK?dms(st.lat,1):'--';"
+		"$('lng').textContent=fixOK?st.lng.toFixed(5):'--';$('lngd').textContent=fixOK?dms(st.lng,0):'--';"
+		"$('alt').textContent=fixOK?st.alt.toFixed(1):'--';"
+		"$('altft').textContent=fixOK?Math.round(st.alt*3.28084):'--';"
+		"$('geo').textContent=st.geoid?st.geoid.toFixed(1):'--';"
+		"var kmh=st.spdKmh||st.spdKn*1.852;"
+		"$('spd').textContent=fixOK?kmh.toFixed(1):'--';$('kn').textContent=fixOK?(kmh/1.852).toFixed(1):'--';"
+		"$('mph').textContent=fixOK?(kmh/1.609344).toFixed(1):'--';"
+		"$('csd').textContent=fixOK?st.csd.toFixed(0):'--';$('csdt').textContent=fixOK?cmp(st.csd):'--';"
+		"$('arrow').style.transform='rotate('+(fixOK?st.csd:0)+'deg)';"
+		"$('fixq').textContent=fixOK?(qname(st.fixQ)+(st.mode?' '+st.mode:'')):'no fix';"
+		"$('fixq').style.color=fixOK?'#22c55e':'#ef4444';"
+		"$('acc').textContent=(st.stdLat||st.stdLon)?('GST +-'+Math.max(st.stdLat,st.stdLon).toFixed(2)+' m'):'no GST data';"
+		"$('sats').textContent=st.satsUsed;"
+		"$('inview').textContent=st.inView?('of '+st.inView+' in view'):'';"
+		"var mx=0,avg=0,n=0;for(var k in snr){var a=snr[k];for(var i=0;i<a.length;i++){"
+		"n++;avg+=a[i];if(a[i]>mx)mx=a[i]}}"
+		"$('snr').textContent=mx?('SNR max '+mx+', avg '+(avg/n).toFixed(0)+' dB-Hz'):'no signal data';"
+		"var q=ql(st.hdop);"
+		"$('hdop').textContent=st.hdop?st.hdop.toFixed(2):'--';"
+		"$('hdopp').textContent=q[0];$('hdopp').style.color=q[1];"
+		"$('dop').textContent='H '+(st.hdop?st.hdop.toFixed(1):'-')+' V '+(st.vdop?st.vdop.toFixed(1):'-')"
+		"+' P '+(st.pdop?st.pdop.toFixed(1):'-');"
+		"$('utc').textContent=fmtT(st.utc);$('date').textContent=st.date||'--';"
+		"var d=new Date(devTs*1000+(Date.now()-devT0));"
+		"$('dev').textContent=p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());"
+		"$('devd').textContent=d.toLocaleDateString();"
+		"$('age').textContent=fixOK?((Date.now()-lastFix)/1000).toFixed(0):'--';"
+		"$('talker').textContent=st.talker;$('csum').textContent=cOk+' ok / '+cBad+' bad';"
+		"$('txt').textContent=st.txt||'-';$('en').textContent=en;"
+		"$('fixdot').className='dot '+(fixOK?'on':'off');$('fixtxt').textContent=fixOK?'FIX':'NO FIX';"
+		"var a=$('mapa');if(fixOK){a.href='https://www.openstreetmap.org/?mlat='+st.lat.toFixed(5)"
+		"+'&mlon='+st.lng.toFixed(5)+'#map=16/'+st.lat.toFixed(5)+'/'+st.lng.toFixed(5);"
+		"a.textContent='open map'}else{a.removeAttribute('href');a.textContent='no fix'}}");
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>HDOP: </b></td><td align=\"left\"> <label id=\"hdop\">%.2f</label> </td></tr>", gps.hdop.hdop());
-	strcat(webString, temp_buf);
+	add("function onNmea(txt){var ta=$('raw_txt');"
+		"if(!paused){ta.value+=txt;if(ta.value.length>16000)ta.value=ta.value.slice(-12000);"
+		"ta.scrollTop=ta.scrollHeight}"
+		"var ls=txt.split(/[\\r\\n]+/);for(var i=0;i<ls.length;i++){"
+		"var t=parseLine(ls[i]);if(t){cnt[t]=(cnt[t]||0)+1;lines++}}"
+		"drawChips();render()}");
+	add("function connect(){ws=new WebSocket('ws://'+location.hostname+':81/ws_gnss');"
+		"ws.onopen=function(){$('ws_status').textContent='connected';$('wsdot').className='dot on'};"
+		"ws.onclose=function(){$('ws_status').textContent='disconnected - retrying';"
+		"$('wsdot').className='dot off';setTimeout(connect,3000)};"
+		"ws.onerror=function(){$('ws_status').textContent='websocket error (port 81?)'};"
+		"ws.onmessage=function(ev){try{onNmea(ev.data)}catch(e){console.log('nmea',e)}}}");
+	add("function togglePause(e){e.preventDefault();paused=!paused;"
+		"$('pbtn').textContent=paused?'resume':'pause'}"
+		"function clearLog(e){e.preventDefault();$('raw_txt').value='';cnt={};lines=0;drawChips()}"
+		"setInterval(function(){if(fixOK)$('age').textContent=((Date.now()-lastFix)/1000).toFixed(0)},1000);"
+		"connect();</script></body></html>");
 
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>SAT: </b></td><td align=\"left\"> <label id=\"sat\">%d</label> </td></tr>", gps.satellites.value());
-	strcat(webString, temp_buf);
-
-	snprintf(temp_buf, sizeof(temp_buf), "<tr><td align=\"right\"><b>Time: </b></td><td align=\"left\"> <label id=\"time\">%d</label> </td></tr>", gps.time.value());
-	strcat(webString, temp_buf);
-
-	strcat(webString,
-		"</table><table>"
-		"<tr><td><b>Terminal:</b> <label id=\"ws_status\">connecting...</label><br /><textarea id=\"raw_txt\" name=\"raw_txt\" rows=\"30\" cols=\"80\" readonly></textarea></td></tr>\n"
-		"</table>\n");
-
-	strcat(webString, "</body></html>\n");
+	if (len >= cap - 1)
+		log_e("GNSS page truncated at %u byte (cap %u) - the terminal would be cut off",
+			  (unsigned int)len, (unsigned int)cap);
+	else
+		log_d("GNSS page: %u byte", (unsigned int)len);
 
 	AsyncWebServerResponse *response = beginHtmlResponse(request, webString, strlen(webString));
 	response->addHeader("GNSS", "content");
