@@ -220,7 +220,7 @@ void setMainPage(AsyncWebServerRequest *request)
 	}
 
 	// Using dynamic memory allocation instead of String
-	char *webString = allocateStringMemory(12288); // Initial buffer size, adjust as needed
+	char *webString = allocateStringMemory(14336); // Initial buffer size, adjust as needed
 	if (!webString)
 	{
 		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
@@ -392,7 +392,8 @@ void setMainPage(AsyncWebServerRequest *request)
 		"tr.innerHTML = `\n"
 		"<td>${row.time}</td>\n"
 		"<td><img src=\"http://aprs.nakhonthai.net/symbols/icons/${row.icon}\"></td>\n"
-		"<td>${row.callsign}</td>\n"
+		"<td style=\"cursor:pointer;color:#0b5ed7;text-decoration:underline dotted\" "
+		"onclick=\"aprsInfo(${row.idx})\">${row.callsign}</td>\n"
 		"<td align=\"left\">${row.path}</td>\n"
 		"<td>${row.dx !== null ? row.dx : \"-\"}</td>\n"
 		"<td>${row.packet}</td>\n"
@@ -401,6 +402,12 @@ void setMainPage(AsyncWebServerRequest *request)
 		"`;\n"
 		"tableBody.appendChild(tr);\n"
 		"});\n"
+		"}\n\n");
+
+	strcat(webString,
+		"function aprsInfo(i) {\n"
+		"window.open(\"/aprsinfo?idx=\" + i, \"aprsinfo\" + i, "
+		"\"width=540,height=720,scrollbars=yes,resizable=yes\");\n"
 		"}\n\n");
 
 	strcat(webString,
@@ -1346,7 +1353,8 @@ void event_lastHeard(bool gethtml)
 					// Append to html
 					// strcat(html, "  { time: \"21:54:23\", icon: \"91-1.png\", callsign: \"HS5TQA-7\", path: \"RF: WIDE1-1\", dx: 0.0, packet: 2, rssi: -19.6 },\n");
 					
-					snprintf(temp_html, sizeof(temp_html), "{\"time\":\"%s\",", strTime);
+					// "idx" lets the browser open /aprsinfo?idx=N for that row
+					snprintf(temp_html, sizeof(temp_html), "{\"time\":\"%s\",\"idx\":%d,", strTime, i);
 					strcat(html, temp_html);
 					char fileImg[64] = "";
 					bool pkgINET = false;
@@ -13530,6 +13538,376 @@ void handle_gnss(AsyncWebServerRequest *request)
 	request->send(response);
 }
 
+// Escapes the characters that would break the APRS info markup.
+static void aprsHtmlEscape(const char *in, size_t inLen, char *out, size_t outSize)
+{
+	size_t o = 0;
+	if (outSize == 0)
+		return;
+	for (size_t i = 0; i < inLen && in[i] != '\0' && o + 6 < outSize; i++)
+	{
+		const char *rep = NULL;
+		switch (in[i])
+		{
+		case '<':
+			rep = "&lt;";
+			break;
+		case '>':
+			rep = "&gt;";
+			break;
+		case '&':
+			rep = "&amp;";
+			break;
+		case '"':
+			rep = "&quot;";
+			break;
+		default:
+			break;
+		}
+		if (rep != NULL)
+		{
+			size_t n = strlen(rep);
+			memcpy(out + o, rep, n);
+			o += n;
+		}
+		else if ((unsigned char)in[i] >= 32 || in[i] == '\t')
+		{
+			out[o++] = in[i];
+		}
+	}
+	out[o] = '\0';
+}
+
+// Splits a stored TNC2 packet (src>dst,path:info) and runs the APRS parser on
+// it, so the popup shows exactly what the LAST HEARD table received.
+static bool aprsDecodePkg(const pkgListType &pkg, struct pbuf_t &aprs, ParseAPRS &aprsParse,
+						  char *src, size_t srcSize, char *dst, size_t dstSize,
+						  char *path, size_t pathSize)
+{
+	src[0] = '\0';
+	dst[0] = '\0';
+	path[0] = '\0';
+	if (pkg.raw == NULL || pkg.length == 0)
+		return false;
+
+	memset(&aprs, 0, sizeof(pbuf_t));
+	size_t len = pkg.length;
+	if (len > sizeof(aprs.data) - 1)
+		len = sizeof(aprs.data) - 1;
+	aprs.buf_len = sizeof(aprs.data);
+	aprs.packet_len = (int)len;
+	memcpy(aprs.data, pkg.raw, len);
+	aprs.data[len] = '\0';
+
+	const char *pos_gt = strchr(aprs.data, '>');
+	const char *pos_colon = strchr(aprs.data, ':');
+	if (pos_gt == NULL || pos_colon == NULL || pos_colon <= pos_gt)
+		return false;
+
+	int start_dst = (int)(pos_gt - aprs.data);
+	int start_info = (int)(pos_colon - aprs.data);
+	if (start_dst <= 0 || start_dst >= (int)srcSize - 1 || start_info <= start_dst + 1)
+		return false;
+	memcpy(src, aprs.data, start_dst);
+	src[start_dst] = '\0';
+
+	const char *pos_comma = strchr(aprs.data, ',');
+	int end_ssid = pos_comma ? (int)(pos_comma - aprs.data) : start_info;
+	if (end_ssid <= start_dst || end_ssid > start_info)
+		end_ssid = start_info;
+	int dst_len = end_ssid - start_dst - 1;
+	if (dst_len < 0 || dst_len >= (int)dstSize)
+		return false;
+	memcpy(dst, aprs.data + start_dst + 1, dst_len);
+	dst[dst_len] = '\0';
+
+	if (end_ssid < start_info)
+	{
+		int plen = start_info - end_ssid - 1;
+		if (plen >= (int)pathSize)
+			plen = (int)pathSize - 1;
+		memcpy(path, aprs.data + end_ssid + 1, plen);
+		path[plen] = '\0';
+	}
+
+	const char *pos_dash = strchr(aprs.data + start_dst, '-');
+	if (pos_dash != NULL && pos_dash > aprs.data + end_ssid)
+		pos_dash = NULL;
+	aprs.dstcall_end_or_ssid = pos_dash ? pos_dash : &aprs.data[end_ssid];
+	aprs.info_start = &aprs.data[start_info + 1];
+	aprs.dstname = &aprs.data[start_dst + 1];
+	aprs.dstname_len = end_ssid - start_dst;
+	aprs.dstcall_end = &aprs.data[end_ssid];
+	aprs.srccall_end = &aprs.data[start_dst];
+	return aprsParse.parse_aprs(&aprs);
+}
+
+// /aprsinfo?idx=N - detail popup for one entry of the LAST HEARD list.
+void handle_aprsinfo(AsyncWebServerRequest *request)
+{
+	const size_t cap = 8192;
+	char *html = allocateStringMemory(cap);
+	if (!html)
+	{
+		request->send(503, "text/html", "<h3>Device busy, please reload</h3>");
+		return;
+	}
+	size_t len = 0;
+	auto add = [&](const char *s)
+	{
+		if (s == NULL)
+			return;
+		size_t n = strlen(s);
+		if (len + n >= cap)
+			return;
+		memcpy(html + len, s, n);
+		len += n;
+		html[len] = '\0';
+	};
+	auto addf = [&](const char *fmt, ...)
+	{
+		if (len + 1 >= cap)
+			return;
+		size_t room = cap - len;
+		va_list ap;
+		va_start(ap, fmt);
+		int n = vsnprintf(html + len, room, fmt, ap);
+		va_end(ap);
+		if (n < 0)
+			return;
+		len += ((size_t)n < room) ? (size_t)n : (room - 1);
+		html[len] = '\0';
+	};
+
+	int idx = request->hasArg("idx") ? request->arg("idx").toInt() : 0;
+	if (idx < 0 || idx >= PKGLISTSIZE)
+		idx = 0;
+	pkgListType pkg = getPkgList(idx);
+
+	add("<!DOCTYPE html><html lang='th'><head><meta charset='utf-8'>"
+		"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+		"<title>APRS info</title><style>");
+	add("*{box-sizing:border-box}"
+		"body{margin:0;padding:12px 14px;font:13px/1.45 system-ui,'Segoe UI',Roboto,sans-serif;"
+		"background:#0f172a;color:#e2e8f0}"
+		"h1{margin:0 0 2px;font-size:16px;color:#67e8f9}.sub{margin:0 0 10px;font-size:12px;color:#94a3b8}"
+		".ico{width:26px;height:26px;vertical-align:-7px;margin-right:6px}"
+		"table{width:100%;border-collapse:collapse}"
+		"td{padding:3px 0;vertical-align:top;border-bottom:1px solid #1e293b;word-break:break-word}"
+		"td.k{width:33%;color:#94a3b8}td.v{font-family:ui-monospace,Consolas,monospace}"
+		"pre{margin:10px 0 0;padding:8px;border-radius:8px;background:#020617;color:#86efac;"
+		"font:11px ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}"
+		"a{color:#38bdf8}</style></head><body>");
+
+	if (pkg.time == 0 || pkg.raw == NULL || pkg.length == 0)
+	{
+		add("<h1>APRS info</h1><p class='sub'>No packet at this index any more. "
+			"Close this window and click the callsign again.</p></body></html>");
+		AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
+		response->addHeader("Cache-Control", "no-cache");
+		request->send(response);
+		return;
+	}
+
+	struct pbuf_t aprs;
+	ParseAPRS aprsParse;
+	char src[12], dst[12], path[160];
+	bool parsed = aprsDecodePkg(pkg, aprs, aprsParse, src, sizeof(src), dst, sizeof(dst), path, sizeof(path));
+
+	char esc[320], buf[220], typeTxt[96], tbuf[40], title[16];
+	struct tm tmv;
+	time_t tval = pkg.time;
+	localtime_r(&tval, &tmv);
+	strftime(tbuf, sizeof(tbuf), "%d/%m/%Y %H:%M:%S", &tmv);
+
+	snprintf(title, sizeof(title), "%s", (pkg.calsign[0] != '\0') ? pkg.calsign : src);
+	aprsHtmlEscape(title, strlen(title), esc, sizeof(esc));
+
+	// Symbol icon, same file naming as the icons used by the LAST HEARD table.
+	char iconFile[24];
+	strcpy(iconFile, "dot.png");
+	uint8_t symCode = (uint8_t)aprs.symbol[1];
+	if (symCode > 31 && symCode < 127)
+	{
+		if (aprs.symbol[0] > 64 && aprs.symbol[0] < 91) // overlay A-Z uses the primary table
+			snprintf(iconFile, sizeof(iconFile), "%d-1.png", symCode);
+		else if (aprs.symbol[0] == '\\')
+			snprintf(iconFile, sizeof(iconFile), "%d-2.png", symCode);
+		else if (aprs.symbol[0] == '/')
+			snprintf(iconFile, sizeof(iconFile), "%d-1.png", symCode);
+	}
+	addf("<h1><img class='ico' src='http://aprs.nakhonthai.net/symbols/icons/%s' alt=''>%s</h1>"
+		 "<p class='sub'>%s%s%s</p>",
+		 iconFile, esc, tbuf,
+		 (pkg.object[0] != '\0') ? " - object " : "", (pkg.object[0] != '\0') ? pkg.object : "");
+	add("<table>");
+	auto row = [&](const char *k, const char *v)
+	{
+		aprsHtmlEscape(v, strlen(v), esc, sizeof(esc));
+		addf("<tr><td class='k'>%s</td><td class='v'>%s</td></tr>", k, esc);
+	};
+
+	// packet type
+	typeTxt[0] = '\0';
+	auto addType = [&](const char *name)
+	{
+		if (typeTxt[0] != '\0')
+			strcat(typeTxt, ", ");
+		strncat(typeTxt, name, sizeof(typeTxt) - strlen(typeTxt) - 1);
+	};
+	if (!parsed)
+		addType("unparsed");
+	if (aprs.packettype & T_POSITION)
+		addType("Position");
+	if (aprs.packettype & T_OBJECT)
+		addType("Object");
+	if (aprs.packettype & T_ITEM)
+		addType("Item");
+	if (aprs.packettype & T_MESSAGE)
+		addType("Message");
+	if (aprs.packettype & T_STATUS)
+		addType("Status");
+	if (aprs.packettype & T_WX)
+		addType("Weather");
+	if (aprs.packettype & T_TELEMETRY)
+		addType("Telemetry");
+	if (aprs.packettype & T_QUERY)
+		addType("Query");
+	if (aprs.packettype & T_THIRDPARTY)
+		addType("Third-party");
+	if (typeTxt[0] == '\0')
+		strcpy(typeTxt, "Other");
+	row("Type", typeTxt);
+	row("Source", src);
+	row("Destination", dst);
+	row("Path", (path[0] != '\0') ? path : "DIRECT");
+
+	char sym[8];
+	snprintf(sym, sizeof(sym), "%c%c", aprs.symbol[0] ? aprs.symbol[0] : ' ', aprs.symbol[1] ? aprs.symbol[1] : ' ');
+	row("Symbol", sym);
+
+	if (aprs.packettype & T_POSITION)
+	{
+		double latDeg = aprs.lat;
+		double lonDeg = aprs.lng;
+		if (latDeg != 0.0 || lonDeg != 0.0)
+		{
+			// Show degrees with hemisphere, plus the DMS form used by /gnss.
+			double alat = fabs(latDeg), alon = fabs(lonDeg);
+			int latD = (int)alat, lonD = (int)alon;
+			double latMf = (alat - latD) * 60.0, lonMf = (alon - lonD) * 60.0;
+			int latM = (int)latMf, lonM = (int)lonMf;
+			double latS = (latMf - latM) * 60.0, lonS = (lonMf - lonM) * 60.0;
+			addf("<tr><td class='k'>Position</td><td class='v'>%.5f&deg; %c, %.5f&deg; %c</td></tr>",
+				 alat, (latDeg >= 0.0) ? 'N' : 'S', alon, (lonDeg >= 0.0) ? 'E' : 'W');
+			addf("<tr><td class='k'>Position (DMS)</td><td class='v'>"
+				 "%d&deg;%02d'%05.2f\"%c &nbsp; %d&deg;%02d'%05.2f\"%c</td></tr>",
+				 latD, latM, latS, (latDeg >= 0.0) ? 'N' : 'S',
+				 lonD, lonM, lonS, (lonDeg >= 0.0) ? 'E' : 'W');
+			// Station page on the APRS Thailand site, keyed by the packet source.
+			char stationUrl[96], linkTxt[80];
+			snprintf(stationUrl, sizeof(stationUrl), "http://aprs.nakhonthai.net/station/%s/", src);
+			snprintf(linkTxt, sizeof(linkTxt), "aprs.nakhonthai.net/station/%s/", src);
+			aprsHtmlEscape(stationUrl, strlen(stationUrl), esc, sizeof(esc));
+			aprsHtmlEscape(linkTxt, strlen(linkTxt), buf, sizeof(buf));
+			addf("<tr><td class='k'>Map</td><td class='v'><a target='_blank' rel='noopener' "
+				 "href='%s'>%s</a></td></tr>", esc, buf);
+
+			double baseLat, baseLon;
+			if (gps.location.isValid())
+			{
+				baseLat = gps.location.lat();
+				baseLon = gps.location.lng();
+			}
+			else
+			{
+				baseLat = config.igate_lat;
+				baseLon = config.igate_lon;
+			}
+			double dist = aprsParse.distance(baseLon, baseLat, aprs.lng, aprs.lat);
+			double dir = aprsParse.direction(baseLon, baseLat, aprs.lng, aprs.lat);
+			snprintf(buf, sizeof(buf), "%.1f km / %.0f deg", dist, dir);
+			row("Distance", buf);
+		}
+		if (aprs.speed > 0.0)
+		{
+			snprintf(buf, sizeof(buf), "%.1f km/h", aprs.speed);
+			row("Speed", buf);
+		}
+		if (aprs.course > 0)
+		{
+			snprintf(buf, sizeof(buf), "%u deg", (unsigned int)aprs.course);
+			row("Course", buf);
+		}
+		if (aprs.altitude != 0.0)
+		{
+			snprintf(buf, sizeof(buf), "%.1f m", aprs.altitude);
+			row("Altitude", buf);
+		}
+	}
+
+	if (aprs.comment != NULL && aprs.comment_len > 0)
+	{
+		size_t clen = aprs.comment_len;
+		if (clen > sizeof(buf) - 1)
+			clen = sizeof(buf) - 1;
+		memcpy(buf, aprs.comment, clen);
+		buf[clen] = '\0';
+		row("Comment", buf);
+	}
+
+	if ((aprs.packettype & T_MESSAGE) && aprs.msg.body != NULL)
+	{
+		size_t mlen = aprs.msg.body_len;
+		if (mlen > sizeof(buf) - 1)
+			mlen = sizeof(buf) - 1;
+		memcpy(buf, aprs.msg.body, mlen);
+		buf[mlen] = '\0';
+		char mkey[40];
+		snprintf(mkey, sizeof(mkey), "to %.10s", (aprs.dstname != NULL) ? aprs.dstname : "?");
+		row(mkey, buf);
+	}
+
+	if (aprs.packettype & T_WX)
+	{
+		buf[0] = '\0';
+		if (aprs.wx_report.flags & W_TEMP)
+			snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "temp %.1fC ", aprs.wx_report.temp);
+		if (aprs.wx_report.flags & W_HUM)
+			snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "hum %.0f%% ", aprs.wx_report.humidity);
+		if (aprs.wx_report.flags & W_PAR)
+			snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "baro %.1fmb ", aprs.wx_report.pressure);
+		if (aprs.wx_report.flags & W_WS)
+			snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "wind %.1fm/s ", aprs.wx_report.wind_speed);
+		if (aprs.wx_report.flags & W_WD)
+			snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "dir %u ", aprs.wx_report.wind_dir);
+		if (aprs.wx_report.flags & W_R1H)
+			snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "rain1h %.1fmm", aprs.wx_report.rain_1h);
+		if (buf[0] != '\0')
+			row("Weather", buf);
+	}
+
+	const char *rfSrc = (pkg.rfch == 2) ? "RF2" : "RF1";
+	if (pkg.rssi != 0.0F)
+		snprintf(buf, sizeof(buf), "%s - RSSI %.1f dBm, SNR %.1f, FreqErr %d Hz", rfSrc,
+				 pkg.rssi, pkg.snr, (int)pkg.freqErr);
+	else
+		snprintf(buf, sizeof(buf), "INET (from APRS-IS/network)");
+	row("Received", buf);
+
+	snprintf(buf, sizeof(buf), "%u byte", (unsigned int)pkg.length);
+	row("Length", buf);
+	add("</table>");
+
+	aprsHtmlEscape(pkg.raw, pkg.length, esc, sizeof(esc));
+	addf("<pre>%s</pre>", esc);
+	add("<p class='sub'>Parsed from the stored TNC2 packet. Reload to refresh.</p>"
+		"</body></html>");
+
+	AsyncWebServerResponse *response = beginHtmlResponse(request, html, strlen(html));
+	response->addHeader("Cache-Control", "no-cache");
+	request->send(response);
+}
 void handle_default()
 {
 	defaultSetting = true;
@@ -13638,6 +14016,8 @@ void webService()
 					{ handle_test(request); });
 	async_server.on("/gnss", HTTP_GET, [](AsyncWebServerRequest *request)
 					{ handle_gnss(request); });
+	async_server.on("/aprsinfo", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_aprsinfo(request); });
 	async_server.on("/realtime", HTTP_GET, [](AsyncWebServerRequest *request)
 					{ handle_realtime(request); });
 	async_server.on("/about", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request)
