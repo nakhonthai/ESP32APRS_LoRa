@@ -1431,6 +1431,7 @@ void setupPower()
 
 void PowerOn()
 {
+    log_d("PowerOn");
 #ifdef ST7735_LED_K_Pin
     ledcWrite(ST7735_LED_K_Pin, (uint32_t)config.disp_brightness);
 #endif
@@ -1448,17 +1449,20 @@ void PowerOn()
     {
         pinMode(config.pwr_gpio, OUTPUT);
         digitalWrite(config.pwr_gpio, HIGH);
+        log_d("Power GPIO %d set HIGH", config.pwr_gpio);
     }
     else
     {
         pinMode(config.pwr_gpio, OUTPUT_OPEN_DRAIN);
         digitalWrite(config.pwr_gpio, LOW);
+        log_d("Power GPIO %d set LOW", config.pwr_gpio);
     }
     pwr_status = true;
 }
 
 void PowerOff()
 {
+    log_d("PowerOff");
 #ifdef ST7735_LED_K_Pin
     ledcWrite(ST7735_LED_K_Pin, 0);
 #endif
@@ -4822,9 +4826,6 @@ void setup()
     setupPower();
 #endif
 
-Sleep_Activate = config.pwr_sleep_activate;
-PowerOn();
-
 #ifdef APRS_LORA_HT
     pinMode(0, INPUT);
     pinMode(1, INPUT);
@@ -4868,6 +4869,16 @@ PowerOn();
         log_d("Total space: %lu\n", LITTLEFS.totalBytes());
         log_d("Use space:  %lu\n\n", LITTLEFS.usedBytes());
     }
+    
+    if (!loadConfiguration("/default.cfg", config))
+    {
+        log_d("Factory Default");
+        defaultConfig();
+        saveConfiguration("/default.cfg", config);
+    }
+
+    Sleep_Activate = config.pwr_sleep_activate;
+    PowerOn();
 
 #ifdef SDCARD
     // SD Card on shared SPI bus with RF (MOSI/MISO/SCLK from config), CS=SD_CS(18), switch detect=SD_SW(48)
@@ -4942,6 +4953,10 @@ PowerOn();
 
     log_d("PSRAM: %s, size %u byte, free %u byte", psramFound() ? "found" : "NOT FOUND",
           (unsigned int)ESP.getPsramSize(), (unsigned int)ESP.getFreePsram());
+    // Lets you confirm which firmware is actually running by comparing this
+    // with the size of the .bin that was flashed.
+    log_d("App size: %u byte, free sketch space %u byte",
+          (unsigned int)ESP.getSketchSize(), (unsigned int)ESP.getFreeSketchSpace());
     // log_d("Push BOOT after 3 sec for Factory Default config.");
 
     // if (!EEPROM.begin(EEPROM_SIZE))
@@ -4963,13 +4978,6 @@ PowerOn();
     strip.begin();
     LED_Status(200, 200, 200);
 #endif
-
-    if (!loadConfiguration("/default.cfg", config))
-    {
-        log_d("Factory Default");
-        defaultConfig();
-        saveConfiguration("/default.cfg", config);
-    }
 
 #ifdef PCF85063
     // PCF85063 RTC shares the PMU I2C bus (Wire) and restores the clock at boot
@@ -5463,7 +5471,7 @@ PowerOn();
     xTaskCreatePinnedToCore(
         taskAPRS,        /* Function to implement the task */
         "taskAPRS",      /* Name of the task */
-        4096,            /* Stack size in words */
+        STACK_TASK_APRS, /* Stack size in byte (ESP-IDF) */
         NULL,            /* Task input parameter */
         2,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
@@ -5474,7 +5482,7 @@ PowerOn();
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        8192,              /* Stack size in words */
+        STACK_TASK_NETWORK, /* Stack size in byte (ESP-IDF) */
         NULL,               /* Task input parameter */
         0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -5483,7 +5491,7 @@ PowerOn();
     xTaskCreatePinnedToCore(
         taskSensor,        /* Function to implement the task */
         "taskSensor",      /* Name of the task */
-        4096,              /* Stack size in words */
+        STACK_TASK_SENSOR, /* Stack size in byte (ESP-IDF) */
         NULL,              /* Task input parameter */
         1,                 /* Priority of the task */
         &taskSensorHandle, /* Task handle. */
@@ -5492,7 +5500,7 @@ PowerOn();
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
         "taskNetwork",      /* Name of the task */
-        8192,              /* Stack size in words */
+        STACK_TASK_NETWORK, /* Stack size in byte (ESP-IDF) */
         NULL,               /* Task input parameter */
         1,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
@@ -5501,7 +5509,7 @@ PowerOn();
     xTaskCreatePinnedToCore(
         taskSensor,        /* Function to implement the task */
         "taskSensor",      /* Name of the task */
-        4096,              /* Stack size in words */
+        STACK_TASK_SENSOR, /* Stack size in byte (ESP-IDF) */
         NULL,              /* Task input parameter */
         4,                 /* Priority of the task */
         &taskSensorHandle, /* Task handle. */
@@ -5511,23 +5519,14 @@ PowerOn();
     xTaskCreatePinnedToCore(
         taskAPRSPoll,        /* Function to implement the task */
         "taskAPRSPoll",      /* Name of the task */
-        4096,                /* Stack size in words */
+        STACK_TASK_APRSPOLL, /* Stack size in byte (ESP-IDF) */
         NULL,                /* Task input parameter */
         3,                   /* Priority of the task */
         &taskAPRSPollHandle, /* Task handle. */
         0);                  /* Core where the task should run */
 
     if (config.gnss_enable)
-    {
-        xTaskCreatePinnedToCore(
-            taskGPS,        /* Function to implement the task */
-            "taskGPS",      /* Name of the task */
-            3072,           /* Stack size in words */
-            NULL,           /* Task input parameter */
-            5,              /* Priority of the task */
-            &taskGPSHandle, /* Task handle. */
-            0);             /* Core where the task should run */
-    }
+        gnssStartTask();
 
     // if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
     if (config.ext_tnc_enable)
@@ -5535,7 +5534,7 @@ PowerOn();
         xTaskCreatePinnedToCore(
             taskSerial,        /* Function to implement the task */
             "taskSerial",      /* Name of the task */
-            2048,              /* Stack size in words */
+            STACK_TASK_SERIAL, /* Stack size in byte (ESP-IDF) */
             NULL,              /* Task input parameter */
             6,                 /* Priority of the task */
             &taskSerialHandle, /* Task handle. */
@@ -6828,8 +6827,14 @@ int timeHalfSec = 0;
 
 unsigned long timeSec;
 
-char nmea[100];
+char nmea[200];
 int nmea_idx = 0;
+// NMEA lines pushed to the GNSS terminal (diagnostics)
+unsigned long gnssNmeaSent = 0;
+// Effective GNSS serial settings, filled in by gnssPrepareUart() and shown in
+// the reception diagnostics.
+int8_t gnssRxPin = -1;
+unsigned long gnssBaudRate = 9600;
 char morse[50];
 uint8_t morseState = 0;
 long int sleep_timer = 0;
@@ -6870,10 +6875,57 @@ void msgBox(String msg)
 #endif
 }
 
+// Minimum free stack (in bytes) each task has ever had. ESP-IDF counts task
+// stacks in bytes and uxTaskGetStackHighWaterMark() returns bytes as well, so
+// a task whose value gets close to 0 is dangerously close to the canary.
+// Aim for at least ~25% of STACK_TASK_* still free at the worst moment.
+void logTaskStacks()
+{
+    struct
+    {
+        const char *name;
+        TaskHandle_t handle;
+        uint32_t size;
+    } tasks[] = {
+        {"APRS", taskAPRSHandle, STACK_TASK_APRS},
+        {"NET", taskNetworkHandle, STACK_TASK_NETWORK},
+        {"SENSOR", taskSensorHandle, STACK_TASK_SENSOR},
+        {"POLL", taskAPRSPollHandle, STACK_TASK_APRSPOLL},
+        {"GPS", taskGPSHandle, STACK_TASK_GPS},
+        {"SERIAL", taskSerialHandle, STACK_TASK_SERIAL},
+    };
+
+    char line[224];
+#if defined(__XTENSA__)
+    const char *arch = "XTENSA";
+#else
+    const char *arch = "RISC-V";
+#endif
+    int len = snprintf(line, sizeof(line), "Stack free/total (byte) [%s]:", arch);
+    for (size_t i = 0; i < sizeof(tasks) / sizeof(tasks[0]); i++)
+    {
+        if (tasks[i].handle == NULL || len >= (int)sizeof(line) - 1)
+            continue;
+        UBaseType_t freeBytes = uxTaskGetStackHighWaterMark(tasks[i].handle);
+        len += snprintf(line + len, sizeof(line) - len, " %s=%u/%u", tasks[i].name,
+                        (unsigned int)freeBytes, (unsigned int)tasks[i].size);
+        if (freeBytes < STACK_TASK_WARN)
+            log_e("Stack almost full: %s free %u of %u byte", tasks[i].name,
+                  (unsigned int)freeBytes, (unsigned int)tasks[i].size);
+    }
+    log_d("%s", line);
+}
+
 void loop()
 {
     if (millis() > timeTask)
     {
+        static unsigned long stackLogTimeout = 0;
+        if (millis() > stackLogTimeout)
+        {
+            stackLogTimeout = millis() + 60000;
+            logTaskStacks();
+        }
         timeTask = millis() + 10000; // ⏱️ เช็คทุกๆ 10 วินาที
         VbatRead=true;
         VBat_Flag=false;
@@ -7505,7 +7557,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskNetwork,        /* Function to implement the task */
                             "taskNetwork",      /* Name of the task */
-                            8192,               /* Stack size in words */
+                            STACK_TASK_NETWORK, /* Stack size in byte (ESP-IDF) */
                             NULL,               /* Task input parameter */
                             0,                  /* Priority of the task */
                             &taskNetworkHandle, /* Task handle. */
@@ -7513,7 +7565,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskSensor,        /* Function to implement the task */
                             "taskSensor",      /* Name of the task */
-                            4096,              /* Stack size in words */
+                            STACK_TASK_SENSOR, /* Stack size in byte (ESP-IDF) */
                             NULL,              /* Task input parameter */
                             1,                 /* Priority of the task */
                             &taskSensorHandle, /* Task handle. */
@@ -7522,7 +7574,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskNetwork,        /* Function to implement the task */
                             "taskNetwork",      /* Name of the task */
-                            8192,               /* Stack size in words */
+                            STACK_TASK_NETWORK, /* Stack size in byte (ESP-IDF) */
                             NULL,               /* Task input parameter */
                             1,                  /* Priority of the task */
                             &taskNetworkHandle, /* Task handle. */
@@ -7530,7 +7582,7 @@ void loop()
                         xTaskCreatePinnedToCore(
                             taskSensor,        /* Function to implement the task */
                             "taskSensor",      /* Name of the task */
-                            4096,              /* Stack size in words */
+                            STACK_TASK_SENSOR, /* Stack size in byte (ESP-IDF) */
                             NULL,              /* Task input parameter */
                             4,                 /* Priority of the task */
                             &taskSensorHandle, /* Task handle. */
@@ -7981,6 +8033,9 @@ void sendTelemetry_digi(char *raw, int dly_ms)
 }
 
 RTC_DATA_ATTR statusType statOld;
+#ifdef PPPOS
+extern pppType pppStatus; // defined below, but needed by the GSM RSSI channel
+#endif
 uint8_t getState(int ch)
 {
     int val = 0;
@@ -8009,9 +8064,28 @@ uint8_t getState(int ch)
         val = status.dropCount - statOld.dropCount;
         statOld.dropCount = status.dropCount;
         break;
+    case 6: // free internal RAM, KB
+        val = ESP.getFreeHeap() / 1024;
+        break;
+    case 7: // battery voltage x10 (4.12V -> 41, use EQNS b=0.1)
+        val = (int)(VBat * 10.0f);
+        break;
+    case 8: // CPU temperature, degree C
+        val = (int)temperatureRead();
+        break;
+    case 9: // WiFi RSSI, positive magnitude (-67dBm -> 67, use EQNS b=-1)
+        val = WiFi.isConnected() ? -(int)WiFi.RSSI() : 0;
+        break;
+#ifdef PPPOS
+    case 10: // GSM/PPP RSSI, positive magnitude (-127 means unknown)
+        val = (pppStatus.rssi <= -127 || pppStatus.rssi >= 0) ? 0 : -pppStatus.rssi;
+        break;
+#endif
     }
     if (val < 0)
         val = 0;
+    else if (val > 255)
+        val = 255;
     return val;
 }
 
@@ -8327,27 +8401,37 @@ unsigned long gnssTimeInterval = 0;
 void taskGPS(void *pvParameters)
 {
     int c;
+    static unsigned long gnssStatusInterval = 0;
     log_d("GNSS Init");
+#ifdef STRIP_PIN
+    log_d("GNSS position LED: blue 100 ms on GPIO %d", STRIP_PIN);
+#endif
     nmea_idx = 0;
 
     if (config.gnss_enable)
     {
         if ((config.gnss_channel > 0) && (config.gnss_channel < 4))
         {
-            if (strstr("AT", config.gnss_at_command) != NULL)
+            // Only a real AT command may be sent to the module; the previous
+            // strstr("AT", command) had the arguments swapped, so every proper
+            // command was silently ignored.
+            if (strncmp(config.gnss_at_command, "AT", 2) == 0)
             {
+                log_d("GNSS send AT command to %s: %s", GNSS_PORT[config.gnss_channel], config.gnss_at_command);
                 if (config.gnss_channel == 1)
                 {
-                    Serial.println(config.gnss_at_command);
+                    Serial0.println(config.gnss_at_command);
                 }
                 else if (config.gnss_channel == 2)
                 {
                     Serial1.println(config.gnss_at_command);
                 }
+#if SOC_UART_NUM > 2
                 else if (config.gnss_channel == 3)
                 {
-                    // Serial2.println(config.gnss_at_command);
+                    Serial2.println(config.gnss_at_command);
                 }
+#endif
             }
         }
     }
@@ -8384,9 +8468,13 @@ void taskGPS(void *pvParameters)
                     if (c > -1)
                     {
                         gps.encode((char)c);
-                        if (webServiceBegin == false)
+                        // Only build/forward NMEA lines while somebody is
+                        // watching the GNSS terminal. The old webServiceBegin
+                        // gate kept the terminal empty whenever the web service
+                        // had not been started yet.
+                        if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                         {
-                            if (nmea_idx > 99)
+                            if (nmea_idx > sizeof(nmea) - 1)
                             {
                                 nmea_idx = 0;
                                 memset(nmea, 0, sizeof(nmea));
@@ -8397,18 +8485,10 @@ void taskGPS(void *pvParameters)
                                 nmea[nmea_idx++] = (char)c;
                                 if ((char)c == '\r' || (char)c == '\n')
                                 {
-                                    // nmea[nmea_idx] = 0;
                                     if (nmea_idx > 10)
                                     {
-                                        // if (webServiceBegin == false)
-                                        if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
-                                        {
-                                            // if (ws_gnss.availableForWriteAll())
-                                            {
-                                                handle_ws_gnss(nmea, nmea_idx);
-                                            }
-                                        }
-                                        // log_d("[%d]:%s",nmea_idx,nmea);
+                                        handle_ws_gnss(nmea, nmea_idx);
+                                        gnssNmeaSent++;
                                     }
                                     nmea_idx = 0;
                                     memset(nmea, 0, sizeof(nmea));
@@ -8444,9 +8524,9 @@ void taskGPS(void *pvParameters)
                             c = (char)gnssClient.read();
                             // Serial.print(c);
                             gps.encode(c);
-                            if (webServiceBegin == false)
+                            if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
                             {
-                                if (nmea_idx > 99)
+                                if (nmea_idx > sizeof(nmea) - 1)
                                 {
                                     nmea_idx = 0;
                                     memset(nmea, 0, sizeof(nmea));
@@ -8456,15 +8536,10 @@ void taskGPS(void *pvParameters)
                                     nmea[nmea_idx++] = c;
                                     if (c == '\r' || c == '\n')
                                     {
-                                        // nmea[nmea_idx] = 0;
                                         if (nmea_idx > 10)
                                         {
-                                            // if (webServiceBegin == false)
-                                            if (ws_gnss.enabled() && !ws_gnss.getClients().isEmpty())
-                                            {
-                                                handle_ws_gnss(nmea, nmea_idx);
-                                            }
-                                            // log_d("%s",nmea);
+                                            handle_ws_gnss(nmea, nmea_idx);
+                                            gnssNmeaSent++;
                                         }
                                         nmea_idx = 0;
                                         memset(nmea, 0, sizeof(nmea));
@@ -8474,6 +8549,48 @@ void taskGPS(void *pvParameters)
                         }
                     }
                 }
+            }
+
+#ifdef STRIP_PIN
+            // Every received position sentence blinks the RGB LED blue for
+            // 100 ms. Non-blocking, so the NMEA stream is never paused; the
+            // sentencesWithFix counter is used because TinyGPS++ isUpdated()
+            // flags are cleared by any other read of the same field.
+            static uint32_t gnssFixSentences = 0;
+            static uint32_t gnssLedOffAt = 0;
+            uint32_t fixSentences = gps.sentencesWithFix();
+            if (fixSentences != gnssFixSentences)
+            {
+                gnssFixSentences = fixSentences;
+                if (gps.location.isValid())
+                {
+                    LED_Status(0, 0, 255);
+                    gnssLedOffAt = millis() + 100;
+                }
+            }
+            if (gnssLedOffAt && (int32_t)(millis() - gnssLedOffAt) >= 0)
+            {
+                LED_Status(0, 0, 0);
+                gnssLedOffAt = 0;
+            }
+#endif
+
+            // Reception diagnostics, so "no fix" problems can be told apart:
+            // no bytes at all = wiring/baud/UART disabled, bytes but checksum
+            // errors = wrong baud or noise, good checksums but no fix = antenna
+            // or sky view.
+            if (millis() > gnssStatusInterval)
+            {
+                gnssStatusInterval = millis() + 30000;
+                const char *gnssName = (config.gnss_channel >= 0 && config.gnss_channel < 5) ? GNSS_PORT[config.gnss_channel] : "NONE";
+                log_d("GNSS %s ch=%d chars=%lu sentences=%lu fix=%lu bad=%lu sat=%d sent=%lu lat=%.5f lon=%.5f",
+                      gnssName, config.gnss_channel, (unsigned long)gps.charsProcessed(),
+                      (unsigned long)gps.passedChecksum(), (unsigned long)gps.sentencesWithFix(),
+                      (unsigned long)gps.failedChecksum(), (int)gps.satellites.value(),
+                      gnssNmeaSent, gps.location.lat(), gps.location.lng());
+                if (gps.charsProcessed() == 0)
+                    log_e("GNSS: no data on %s (RX GPIO %d, %lu bps) - check the module TX wire, the baud rate and that this UART is enabled",
+                          gnssName, gnssRxPin, gnssBaudRate);
             }
 
             if (gps.time.isValid())
@@ -8514,11 +8631,114 @@ void taskGPS(void *pvParameters)
     }
 }
 
+// Makes sure the UART selected as GNSS source is usable. UART1/UART2 are
+// started on demand (enabling GNSS should be enough to receive NMEA), while
+// UART0 is shared with the console and is only reported.
+void gnssPrepareUart()
+{
+    if (config.gnss_channel < 1 || config.gnss_channel > 3)
+        return;
+
+    unsigned long baud = 9600;
+    int8_t rx = -1;
+    int8_t tx = -1;
+    bool uartOn = false;
+    HardwareSerial *port = NULL;
+
+    if (config.gnss_channel == 1)
+    {
+        baud = config.uart0_baudrate;
+        rx = config.uart0_rx_gpio;
+        tx = config.uart0_tx_gpio;
+        uartOn = config.uart0_enable;
+        port = &Serial0;
+    }
+    else if (config.gnss_channel == 2)
+    {
+        baud = config.uart1_baudrate;
+        rx = config.uart1_rx_gpio;
+        tx = config.uart1_tx_gpio;
+        uartOn = config.uart1_enable;
+        port = &Serial1;
+    }
+#if SOC_UART_NUM > 2
+    else
+    {
+        baud = config.uart2_baudrate;
+        rx = config.uart2_rx_gpio;
+        tx = config.uart2_tx_gpio;
+        uartOn = config.uart2_enable;
+        port = &Serial2;
+    }
+#endif
+
+    if (baud == 0)
+        baud = 9600;
+    gnssBaudRate = baud;
+    gnssRxPin = rx;
+
+    if (port == NULL)
+    {
+        log_e("GNSS: this chip has no UART for channel %d", config.gnss_channel);
+        return;
+    }
+
+    // Any other feature on the same UART would consume the NMEA bytes first.
+    if (config.ext_tnc_enable && config.ext_tnc_channel == config.gnss_channel)
+        log_e("GNSS: %s is also used by the external TNC - move one of them", GNSS_PORT[config.gnss_channel]);
+    if (config.modbus_enable && config.modbus_channel == config.gnss_channel)
+        log_e("GNSS: %s is also used by Modbus - move one of them", GNSS_PORT[config.gnss_channel]);
+#ifdef PPPOS
+    if (config.ppp_enable && (config.ppp_serial + 1) == config.gnss_channel)
+        log_e("GNSS: %s is also used by the PPP modem - no NMEA will arrive", GNSS_PORT[config.gnss_channel]);
+#endif
+
+    if (!uartOn)
+    {
+        if (config.gnss_channel == 1)
+        {
+            // Starting UART0 here could steal the console, so just report it.
+            log_e("GNSS: UART0 is disabled - enable it in UART Modify or no NMEA will arrive");
+            return;
+        }
+        log_d("GNSS: starting %s on demand, %lu bps, RX GPIO %d", GNSS_PORT[config.gnss_channel], baud, rx);
+        if (config.gnss_channel == 2)
+            config.uart1_enable = true;
+        else
+            config.uart2_enable = true;
+        port->begin(baud, SERIAL_8N1, rx, tx);
+    }
+
+    log_d("GNSS source %s (Serial%d) RX=%d TX=%d %lu bps, uart %s",
+          GNSS_PORT[config.gnss_channel], config.gnss_channel - 1, rx, tx, baud, uartOn ? "enabled" : "started now");
+}
+
+void gnssStartTask()
+{
+    // Prepare the UART every time, so a channel/baud change from the web UI is
+    // picked up even when the task already exists.
+    if (config.gnss_channel > 0 && config.gnss_channel < 4)
+        gnssPrepareUart();
+
+    if (taskGPSHandle != NULL)
+        return;
+
+    xTaskCreatePinnedToCore(
+        taskGPS,        /* Function to implement the task */
+        "taskGPS",      /* Name of the task */
+        STACK_TASK_GPS, /* Stack size in byte (ESP-IDF) */
+        NULL,           /* Task input parameter */
+        5,              /* Priority of the task */
+        &taskGPSHandle, /* Task handle. */
+        0);             /* Core where the task should run */
+    log_d("GNSS task started on %s", GNSS_PORT[config.gnss_channel]);
+}
+
 void taskSerial(void *pvParameters)
 {
     String raw;
     int c;
-    char rawP[500];
+    char rawP[300];
     char call[11];
     log_d("Serial task Init");
     nmea_idx = 0;

@@ -4508,6 +4508,8 @@ void handle_mod(AsyncWebServerRequest *request)
 		}
 
 		config.gnss_enable = En;
+		if (En)
+			gnssStartTask(); // works without a reboot when the task is not running yet
 		saveConfig(request);
 	}
 	else if (request->hasArg("commitUART0"))
@@ -6121,7 +6123,43 @@ void handle_mod(AsyncWebServerRequest *request)
 		"</td>\n"
 		"</tr>\n");
 
-		strcat(html, "<td align=\"right\"><b>AT Command:</b></td>\n");
+		// The GNSS has no UART of its own: it reuses the pin/baud settings of
+		// the selected UART, so show them here to make misconfiguration obvious.
+		{
+			unsigned long gnssBaud = 0;
+			int gnssRx = -1;
+			bool gnssUartOn = false;
+			if (config.gnss_channel == 1)
+			{
+				gnssBaud = config.uart0_baudrate;
+				gnssRx = config.uart0_rx_gpio;
+				gnssUartOn = config.uart0_enable;
+			}
+			else if (config.gnss_channel == 2)
+			{
+				gnssBaud = config.uart1_baudrate;
+				gnssRx = config.uart1_rx_gpio;
+				gnssUartOn = config.uart1_enable;
+			}
+			else if (config.gnss_channel == 3)
+			{
+				gnssBaud = config.uart2_baudrate;
+				gnssRx = config.uart2_rx_gpio;
+				gnssUartOn = config.uart2_enable;
+			}
+			else if (config.gnss_channel == 4)
+			{
+				snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td align=\"right\"><b>Source:</b></td><td style=\"text-align: left;\">TCP %s:%d</td></tr>\n", config.gnss_tcp_host, config.gnss_tcp_port);
+				strcat(html, temp_buffer);
+			}
+			if (gnssBaud > 0)
+			{
+				snprintf(temp_buffer, sizeof(temp_buffer), "<tr><td align=\"right\"><b>UART:</b></td><td style=\"text-align: left;\">%s, %lu bps, RX GPIO %d %s</td></tr>\n",
+						 gnssUartOn ? "enabled" : "DISABLED", gnssBaud, gnssRx, gnssUartOn ? "" : "(set it in UART Modify)");
+				strcat(html, temp_buffer);
+			}
+		}
+		strcat(html, "<tr><td align=\"right\"><b>AT Command:</b></td>\n");
 		snprintf(temp_buffer, sizeof(temp_buffer), "<td style=\"text-align: left;\"><input maxlength=\"30\" size=\"20\" id=\"atc\" name=\"atc\" type=\"text\" value=\"%s\" /></td>\n", config.gnss_at_command);
 		strcat(html, temp_buffer);
 		strcat(html,
@@ -12262,7 +12300,7 @@ void handle_realtime(AsyncWebServerRequest *request)
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, output_buffer, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%lli\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, output_buffer, (long long)timeStamp);
 			// Serial.println(jsonMsg);
 		}
 		free(input_buffer);
@@ -12274,9 +12312,9 @@ void handle_realtime(AsyncWebServerRequest *request)
 		if (jsonMsg)
 		{
 			if (afskSync)
-				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%lli\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, (long long)timeStamp);
 			else
-				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"rfch\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"rfch\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%lli\"}", (long long)timeStamp);
 		}
 	}
 	afskSync = false;
@@ -12313,7 +12351,7 @@ void handle_ws()
 			lastPkgRaw.clear();
 			encode_base64((unsigned char *)input_buffer, input_length, (unsigned char *)output_buffer);
 			// Serial.println(output_buffer);
-			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, output_buffer, timeStamp);
+			sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"%s\",\"timeStamp\":\"%lli\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, output_buffer, (long long)timeStamp);
 			// Serial.println(jsonMsg);
 		}
 		free(input_buffer);
@@ -12325,9 +12363,9 @@ void handle_ws()
 		if (jsonMsg)
 		{
 			if (afskSync)
-				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%li\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"1\",\"rssi\":\"%d\",\"snr\":\"%d\",\"freqErr\":\"%d\",\"rfch\":\"%d\",\"RAW\":\"REVDT0RFIEZBSUwh\",\"timeStamp\":\"%lli\"}", (int)rssi, (int)snr, (int)freqErr, (int)rfch, (long long)timeStamp);
 			else
-				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"rfch\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%li\"}", timeStamp);
+				sprintf(jsonMsg, "{\"Active\":\"0\",\"rssi\":\"-140\",\"snr\":\"0\",\"freqErr\":\"0\",\"rfch\":\"0\",\"RAW\":\"\",\"timeStamp\":\"%lli\"}", (long long)timeStamp);
 		}
 	}
 	afskSync = false;
@@ -12343,16 +12381,36 @@ void handle_ws_gnss(char *nmea, size_t size)
 	if (ws_gnss.count() < 1)
 		return;
 
+	// NMEA lines are shorter than 100 byte; clamp so a corrupted length can
+	// never overflow the buffers below.
+	if (size > 200)
+		size = 200;
+
 	time_t timeStamp;
 	time(&timeStamp);
 
-	unsigned int output_length = encode_base64_length(size);
-	// encode_base64() always appends a NUL terminator
-	unsigned char nmea_enc[output_length + 1];
-	char jsonMsg[output_length + 256];
-	encode_base64((unsigned char *)nmea, size, nmea_enc);
-	snprintf(jsonMsg, sizeof(jsonMsg), "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%li\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), gps.satellites.value(), gps.time.value(), timeStamp, (const char *)nmea_enc);
+	// taskGPS runs on a few KB of stack and the %f conversions below pull in
+	// newlib's dtoa (_dtoa_r + _Balloc), which needs a lot of stack on top of
+	// the output buffer. Keep both buffers in the heap instead.
+	size_t encSize = encode_base64_length(size) + 1;
+	size_t jsonSize = encSize + 320;
+	char *nmea_enc = (char *)calloc(encSize, sizeof(char));
+	char *jsonMsg = (char *)calloc(jsonSize, sizeof(char));
+	if (nmea_enc == NULL || jsonMsg == NULL)
+	{
+		free(nmea_enc);
+		free(jsonMsg);
+		return;
+	}
+
+	encode_base64((unsigned char *)nmea, size, (unsigned char *)nmea_enc);
+	// time_t is 64 bit on ESP-IDF 5: %li consumed only half of it and the %s
+	// that follows then read an invalid pointer, which crashed in snprintf.
+	snprintf(jsonMsg, jsonSize, "{\"en\":\"%d\",\"lat\":\"%.5f\",\"lng\":\"%.5f\",\"alt\":\"%.2f\",\"spd\":\"%.2f\",\"csd\":\"%.1f\",\"hdop\":\"%.2f\",\"sat\":\"%d\",\"time\":\"%d\",\"timeStamp\":\"%lli\",\"RAW\":\"%s\"}", (int)config.gnss_enable, gps.location.lat(), gps.location.lng(), gps.altitude.meters(), gps.speed.kmph(), gps.course.deg(), gps.hdop.hdop(), (int)gps.satellites.value(), (int)gps.time.value(), (long long)timeStamp, nmea_enc);
 	ws_gnss.textAll(jsonMsg);
+
+	free(nmea_enc);
+	free(jsonMsg);
 }
 
 void handle_test(AsyncWebServerRequest *request)
@@ -13201,9 +13259,16 @@ void handle_gnss(AsyncWebServerRequest *request)
 		"var raw=\"\";var timeStamp;\n"
 		"var host='ws://'+location.hostname+':81/ws_gnss'\n"
 		"const ws = new WebSocket(host);\n"
-		"ws.onopen = function() { console.log('Connection opened');};\n ws.onclose = function() { console.log('Connection closed');};\n"
-		"ws.onmessage = function(event) {\n  console.log(event.data);\n"
+		"ws.onopen = function() { document.getElementById('ws_status').innerHTML='connected'; console.log('Connection opened');};\n"
+		"ws.onclose = function() { document.getElementById('ws_status').innerHTML='disconnected - reload the page'; console.log('Connection closed');};\n"
+		"ws.onerror = function() { document.getElementById('ws_status').innerHTML='websocket error (is port 81 reachable?)';};\n"
+		"ws.onmessage = function(event) {\n"
+		"try {\n"
 		"const jsonR=JSON.parse(event.data);\n"
+		// Update the terminal first: if any label below is missing the raw NMEA
+		// still shows up instead of the handler dying before the textarea.
+		"var textArea=document.getElementById('raw_txt');\n"
+		"if(textArea && jsonR.RAW){textArea.value+=atob(jsonR.RAW);textArea.scrollTop=textArea.scrollHeight;}\n"
 		"document.getElementById(\"en\").innerHTML=parseInt(jsonR.en);\n"
 		"document.getElementById(\"lat\").innerHTML=parseFloat(jsonR.lat);\n"
 		"document.getElementById(\"lng\").innerHTML=parseFloat(jsonR.lng);\n"
@@ -13213,11 +13278,7 @@ void handle_gnss(AsyncWebServerRequest *request)
 		"document.getElementById(\"hdop\").innerHTML=parseFloat(jsonR.hdop);\n"
 		"document.getElementById(\"sat\").innerHTML=parseInt(jsonR.sat);\n"
 		"document.getElementById(\"time\").innerHTML=parseInt(jsonR.time);\n"
-		"raw=jsonR.RAW;\n"
-		"timeStamp=Number(jsonR.timeStamp);\n"
-		"var textArea=document.getElementById(\"raw_txt\");\n"
-		"textArea.value+=atob(raw)+\"\\n\";\n"
-		"textArea.scrollTop = textArea.scrollHeight;\n"
+		"} catch(e) { console.log('GNSS ws error', e); }\n"
 		"}\n"
 		"};\n</script>\n"
 		"</head><body onload=\"gnss()\">\n");
@@ -13257,7 +13318,7 @@ void handle_gnss(AsyncWebServerRequest *request)
 
 	strcat(webString,
 		"</table><table>"
-		"<tr><td><b>Terminal:</b><br /><textarea id=\"raw_txt\" name=\"raw_txt\" rows=\"30\" cols=\"80\" /></textarea></td></tr>\n"
+		"<tr><td><b>Terminal:</b> <label id=\"ws_status\">connecting...</label><br /><textarea id=\"raw_txt\" name=\"raw_txt\" rows=\"30\" cols=\"80\" readonly></textarea></td></tr>\n"
 		"</table>\n");
 
 	strcat(webString, "</body></html>\n");

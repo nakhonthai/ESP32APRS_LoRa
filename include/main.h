@@ -322,6 +322,41 @@ typedef struct txQueue_struct
 #define RF2_CHANNEL (1 << 2)
 #define TNC_CHANNEL (1 << 2)
 
+// ESP-IDF's xTaskCreate*() takes the stack depth in BYTES (vanilla FreeRTOS
+// uses words), so the old "Stack size in words" comments were wrong. Values are
+// the observed requirement plus margin; uxTaskGetStackHighWaterMark() results
+// are logged as "Stack free/total" so they can be re-tuned on real traffic.
+//
+// Two sets are used because the Xtensa windowed register ABI spills much more
+// than RISC-V:  task size used-Xtensa used-RISC-V
+//   taskAPRS     4608/4096   3508      2812
+//   taskNetwork  6144/5632   4512      4424
+//   taskSensor   3584/3072   2260      1976
+//   taskAPRSPoll 3584/2816   2568      2248
+//   taskGPS      4096/2816   2456      2176
+// RISC-V values target the ESP32-C3 (measured on lora-tracker) and keep
+// ~20-30% headroom plus room for the OLED variants (esp32c3-mini). C5/C6 are
+// not tuned; they simply share the RISC-V set.
+// Keep at least ~500 bytes free so a rare deeper path cannot trip the canary;
+// logTaskStacks() logs an error below STACK_TASK_WARN.
+#if defined(__XTENSA__)
+#define STACK_TASK_APRS 4608
+#define STACK_TASK_NETWORK 6144
+#define STACK_TASK_SENSOR 3584
+#define STACK_TASK_APRSPOLL 3584
+#define STACK_TASK_SERIAL 3072 // 512 byte receive buffer + printf in this task
+#define STACK_TASK_GPS 4096    // NMEA/JSON building pulls in newlib dtoa
+#else
+#define STACK_TASK_APRS 4096
+#define STACK_TASK_NETWORK 5632
+#define STACK_TASK_SENSOR 3072
+#define STACK_TASK_APRSPOLL 2816
+#define STACK_TASK_SERIAL 3072 // not measured yet (needs ext_tnc_enable)
+#define STACK_TASK_GPS 2816
+#endif
+
+#define STACK_TASK_WARN 512 // log an error when a task has less free than this
+
 typedef struct txDispStruct
 {
 	uint8_t tx_ch;
@@ -411,6 +446,8 @@ String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);
 void taskSerial(void *pvParameters);
 void taskGPS(void *pvParameters);
+// Creates the GNSS reader task on demand (setup and when enabled from the web UI)
+void gnssStartTask();
 void taskAPRS(void *pvParameters);
 void taskAPRSPoll(void *pvParameters);
 void taskNetwork(void *pvParameters);
