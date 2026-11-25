@@ -44,6 +44,10 @@
 
 #include "handleATCommand.h"
 
+#ifdef USE_LVGL_UI
+#include "lvgl_ui.h"
+#endif
+
 // #include <EEPROM.h>
 
 // #include "IP5306_I2C.h"
@@ -5561,6 +5565,9 @@ void setup()
 #ifdef APRS_LORA_HT
     encoder0PosPrev = encoder0Pos = curTab;
 #endif
+#ifdef USE_LVGL_UI
+  lvgl_ui_init();
+#endif
 }
 
 String getTimeStamp()
@@ -6918,6 +6925,9 @@ void logTaskStacks()
 
 void loop()
 {
+    #ifdef USE_LVGL_UI
+  lvgl_ui_loop();
+#endif
     if (millis() > timeTask)
     {
         static unsigned long stackLogTimeout = 0;
