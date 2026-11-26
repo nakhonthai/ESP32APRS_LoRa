@@ -46,6 +46,7 @@
 
 #ifdef USE_LVGL_UI
 #include "lvgl_ui.h"
+#include "ui_bind.h"
 #endif
 
 // #include <EEPROM.h>
@@ -3701,6 +3702,58 @@ void defaultConfig()
     config.sensor[9].type = 19;
     sprintf(config.sensor[9].parm, "Voltage");
     sprintf(config.sensor[9].unit, "V");
+#elif defined(ESP32_2432S028)
+    config.rf_en = false;
+    config.rf_type = RF_SX1278;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = -1; // HPDIO1->33
+    config.rf_reset_gpio = 22;
+    config.rf_dio0_gpio = 27;
+    config.rf_nss_gpio = 5;
+    config.rf_sclk_gpio = 18;
+    config.rf_miso_gpio = 19;
+    config.rf_mosi_gpio = 23;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.uart1_rx_gpio = -1;
+    config.uart1_tx_gpio = -1;
+    config.i2c_enable = false;
+    config.i2c_sda_pin = -1;
+    config.i2c_sck_pin = -1;
+    config.pwr_gpio = -1;
+    config.pwr_active = 0;
+#elif defined(ESP32_3248S035)
+    config.rf_en = false;
+    config.rf_type = RF_SX1278;
+    config.rf_tx_gpio = -1; // LORA ANTENNA TX ENABLE
+    config.rf_rx_gpio = -1;
+    config.rf_dio1_gpio = 36;
+    config.rf_reset_gpio = -1;
+    // config.rf_busy_gpio = -1;
+    config.rf_dio0_gpio = -1;
+    config.rf_nss_gpio = 33;
+    config.rf_sclk_gpio = 14;
+    config.rf_miso_gpio = 12;
+    config.rf_mosi_gpio = 13;
+    config.rf_tx_active = 1;
+    config.rf_rx_active = 1;
+    config.rf_reset_active = 0;
+    config.rf_nss_active = 0;
+    config.uart0_rx_gpio = 3;
+    config.uart0_tx_gpio = 1;
+    config.uart1_rx_gpio = -1;
+    config.uart1_tx_gpio = -1;
+    config.i2c_enable = false;
+    config.i2c_sda_pin = -1;
+    config.i2c_sck_pin = -1;
+    config.pwr_gpio = -1;
+    config.pwr_active = 0;
+
 
 #endif
 
@@ -4461,6 +4514,9 @@ bool pkgTxPush(const char *info, size_t len, int dly, uint8_t Ch)
 
 bool pkgTxSend()
 {
+#ifdef USE_LVGL_UI
+    ui_bind_note_tx();
+#endif
 //   if (getReceive())
 //     return false;
 #ifdef BOARD_HAS_PSRAM
@@ -4959,6 +5015,22 @@ void setup()
           (unsigned int)ESP.getPsramSize(), (unsigned int)ESP.getFreePsram());
     // Lets you confirm which firmware is actually running by comparing this
     // with the size of the .bin that was flashed.
+#ifdef USE_LVGL_UI
+    // Make the task watchdog print which task is stuck instead of a silent reset.
+    {
+        esp_task_wdt_config_t twdt_cfg = {};
+        twdt_cfg.timeout_ms = 8000;
+        twdt_cfg.idle_core_mask = (1U << portNUM_PROCESSORS) - 1U;
+        twdt_cfg.trigger_panic = true;
+        esp_err_t err = esp_task_wdt_reconfigure(&twdt_cfg);
+        log_d("BOOT: task wdt reconfigure -> %d (panic on timeout)", (int)err);
+    }
+#endif
+    log_d("BOOT cfg: uart0_en=%d rx=%d tx=%d gnss_en=%d ch=%d tnc=%d ch=%d heap=%u",
+          (int)config.uart0_enable, (int)config.uart0_rx_gpio, (int)config.uart0_tx_gpio,
+          (int)config.gnss_enable, (int)config.gnss_channel,
+          (int)config.ext_tnc_enable, (int)config.ext_tnc_channel,
+          (unsigned)ESP.getFreeHeap());
     log_d("App size: %u byte, free sketch space %u byte",
           (unsigned int)ESP.getSketchSize(), (unsigned int)ESP.getFreeSketchSpace());
     // log_d("Push BOOT after 3 sec for Factory Default config.");
@@ -5377,7 +5449,17 @@ void setup()
 #endif
 
     log_d("MODBUS config");
-    if (config.modbus_enable)
+    if (config.modbus_enable && !((config.modbus_channel == 1 && config.uart0_enable) ||
+                                  (config.modbus_channel == 2 && config.uart1_enable)
+#if SOC_UART_NUM > 2
+                                  || (config.modbus_channel == 3 && config.uart2_enable)
+#endif
+                                      ))
+    {
+        log_e("MODBUS: channel %d but that UART is disabled - Modbus stays off",
+              (int)config.modbus_channel);
+    }
+    else if (config.modbus_enable)
     {
         if (config.modbus_channel == 1)
         {
@@ -5480,6 +5562,9 @@ void setup()
         2,               /* Priority of the task */
         &taskAPRSHandle, /* Task handle. */
         0);              /* Core where the task should run */
+#ifdef USE_LVGL_UI
+    log_d("BOOT: taskAPRS created");
+#endif
 
 // Task 2
 #ifdef __XTENSA__
@@ -5500,6 +5585,9 @@ void setup()
         1,                 /* Priority of the task */
         &taskSensorHandle, /* Task handle. */
         1);                /* Core where the task should run */
+#ifdef USE_LVGL_UI
+    log_d("BOOT: taskNetwork/taskSensor created");
+#endif
 #else
     xTaskCreatePinnedToCore(
         taskNetwork,        /* Function to implement the task */
@@ -5528,11 +5616,20 @@ void setup()
         3,                   /* Priority of the task */
         &taskAPRSPollHandle, /* Task handle. */
         0);                  /* Core where the task should run */
+#ifdef USE_LVGL_UI
+    log_d("BOOT: taskAPRSPoll created");
+#endif
 
     if (config.gnss_enable)
         gnssStartTask();
+#ifdef USE_LVGL_UI
+    log_d("BOOT: gnssStartTask returned");
+#endif
 
     // if (config.ext_tnc_enable || (config.wx_en && (config.wx_channel > 0 && config.wx_channel < 4)))
+#ifdef USE_LVGL_UI
+    log_d("BOOT: before ext_tnc block (ext_tnc_enable=%d)", (int)config.ext_tnc_enable);
+#endif
     if (config.ext_tnc_enable)
     {
         xTaskCreatePinnedToCore(
@@ -5545,6 +5642,9 @@ void setup()
             0);                /* Core where the task should run */
     }
 
+#ifdef USE_LVGL_UI
+    log_d("BOOT: ext_tnc block done");
+#endif
     pinMode(BOOT_PIN, INPUT_PULLUP);
     // esp_task_wdt_add(taskAPRSPollHandle);
     //  esp_task_wdt_add(NULL);
@@ -5566,7 +5666,9 @@ void setup()
     encoder0PosPrev = encoder0Pos = curTab;
 #endif
 #ifdef USE_LVGL_UI
+  log_d("BOOT: setup tail reached, heap %u", (unsigned)ESP.getFreeHeap());
   lvgl_ui_init();
+  log_d("BOOT: setup done, heap %u", (unsigned)ESP.getFreeHeap());
 #endif
 }
 
@@ -6925,8 +7027,11 @@ void logTaskStacks()
 
 void loop()
 {
-    #ifdef USE_LVGL_UI
-  lvgl_ui_loop();
+#ifdef USE_LVGL_UI
+    static bool lvglLoopLogged = false;
+    if (!lvglLoopLogged) { lvglLoopLogged = true;
+        log_d("BOOT: loop start, heap %u", (unsigned)ESP.getFreeHeap()); }
+    lvgl_ui_loop();
 #endif
     if (millis() > timeTask)
     {
@@ -9071,6 +9176,47 @@ int trkTlmInvCount = 0;
 int igateTlmInvCount = 0;
 int digiTlmInvCount = 0;
 
+/* Pins that must never be handed to RadioLib: out of range, the integrated
+   SPI flash bank (GPIO6..11) or - on boards that drive a local display - the
+   TFT/touch pins.  Driving them locks the flash cache and resets the chip with
+   no panic message. */
+static bool rfPinConflict(int8_t pin)
+{
+    if (pin < 0 || pin > 39)
+        return true;
+    if (pin >= 6 && pin <= 11)
+        return true;
+#ifdef USE_LVGL_UI
+    switch (pin)
+    {
+    case 2:  /* TFT_DC   */
+    case 12: /* TFT_MISO */
+    case 13: /* TFT_MOSI */
+    case 14: /* TFT_SCLK */
+    case 15: /* TFT_CS   */
+    case 21: /* TFT_BL   */
+    case 25: /* TOUCH_CLK  */
+    case 27: /* spare */
+    case 32: /* TOUCH_MOSI */
+    case 33: /* TOUCH_CS   */
+    case 36: /* TOUCH_IRQ  */
+    case 39: /* TOUCH_MISO */
+        return true;
+    default:
+        break;
+    }
+#endif
+    return false;
+}
+
+static bool rfPinsUsable(void)
+{
+    if (!config.rf_en)
+        return false;
+    return !(rfPinConflict(config.rf_nss_gpio) || rfPinConflict(config.rf_sclk_gpio) ||
+             rfPinConflict(config.rf_miso_gpio) || rfPinConflict(config.rf_mosi_gpio));
+}
+
 void taskAPRS(void *pvParameters)
 {
     char sts[50];
@@ -9082,6 +9228,13 @@ void taskAPRS(void *pvParameters)
     unsigned long trkSTSInterval = 0;
 
     log_d("Task APRS has been start");
+    if (config.rf_en && !rfPinsUsable())
+    {
+        log_e("RF: SPI pins nss=%d sclk=%d miso=%d mosi=%d clash with this board - radio disabled",
+              (int)config.rf_nss_gpio, (int)config.rf_sclk_gpio, (int)config.rf_miso_gpio,
+              (int)config.rf_mosi_gpio);
+        config.rf_en = false;
+    }
     PacketBuffer.clean();
 
 #ifdef T_BEAM_S3_BPF
@@ -11881,6 +12034,11 @@ void dispWindow(String line, uint8_t mode, bool filter)
         // aprsParse.parse_aprs(&aprs);
         if (aprsParse.parse_aprs(&aprs))
         {
+#ifdef USE_LVGL_UI
+            ui_bind_note_rx();
+            if (aprs.packettype & T_WX)
+                ui_bind_store_wx();
+#endif
             if (filter == true)
             {
                 if ((config.dispFilter & FILTER_STATUS) && (aprs.packettype & T_STATUS))

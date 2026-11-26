@@ -341,7 +341,7 @@ typedef struct txQueue_struct
 // logTaskStacks() logs an error below STACK_TASK_WARN.
 #if defined(__XTENSA__)
 #define STACK_TASK_APRS 4608
-#define STACK_TASK_NETWORK 6144
+#define STACK_TASK_NETWORK 8192
 #define STACK_TASK_SENSOR 3584
 #define STACK_TASK_APRSPOLL 3584
 #define STACK_TASK_SERIAL 3072 // 512 byte receive buffer + printf in this task

@@ -30,12 +30,13 @@ extern Configuration config;
 extern WiFiClient aprsClient;
 
 // Radio::Radio()
+// static: TFT_eSPI also declares a global 'spi', so keep this one file local
 #if CONFIG_IDF_TARGET_ESP32C3
-SPIClass spi(FSPI);
+static SPIClass spi(FSPI);
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
-SPIClass spi(HSPI);
+static SPIClass spi(HSPI);
 #else
-SPIClass spi(VSPI);
+static SPIClass spi(VSPI);
 #endif
 
 #define countof(a) sizeof(a) / sizeof(a[0])
@@ -652,8 +653,29 @@ bool APRS_init(Configuration *cfg)
 
     // SX126x,SX128x
     // setDio0Action->setDio1Action->getIRQ
-    pinMode(config.rf_nss_gpio, OUTPUT);
-    spi.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio);
+    /* GPIO6..11 are the integrated SPI flash bank on the ESP32.  Wiring the
+       radio bus there (the compiled defaults are NSS=8, SCK=10, MISO=6,
+       MOSI=7) kills the running image with no panic message, so the bus is
+       only configured when a radio is enabled and the pins are safe. */
+    auto pinUnsafe = [](int8_t pin) {
+        return (pin < 0) || (pin > 39) || ((pin >= 6) && (pin <= 11));
+    };
+    bool rfWiringOk = config.rf_en && !pinUnsafe(config.rf_nss_gpio) &&
+                      !pinUnsafe(config.rf_sclk_gpio) && !pinUnsafe(config.rf_miso_gpio) &&
+                      !pinUnsafe(config.rf_mosi_gpio);
+    if (config.rf_en && !rfWiringOk)
+    {
+        log_e("RF: SPI pins nss=%d sclk=%d miso=%d mosi=%d are not usable (flash bank) - radio off",
+              (int)config.rf_nss_gpio, (int)config.rf_sclk_gpio, (int)config.rf_miso_gpio,
+              (int)config.rf_mosi_gpio);
+        cfg->rf_en = false;
+        config.rf_en = false;
+    }
+    if (rfWiringOk)
+    {
+        pinMode(config.rf_nss_gpio, OUTPUT);
+        spi.begin(config.rf_sclk_gpio, config.rf_miso_gpio, config.rf_mosi_gpio);
+    }
     if (config.rf_en)
     {
         log_d("[SX12xx] Initializing .. ");

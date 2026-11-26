@@ -1021,11 +1021,46 @@ bool getModbus32Bit(ModbusMaster &node, int i)
     return false;
 }
 
+/* ModbusMaster talks to the UART through a Stream.  The UART must have been
+   started in setup(), otherwise the first transmit dereferences a NULL uart
+   handle and wedges the console UART (watchdog reset with no log). */
+static bool modbusUartReady(void)
+{
+    switch (config.modbus_channel)
+    {
+    case 1:
+        return config.uart0_enable;
+    case 2:
+        return config.uart1_enable;
+#if SOC_UART_NUM > 2
+    case 3:
+        return config.uart2_enable;
+#endif
+    default:
+        return false;
+    }
+}
+
 bool getSensor(int cfgIdx)
 {
     bool status;
     // log_d("Sensor Port %d", config.sensor[cfgIdx].port);
     uint8_t port = config.sensor[cfgIdx].port;
+    if ((port == PORT_M701) || (port == PORT_M702) || (port == PORT_PZEM) ||
+        (port == PORT_MODBUS_16) || (port == PORT_MODBUS_32))
+    {
+        if (!modbusUartReady())
+        {
+            static bool warned = false;
+            if (!warned)
+            {
+                warned = true;
+                log_e("Sensor %d: Modbus is configured but UART%d is disabled - skipping",
+                      cfgIdx, (int)config.modbus_channel - 1);
+            }
+            return false;
+        }
+    }
     switch (port)
     {
     case PORT_ADC:
